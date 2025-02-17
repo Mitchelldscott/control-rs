@@ -11,7 +11,19 @@
 //!
 use nalgebra::{SMatrix, Scalar};
 use num_traits::{One, Zero};
-use std::ops::{Add, Div, Mul, Neg, Sub};
+
+
+#[cfg(feature = "std")]
+use std::{
+    fmt,
+    ops::{Add, Div, Mul, Neg, Sub},
+};
+
+#[cfg(not(feature = "std"))]
+use core::{
+    fmt,
+    ops::{Add, Div, Mul, Neg, Sub},
+};
 
 use super::DynamicModel;
 
@@ -81,7 +93,7 @@ pub struct StateSpace<T, const N: usize, const M: usize, const L: usize> {
 
 impl<T, const N: usize, const M: usize, const L: usize> StateSpace<T, N, M, L>
 where
-    T: 'static + Copy + PartialEq + std::fmt::Debug,
+    T: 'static + Copy + PartialEq + fmt::Debug,
 {
     /// create a new state space model from lists of rows
     ///
@@ -140,7 +152,7 @@ where
         + Div<Output = T>
         + Copy
         + PartialEq
-        + std::fmt::Debug,
+        + fmt::Debug,
     Input: Copy,
     State: Copy + Add<Output = State>,
     Output: Copy + Add<Output = Output>,
@@ -158,12 +170,12 @@ where
     }
 }
 
-impl<T, const N: usize, const M: usize, const L: usize> std::fmt::Display for StateSpace<T, N, M, L>
+impl<T, const N: usize, const M: usize, const L: usize> fmt::Display for StateSpace<T, N, M, L>
 where
-    T: 'static + Copy + PartialEq + std::fmt::Debug + std::fmt::Display,
+    T: 'static + Copy + PartialEq + fmt::Debug + fmt::Display,
 {
     // This trait requires `fmt` with this exact signature.
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "StateSpace:\nA{:}B{:}C{:}D{:}",
@@ -329,6 +341,7 @@ where
 }
 
 #[cfg(test)]
+#[cfg(feature = "std")]
 mod basic_ss_tests {
     // not as productive as it could be...
     use super::*;

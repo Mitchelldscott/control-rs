@@ -1,69 +1,20 @@
+//! # Control-rs
 //!
-//! Tools for numerical model synthesis and analysis
+//! Control-rs is a numerical modeling and control system synthesis library designed for embedded applications. 
+//! Inspired by MATLAB, this crate provides a structured approach to system modeling, analysis, and control design 
+//! while maintaining a lightweight footprint suitable for real-time and resource-constrained environments.
 //!
-//! This toolbox is inpired by MATLab but is intended to be used in embedded applications.
+//! ## Features
+//! - **Modeling:** Support for Transfer Function, State-Space, and Nonlinear system representations.
+//! - **Analysis:** Tools for frequency response, stability analysis, and controllability/observability checks.
+//! - **Synthesis:** Methods for controller design, including LQR, pole placement, and robust control techniques.
+//! - **Simulation:** Step response, impulse response, and custom signal simulation utilities.
 //!
-//! # Controls Tools
-//!
-//! This crate intends to provide a data driven approach to system modelling and controller design.
-//! The crate is built around a few numerical model formats (transfer function, state space and
-//! nonlinear), each of these model formats will implement traits that create a common interface
-//! for simulating, analyzing and synthesizing a model.
-//!
-//! ## Examples
-//!
-//! The goal is that all examples are implementations of a theoritical example in a textbook. There may also
-//! be more practical examples that help users integrate these tools with embedded systems (like how to prepare
-//! and store data for synthesis). More specific hardware integrated examples will be provided in a
-//! cargo template (but thats a long ways off).
-//!
-//! ## Tests
-//!
-//! ### Unit
-//!
-//! Unit tests will be done inside of the module containing the unit that being tested (i.e. src/<module>/...).
-//! Simple tests may be done in mod.rs as a reference, but more complex tests will be in their own files to minimize the
-//! length of mod.rs. The current plan is to have a test module for each unit, test modules then provide many test cases.
-//! Each test case should be short, independent and descriptive of the test being done.
-//!
-//! ### Integration
-//!
-//! Integration tests will be done in the tests/ directory. These tests will seem like examples but the models
-//! they work with may appear trivial. The purpose of this is to provide a high level check that the tools are
-//! working. An example of this is a test that confirms a simple model is identical across model formats.
-//!
-//! ## Docs
-//!
-//! The docs are meant to be as much of a theory reference as a user guide. Each module should have:
-//! - short conceptual description
-//! - links to theoretical references
-//! - use cases (doctests)
-//!
-//! *Will hopefully split the docs into pure dev info and a book with theory/use cases that should be used together*
-//!
-//! ## TODO
-//! - [ ] transfer function: improving tests and docs
-//!   - [ ] system interconnections (add, sub, mul, feedback)
-//!   - [ ] document FrequencyTools impl (should it move to frequency_tools?)
-//!   - [ ] find more productive examples of dc gain, lhp and as monic from textbooks
-//!   - [ ] use textbook examples to make edge case/usage tests for tf
-//!   - [ ] example from textbook for transfer function struct docs (with model and problem)
-//! - [ ] state space
-//!   - [ ] frequency tools
-//!   - [ ] system interconnections (add, sub, mul, feedback)
-//!   - [ ] sigular_values
-//!   - [ ] eigens
-//!   - [ ] is_stable
-//!   - [ ] is_controllable
-//!   - [ ] is_observable
-//!   - [ ] lqr
-//!   - [ ] kalman
-//!   - [ ] hinf
-//!   - [ ] h2
-//!   - [ ] pole placement
-//!   - [ ] tests
-//!   - [ ] docs
-//! - [ ] nl model: modules w/ traits (lyapunov, bifurcation, auto-differentiation?...)
+//! ## Design Philosophy
+//! This crate is structured around core numerical model representations, each implementing traits that ensure 
+//! a consistent interface for simulation, analysis, and synthesis. It is built to be extensible, modular, and 
+//! suitable for embedded applications where computational efficiency is critical.
+#![cfg_attr(not(feature = "std"), no_std)]
 
 pub mod assertf;
 
@@ -77,7 +28,11 @@ pub mod frequency_tools;
 
 pub mod polynomial;
 
+#[cfg(feature = "std")]
 use std::ops::{Add, Div, Mul};
+
+#[cfg(not(feature = "std"))]
+use core::ops::{Add, Div, Mul};
 
 /// # Dynamic Model
 ///

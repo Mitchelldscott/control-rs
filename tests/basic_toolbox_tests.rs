@@ -139,6 +139,7 @@ mod tf_frequency_tool_tests {
 }
 
 #[cfg(test)]
+#[cfg(feature = "std")]
 mod bode_and_nyquist_plot_tests {
     use control_rs::{
         frequency_tools::{bode, FrequencyResponse},

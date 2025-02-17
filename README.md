@@ -18,7 +18,7 @@ The crate organization is currently done so each numerical model has its own mod
 
 > Currently all models are defined at the top of the module (i.e. `mod.rs` or `<module>.rs`)
 >
-> * Common traits should also be impl here (need no std compatibility for plots...)
+> * Common traits should also be impl here (Need a std flag to enable/disable building plotting/viz functions)
 > * Useful tools and functions should be re-exported from a submodule
 
 ## Installation (Not Supported... haven't published the crate yet, clone this repo instead)
@@ -67,7 +67,7 @@ fn main() {
 
 ## Examples
 
-Examples are based on either a textbook problem or demo a practical application. Future work includes providing (a) cargo template(s) for hardware-integrated examples.
+Examples are either based on a textbook problem or demo a practical application. Future work includes providing (a) cargo template(s) for hardware-integrated examples (with specific sensors and mcu's).
 
 ## Testing
 
@@ -92,15 +92,15 @@ The documentation provides theoretical references and specific user guidance. Ea
 
 * A concise conceptual description (similar to [MathWorks TransferFunction docs](https://www.mathworks.com/help/control/ug/transfer-functions.html))
 * Links to theoretical references
-* Use cases (demonstrated with doctests)
+* Use cases (verified with doctests)
 
 ## Book
 
-In the future it would be great to have a book that walks through a series of smaller projects to accomplish a larger one. Fr example identifying models for a few sensors and actuators and integrating them to design an estimator and controller.
+In the future it would be great to have a book that walks through a series of smaller projects to accomplish a larger one. For example designing analytical models for a few sensors and actuators and integrating them to design an estimator and controller.
 
 ## Contributing
 
-We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
+We welcome contributions!
 
 ## License
 

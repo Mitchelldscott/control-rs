@@ -55,6 +55,7 @@ fn main() {
     // Denominator: [L, R + Kb]
     let motor_tf = TransferFunction::new([1.0], [l, r + kb]);
 
+    #[cfg(feature = "std")]
     println!("DC Motor {motor_tf}");
     println!("DC Gain: {:?}", dcgain(&motor_tf));
     println!("LHP: {:?}", lhp(&motor_tf));

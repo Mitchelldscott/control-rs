@@ -14,8 +14,8 @@
 //! > [MathWorks](https://www.mathworks.com/discovery/transfer-function.html)
 //!
 
-
-use std::fmt::Display;
+#[cfg(feature = "std")]
+use std::fmt;
 
 use nalgebra::{ArrayStorage, Complex, RealField, SMatrix};
 use num_traits::{Float, Zero};
@@ -56,7 +56,7 @@ pub struct TransferFunction<T, const N: usize, const M: usize> {
 
 impl<T, const N: usize, const M: usize> TransferFunction<T, N, M>
 where
-    T: 'static + Copy + PartialEq + std::fmt::Debug,
+    T: 'static + Copy + PartialEq,
 {
     /// Create a new transfer function from arrays of coefficients
     ///
@@ -114,12 +114,13 @@ where
     }
 }
 
-impl<T, const N: usize, const M: usize> std::fmt::Display for TransferFunction<T, N, M>
+#[cfg(feature = "std")]
+impl<T, const N: usize, const M: usize> fmt::Display for TransferFunction<T, N, M>
 where
-    T: 'static + Copy + PartialEq + Zero + std::fmt::Debug + std::fmt::Display,
+    T: 'static + Copy + PartialEq + Zero + fmt::Debug + fmt::Display,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        fn polynomial_term<T: Display + Zero>(coeff: T, var: &str, order: usize) -> Option<String> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fn polynomial_term<T: fmt::Display + Zero>(coeff: T, var: &str, order: usize) -> Option<String> {
             match coeff.is_zero() {
                 true => None,
                 _ => {

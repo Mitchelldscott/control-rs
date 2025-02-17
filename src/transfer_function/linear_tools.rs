@@ -102,7 +102,6 @@ where
     crate::polynomial::roots(tf.denominator.as_slice(), &mut poles);
 
     poles.iter().take(N - 1).fold(true, |no_rhp_poles, &pole| {
-        println!("{pole}");
         pole.real() < T::zero() && no_rhp_poles
     })
     // let companion = DMatrix::from_fn(N - 1, N - 1, |i, j| {

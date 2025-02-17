@@ -39,12 +39,6 @@
 
 use nalgebra::{Complex, ComplexField, RealField};
 use num_traits::Float;
-use plotly::{
-    common::{DashType, Line, Marker, Mode}, // Title, color::Rgb, },
-    // layout::{GridPattern, LayoutGrid, RowOrder},
-    Layout,
-    Plot,
-};
 
 /// Standard interface for frequency analysis tools
 pub trait FrequencyTools<T, const N: usize, const M: usize>
@@ -192,9 +186,6 @@ impl<T> FrequencyMargin<T> {
         let mut magnitudes = [T::zero(); L];
 
         (0..L).for_each(|i| (magnitudes[i], phases[i]) = response[i].to_polar());
-
-        println!("{:?}", phases);
-        println!("{:?}", magnitudes);
 
         let gain_crossover = first_crossover::<T>(frequencies, &magnitudes, T::one(), L);
         let phase_crossover = first_crossover::<T>(frequencies, &phases, -T::pi(), L);
@@ -347,6 +338,7 @@ pub fn generate_log_space<T: Float, const N: usize>(start: T, stop: T) -> [T; N]
     log_space
 }
 
+#[cfg(feature = "std")]
 /// Renders a single magnitude and phase plot on subplots
 fn render_bode_subplot<T>(
     plot: &mut plotly::Plot,
@@ -359,6 +351,8 @@ fn render_bode_subplot<T>(
 ) where
     T: 'static + Copy + serde::Serialize + Float + From<i16>,
 {
+    use plotly::common;
+
     let mag_db: Vec<T> = mag
         .iter()
         .map(|&m| <T as From<i16>>::from(20) * m.log10())
@@ -368,34 +362,34 @@ fn render_bode_subplot<T>(
     // Add magnitude plot
     plot.add_trace(
         plotly::Scatter::new(freqs.to_vec(), mag_db)
-            .mode(Mode::Lines)
+            .mode(common::Mode::Lines)
             .name(format!("Magnitude[{row}, {col}]"))
             // .x_axis(x_axis_mag.clone())
             // .y_axis(y_axis_mag.clone()).color(Rgb::new(0, 0, 255))
-            .marker(Marker::new()),
+            .marker(common::Marker::new()),
     );
 
     // Add phase plot
     plot.add_trace(
         plotly::Scatter::new(freqs.to_vec(), phase_deg)
-            .mode(Mode::Lines)
+            .mode(common::Mode::Lines)
             .name(format!("Phase[{row}, {col}]"))
             .x_axis("x2")
             .y_axis("y2")
-            .marker(Marker::new()),
+            .marker(common::Marker::new()),
     );
 
     // Gain margin line
     if let (Some(wc), Some(gm)) = (margins.phase_crossover, margins.gain_margin) {
         plot.add_trace(
             plotly::Scatter::new(vec![wc, wc], vec![-gm, T::zero()])
-                .mode(Mode::Lines)
+                .mode(common::Mode::Lines)
                 .name(format!("Gain Margin[{row}, {col}]"))
                 // .x_axis(x_axis_mag)
                 // .y_axis(y_axis_mag)
                 .line(
-                    Line::new()
-                        .dash(DashType::Dot)
+                    common::Line::new()
+                        .dash(common::DashType::Dot)
                         .color(plotly::color::Rgb::new(0, 0, 0)),
                 ),
         );
@@ -418,20 +412,23 @@ fn render_bode_subplot<T>(
     }
 }
 
+#[cfg(feature = "std")]
 /// Renders a Bode plot for an object implementing FrequencyTools
 pub fn bode<T, F, const L: usize, const N: usize, const M: usize>(
     title: &str,
     system: F,
     mut response: FrequencyResponse<T, L, N, M>,
-) -> Plot
+) -> plotly::Plot
 where
     T: Copy + serde::Serialize + Float + RealField + From<i16>,
     F: FrequencyTools<T, N, M>,
 {
+    use plotly::Layout;
+    
     system.frequency_response::<L>(&mut response);
     let margins = Margin::new(&response);
 
-    let mut plot = Plot::new();
+    let mut plot = plotly::Plot::new();
     plot.set_layout(
         Layout::new()
             .title(plotly::common::Title::with_text(title))
