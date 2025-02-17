@@ -2,9 +2,7 @@
 
 Numerical model synthesis and analysis tools for embedded developers.
 
-This repository is inspired by MATLAB but built specifically for embedded developers.
-
->*The goal is to recreate MATLab's documentation and modelling tools using Cargo, this repo is as much a tool as it is a reference.*
+> *This repository is inspired by MATLAB but built specifically for embedded projects. The goal is to recreate MATLab's documentation and modelling tools using Cargo, this repo should be as much a reference as it is a tool.*
 
 ## Overview
 
@@ -12,7 +10,7 @@ This crate aims to facilitate a data-driven approach to system modeling and cont
 
 * Transfer Function
 * State-Space Representation
-* Nonlinear
+* Nonlinear Function
 
 Each model format implements traits that provide a common interface for simulation, analysis, and synthesis.
 
@@ -21,7 +19,7 @@ The crate organization is currently done so each numerical model has its own mod
 > Currently all models are defined at the top of the module (i.e. `mod.rs` or `<module>.rs`)
 >
 > * Common traits should also be impl here (need no std compatibility for plots...)
-> * Useful tools and functions should be re-exported from a submodule (need a way to specify which tools to include, probably with features)
+> * Useful tools and functions should be re-exported from a submodule
 
 ## Installation (Not Supported... haven't published the crate yet, clone this repo instead)
 
@@ -30,6 +28,12 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 control-rs = "0.1.0"
+```
+
+or run
+
+```bash
+cargo add control-rs
 ```
 
 ## Usage
@@ -41,7 +45,7 @@ use control_rs::transfer_function::{TransferFunction, dcgain};
 
 fn main() {
     let mut tf = Transferfunction::new([1.0], [1.0, 0.0]);
-    println!("Controller output: {}", dcgain(tf));
+    println!("DC Gain of TF: {}", dcgain(tf));
 }
 ```
 
