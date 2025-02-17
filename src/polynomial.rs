@@ -26,11 +26,13 @@ use num_traits::Float;
 ///
 /// # Example
 /// ```rust
+/// use nalgebra::Complex;
 /// use control_rs::polynomial::roots;
 /// fn main() {
-///     let coeff = [1.0, -6.0, 11.0, -6.0]; // x^3 - 6x^2 + 11x - 6 = 0
-///     let roots = roots::<f64, 3>(&coeff);
-///     println!("{:?}", roots); // Roots: [3.0, 2.0, 1.0]
+///     let coeff = [1.0, 2.0, 3.0, 4.0];
+///     let mut rbuffer = [Complex::new(0.0, 0.0); 3];
+///     let roots = roots::<f64>(&coeff, &mut rbuffer);
+///     println!("{roots:?}"); 
 /// }
 /// ```
 ///

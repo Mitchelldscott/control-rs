@@ -17,6 +17,10 @@
 #[cfg(feature = "std")]
 use std::fmt;
 
+#[cfg(not(feature = "std"))]
+use core::fmt;
+
+
 use nalgebra::{ArrayStorage, Complex, RealField, SMatrix};
 use num_traits::{Float, Zero};
 
@@ -150,6 +154,36 @@ where
             f,
             "TransferFunction:\n{n_align}{num_str}\n{d_bar}\n{d_align}{den_str}\n"
         )
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl<T, const N: usize, const M: usize> fmt::Display for TransferFunction<T, N, M>
+where
+    T: 'static + Copy + PartialEq + Zero + fmt::Debug + fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Format the numerator coefficients
+        write!(f, "Numerator: [")?;
+        for i in 0..M {
+            if i > 0 {
+                write!(f, ", ")?;  // Add a comma separator
+            }
+            write!(f, "{}", self.numerator[(i, 0)])?;
+        }
+        write!(f, "]")?;
+
+        // Format the denominator coefficients
+        write!(f, " | Denominator: [")?;
+        for i in 0..N {
+            if i > 0 {
+                write!(f, ", ")?;  // Add a comma separator
+            }
+            write!(f, "{}", self.denominator[(i, 0)])?;
+        }
+        write!(f, "]")?;
+
+        Ok(())
     }
 }
 

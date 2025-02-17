@@ -37,12 +37,8 @@ use crate::TransferFunction;
 /// fn main() {
 ///     // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
 ///     let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
-///
-///     if let Some(gain) = dcgain(&tf) {
-///         println!("DC Gain: {:.2}", gain);
-///     } else {
-///         println!("DC Gain could not be computed.");
-///     }
+///     let gain = dcgain(&tf);
+///     println!("DC Gain: {gain:.2}");
 /// }
 /// ```
 pub fn dcgain<T, const N: usize, const M: usize>(tf: &TransferFunction<T, N, M>) -> T
