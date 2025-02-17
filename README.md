@@ -2,9 +2,9 @@
 
 Numerical model synthesis and analysis tools for embedded developers.
 
-This repository is inspired by MATLAB but built specifically for embedded developers working with control and estimation systems.
+This repository is inspired by MATLAB but built specifically for embedded developers.
 
->*The goal is to recreate MATLab's documentation and modelling tools using Cargo*
+>*The goal is to recreate MATLab's documentation and modelling tools using Cargo, this repo is as much a tool as it is a reference.*
 
 ## Overview
 
@@ -22,7 +22,6 @@ The crate organization is currently done so each numerical model has its own mod
 >
 > * Common traits should also be impl here (need no std compatibility for plots...)
 > * Useful tools and functions should be re-exported from a submodule (need a way to specify which tools to include, probably with features)
-
 
 ## Installation (Not Supported... haven't published the crate yet, clone this repo instead)
 
