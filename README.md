@@ -37,8 +37,6 @@ control-rs = "0.1.0"
 Here's a simple example to get you started:
 
 ```rust
-extern crate control_rs;
-
 use control_rs::transfer_function::{TransferFunction, dcgain};
 
 fn main() {
@@ -48,8 +46,6 @@ fn main() {
 ```
 
 ```rust
-extern crate control_rs;
-
 use control_rs::{StateSpace, TransferFunction, transfer_function::as_monic};
 
 fn main() {
