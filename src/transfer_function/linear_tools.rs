@@ -1,4 +1,4 @@
-use nalgebra::{ComplexField, RealField};
+use nalgebra::{Complex, RealField};
 use num_traits::{Float, Zero};
 
 use crate::TransferFunction;
@@ -45,7 +45,7 @@ use crate::TransferFunction;
 ///     }
 /// }
 /// ```
-pub fn dcgain<T, const N: usize, const M: usize>(tf: &TransferFunction<T, N, M>) -> Option<T>
+pub fn dcgain<T, const N: usize, const M: usize>(tf: &TransferFunction<T, N, M>) -> T
 where
     T: Float,
 {
@@ -53,9 +53,9 @@ where
     let denom_constant = tf.denominator[N - 1]; // Get constant term of denominator
 
     if denom_constant.is_zero() {
-        None // Avoid division by zero
+        T::infinity()
     } else {
-        Some(num_constant / denom_constant)
+        num_constant / denom_constant
     }
 }
 
@@ -96,34 +96,16 @@ where
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
 pub fn lhp<T, const N: usize, const M: usize>(tf: &TransferFunction<T, N, M>) -> bool
 where
-    T: Copy + Zero + Float + ComplexField+ RealField,
+    T: Copy + Zero + Float +  RealField,
 {
-    let mut poles = [T::zero(); N];
+    if N <= 1 {
+        return false;   
+    }
+
+    let mut poles = [Complex::new(T::zero(), T::zero()); N]; // actually only ever need N-1...
     crate::polynomial::roots(tf.denominator.as_slice(), &mut poles);
 
-    poles.iter().take(N - 1).fold(true, |no_rhp_poles, &pole| {
-        pole.real() < T::zero() && no_rhp_poles
-    })
-    // let companion = DMatrix::from_fn(N - 1, N - 1, |i, j| {
-    //     if i == 0 {
-    //         -tf.denominator[j + 1] / tf.denominator[0]
-    //     } else {
-    //         if i - 1 == j {
-    //             T::one()
-    //         } else {
-    //             T::zero()
-    //         }
-    //     }
-    // });
-    // println!("{companion}");
-
-    // match companion.eigenvalues() {
-    //     Some(eigenvalues) => eigenvalues.iter().fold(true, |no_rhp_poles, &eigenvalue| {
-    //         println!("{eigenvalue}");
-    //         eigenvalue < T::zero() && no_rhp_poles
-    //     }),
-    //     None => false,
-    // }
+    poles.iter().take(N - 1).all(|&pole| !pole.re.is_nan() && pole.re < T::zero())
 }
 
 /// Helper function to create a state space model from a transfer function

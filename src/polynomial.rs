@@ -2,7 +2,7 @@
 //! # Polynomial trait and default implementations
 //!
 //!
-use nalgebra::{ComplexField, DMatrix};
+use nalgebra::{Complex, RealField, DMatrix};
 use num_traits::Float;
 
 /// Computes the roots of a univariate polynomial of degree `N` by calculating
@@ -36,49 +36,52 @@ use num_traits::Float;
 ///
 /// ## Edge Case Examples
 /// - see basic_roots_tests
-pub fn roots<T: Copy + Float + ComplexField>(coeff: &[T], root_buffer: &mut [T]) {
-    if coeff.len() <= 1 {
-        root_buffer.fill(T::nan());
-        if coeff.len() == 1 {
-            root_buffer[0] = T::zero();
+pub fn roots<T: Copy + Float + RealField>(coeff: &[T], root_buffer: &mut [Complex<T>]) {
+    // less than 1 coeff has no roots unless len = 1 and coeff[0] = 0 then root[0] = inf
+    match coeff.len() {
+        0 => {
+            root_buffer.fill(Complex::new(T::nan(), T::zero()));
+            return;
         }
-        return;
+        1 => {
+            if coeff[0].is_zero() {
+                root_buffer[0] = Complex::new(T::infinity(), T::zero());
+            }
+            else {
+                root_buffer.fill(Complex::new(T::nan(), T::zero()));
+            }
+            return;
+        }
+        _ => {},
     }
 
     // count coefficients equal to zero
-    let num_non_leading_zero = coeff.iter().fold(0, |acc, &c| match c == T::zero() {
+    let num_zero_coeff = coeff.iter().fold(0, |acc, &c| match c == T::zero() {
         true => acc + 1,
         false => acc,
     });
 
-    // all coeff are zero, no roots
-    if coeff.len() - 1 == num_non_leading_zero {
-        for n in 0..coeff.len() - 1 {
-            root_buffer[n] = T::nan();
-        }
-        return;
-    }
-    // first coeff is zero, recurse
-    else if coeff[0] == T::zero() {
-        return roots::<T>(coeff[1..coeff.len()].try_into().unwrap(), root_buffer);
-    }
-    // all coeff but the first are zero, all roots = 0
-    else if coeff.len() - 1 == num_non_leading_zero {
-        for n in 0..coeff.len() - 1 {
-            root_buffer[n] = T::nan();
-        }
+    // all coeff are zero
+    if coeff.len() == num_zero_coeff {
+        // constant 0, everything is a root
+        root_buffer[0] = Complex::new(T::infinity(), T::zero());
         return;
     }
 
+    // first coeff is zero, recurse
+    if coeff[0] == T::zero() {
+        return roots::<T>(coeff[1..coeff.len()].try_into().unwrap(), root_buffer);
+    }
+
     // Build the companion matrix
-    let companion = DMatrix::from_fn(coeff.len(), coeff.len(), |i, j| {
+    let companion = DMatrix::from_fn(coeff.len() - 1, coeff.len() - 1, |i, j| {
         if i == 0 {
-            -coeff[j + 1] / coeff[0]
+            Complex::new(-coeff[j + 1] / coeff[0], T::zero())
         } else {
             if i - 1 == j {
-                T::one()
+                Complex::new(T::one(), T::zero())
             } else {
-                T::zero()
+                Complex::new(T::zero(), T::zero())
             }
         }
     });
@@ -86,11 +89,7 @@ pub fn roots<T: Copy + Float + ComplexField>(coeff: &[T], root_buffer: &mut [T])
     // Compute the eigenvalues of the companion matrix
     match companion.eigenvalues() {
         Some(eigenvalues) => eigenvalues.iter().enumerate().for_each(|(i, eigenvalue)| root_buffer[i] = *eigenvalue),
-        None => {
-            for n in 0..coeff.len() - 1 {
-                root_buffer[n] = T::nan();
-            }
-        },
+        None => root_buffer.fill(Complex::new(T::nan(), T::zero())),
     }
 }
 
@@ -101,44 +100,76 @@ pub mod basic_roots_tests {
 
     #[test]
     fn test_simple_polynomial() {
-        let coeff: [f64; 4] = [1.0, -6.0, 11.0, -6.0]; // x^3 - 6x^2 + 11x - 6 = 0
-        let mut rbuffer: [f64; 3] = [0.0, 0.0, 0.0]; // x^3 - 6x^2 + 11x - 6 = 0
+        let coeff: [f64; 3] = [1.0, 1.0, 1.0]; // x^2 + x + 1
+        let mut rbuffer = [Complex::new(0.0, 0.0); 2];
         roots(&coeff, &mut rbuffer);
         assert_eq!(
-            rbuffer,
-            [3.000000000000014, 1.9999999999999991, 0.9999999999999999]
+            rbuffer[0].re,
+            -0.49999999999999994
+        );
+        assert_eq!(
+            rbuffer[1].re,
+            -0.5
+        )
+    }
+
+    #[test]
+    fn test_polynomial() {
+        let coeff: [f64; 4] = [1.0, -6.0, 11.0, -6.0]; // x^3 - 6x^2 + 11x - 6 = 0
+        let mut rbuffer = [Complex::new(0.0, 0.0); 3]; // x^3 - 6x^2 + 11x - 6 = 0
+        roots(&coeff, &mut rbuffer);
+        
+        assert_eq!(
+            rbuffer[0].re,
+            3.000000000000014
+        );
+        assert_eq!(
+            rbuffer[1].re,
+            1.9999999999999991
+        );
+        assert_eq!(
+            rbuffer[2].re,
+            0.9999999999999999
         );
     }
 
     #[test]
     fn test_linear_polynomial() {
         let coeff = [1.0, 0.0]; // y = x
-        let mut rbuffer = [0.0];
+        let mut rbuffer = [Complex::new(0.0, 0.0)];
         roots(&coeff, &mut rbuffer);
-        assert_eq!(rbuffer, [0.0]);
+        assert_eq!(rbuffer[0].re, 0.0);
     }
 
     #[test]
     fn test_constant_polynomial() {
         let coeff = [1.0]; // y = 1
-        let mut rbuffer = [0.0];
+        let mut rbuffer = [Complex::new(0.0, 0.0)];
         roots(&coeff, &mut rbuffer);
         assert!(rbuffer[0].is_nan());
+    }
+
+    #[test]
+    fn test_constant_zero_polynomial() {
+        let coeff = [0.0]; // y = 0
+        let mut rbuffer = [Complex::new(0.0, 0.0)];
+        roots(&coeff, &mut rbuffer);
+        assert!(rbuffer[0].is_infinite());
     }
 
     #[test]
     fn test_leading_zero_constant_polynomial() {
         let coeff = [0.0, 1.0]; // y = 1
-        let mut rbuffer = [0.0];
+        let mut rbuffer = [Complex::new(0.0, 0.0)];
         roots(&coeff, &mut rbuffer);
         assert!(rbuffer[0].is_nan());
     }
 
     #[test]
-    fn test_zero_coefficients() {
-        let coeff = [0.0, 0.0]; // No polynomial
-        let mut rbuffer = [0.0];
+    fn test_multiple_zero_coefficients() {
+        let coeff = [0.0, 0.0]; // y = 0
+        let mut rbuffer = [Complex::new(0.0, 0.0)];
         roots(&coeff, &mut rbuffer);
-        assert!(rbuffer[0].is_nan());
+        assert!(rbuffer[0].is_infinite());
     }
 }
