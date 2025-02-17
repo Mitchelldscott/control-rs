@@ -37,7 +37,7 @@
 //! The docs are meant to be as much of a theory reference as a user guide. Each module should have:
 //! - short conceptual description
 //! - links to theoretical references
-//! - use cases
+//! - use cases (doctests)
 //!
 //! *Will hopefully split the docs into pure dev info and a book with theory/use cases that should be used together*
 //!
