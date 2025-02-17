@@ -424,7 +424,7 @@ where
     F: FrequencyTools<T, N, M>,
 {
     use plotly::Layout;
-    
+
     system.frequency_response::<L>(&mut response);
     let margins = Margin::new(&response);
 

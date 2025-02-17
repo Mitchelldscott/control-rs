@@ -1,7 +1,7 @@
 //! # Control-rs
 //!
-//! Control-rs is a numerical modeling and control system synthesis library designed for embedded applications. 
-//! Inspired by MATLAB, this crate provides a structured approach to system modeling, analysis, and control design 
+//! Control-rs is a numerical modeling and control system synthesis library designed for embedded applications.
+//! Inspired by MATLAB, this crate provides a structured approach to system modeling, analysis, and control design
 //! while maintaining a lightweight footprint suitable for real-time and resource-constrained environments.
 //!
 //! ## Features
@@ -11,8 +11,8 @@
 //! - **Simulation:** Step response, impulse response, and custom signal simulation utilities.
 //!
 //! ## Design Philosophy
-//! This crate is structured around core numerical model representations, each implementing traits that ensure 
-//! a consistent interface for simulation, analysis, and synthesis. It is built to be extensible, modular, and 
+//! This crate is structured around core numerical model representations, each implementing traits that ensure
+//! a consistent interface for simulation, analysis, and synthesis. It is built to be extensible, modular, and
 //! suitable for embedded applications where computational efficiency is critical.
 #![cfg_attr(not(feature = "std"), no_std)]
 

@@ -20,7 +20,6 @@ use std::fmt;
 #[cfg(not(feature = "std"))]
 use core::fmt;
 
-
 use nalgebra::{ArrayStorage, Complex, RealField, SMatrix};
 use num_traits::{Float, Zero};
 
@@ -41,9 +40,9 @@ use crate::frequency_tools::{FrequencyResponse, FrequencyTools};
 ///
 /// Stores two nalgebra vectors representing coefficients of polynomials, one for the numerator
 /// and one for the denominator.
-/// 
+///
 /// # Generic Arguments
-/// 
+///
 /// * `T` - type of the coefficients
 /// * `N` - order of the denominator
 /// * `M` - order of the numerator
@@ -124,16 +123,18 @@ where
     T: 'static + Copy + PartialEq + Zero + fmt::Debug + fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fn polynomial_term<T: fmt::Display + Zero>(coeff: T, var: &str, order: usize) -> Option<String> {
+        fn polynomial_term<T: fmt::Display + Zero>(
+            coeff: T,
+            var: &str,
+            order: usize,
+        ) -> Option<String> {
             match coeff.is_zero() {
                 true => None,
-                _ => {
-                    match order {
-                        0 => Some(format!("{coeff}")),
-                        1 => Some(format!("{coeff}{var}")),
-                        _ => Some(format!("{coeff}{var}^{order}")),
-                    }
-                }
+                _ => match order {
+                    0 => Some(format!("{coeff}")),
+                    1 => Some(format!("{coeff}{var}")),
+                    _ => Some(format!("{coeff}{var}^{order}")),
+                },
             }
         }
         let num_str = (0..self.numerator.len())
@@ -146,8 +147,16 @@ where
             .join(" + ");
 
         let (n_align, d_align, d_bar) = match den_str.len() > num_str.len() {
-            true => (" ".repeat((den_str.len() - num_str.len()).max(0) / 2),"".to_string(), "-".repeat(den_str.len())),
-            false => ("".to_string(), " ".repeat((num_str.len() - den_str.len()).max(0) / 2), "-".repeat(num_str.len())),
+            true => (
+                " ".repeat((den_str.len() - num_str.len()).max(0) / 2),
+                "".to_string(),
+                "-".repeat(den_str.len()),
+            ),
+            false => (
+                "".to_string(),
+                " ".repeat((num_str.len() - den_str.len()).max(0) / 2),
+                "-".repeat(num_str.len()),
+            ),
         };
 
         write!(
@@ -167,7 +176,7 @@ where
         write!(f, "Numerator: [")?;
         for i in 0..M {
             if i > 0 {
-                write!(f, ", ")?;  // Add a comma separator
+                write!(f, ", ")?; // Add a comma separator
             }
             write!(f, "{}", self.numerator[(i, 0)])?;
         }
@@ -177,7 +186,7 @@ where
         write!(f, " | Denominator: [")?;
         for i in 0..N {
             if i > 0 {
-                write!(f, ", ")?;  // Add a comma separator
+                write!(f, ", ")?; // Add a comma separator
             }
             write!(f, "{}", self.denominator[(i, 0)])?;
         }

@@ -2,7 +2,7 @@
 //! # Polynomial trait and default implementations
 //!
 //!
-use nalgebra::{Complex, RealField, DMatrix};
+use nalgebra::{Complex, DMatrix, RealField};
 use num_traits::Float;
 
 /// Computes the roots of a univariate polynomial of degree `N` by calculating
@@ -32,7 +32,7 @@ use num_traits::Float;
 ///     let coeff = [1.0, 2.0, 3.0, 4.0];
 ///     let mut rbuffer = [Complex::new(0.0, 0.0); 3];
 ///     let roots = roots::<f64>(&coeff, &mut rbuffer);
-///     println!("{roots:?}"); 
+///     println!("{roots:?}");
 /// }
 /// ```
 ///
@@ -48,13 +48,12 @@ pub fn roots<T: Copy + Float + RealField>(coeff: &[T], root_buffer: &mut [Comple
         1 => {
             if coeff[0].is_zero() {
                 root_buffer[0] = Complex::new(T::infinity(), T::zero());
-            }
-            else {
+            } else {
                 root_buffer.fill(Complex::new(T::nan(), T::zero()));
             }
             return;
         }
-        _ => {},
+        _ => {}
     }
 
     // count coefficients equal to zero
@@ -90,7 +89,10 @@ pub fn roots<T: Copy + Float + RealField>(coeff: &[T], root_buffer: &mut [Comple
 
     // Compute the eigenvalues of the companion matrix
     match companion.eigenvalues() {
-        Some(eigenvalues) => eigenvalues.iter().enumerate().for_each(|(i, eigenvalue)| root_buffer[i] = *eigenvalue),
+        Some(eigenvalues) => eigenvalues
+            .iter()
+            .enumerate()
+            .for_each(|(i, eigenvalue)| root_buffer[i] = *eigenvalue),
         None => root_buffer.fill(Complex::new(T::nan(), T::zero())),
     }
 }
@@ -105,14 +107,8 @@ pub mod basic_roots_tests {
         let coeff: [f64; 3] = [1.0, 1.0, 1.0]; // x^2 + x + 1
         let mut rbuffer = [Complex::new(0.0, 0.0); 2];
         roots(&coeff, &mut rbuffer);
-        assert_eq!(
-            rbuffer[0].re,
-            -0.49999999999999994
-        );
-        assert_eq!(
-            rbuffer[1].re,
-            -0.5
-        )
+        assert_eq!(rbuffer[0].re, -0.49999999999999994);
+        assert_eq!(rbuffer[1].re, -0.5)
     }
 
     #[test]
@@ -120,19 +116,10 @@ pub mod basic_roots_tests {
         let coeff: [f64; 4] = [1.0, -6.0, 11.0, -6.0]; // x^3 - 6x^2 + 11x - 6 = 0
         let mut rbuffer = [Complex::new(0.0, 0.0); 3]; // x^3 - 6x^2 + 11x - 6 = 0
         roots(&coeff, &mut rbuffer);
-        
-        assert_eq!(
-            rbuffer[0].re,
-            3.000000000000014
-        );
-        assert_eq!(
-            rbuffer[1].re,
-            1.9999999999999991
-        );
-        assert_eq!(
-            rbuffer[2].re,
-            0.9999999999999999
-        );
+
+        assert_eq!(rbuffer[0].re, 3.000000000000014);
+        assert_eq!(rbuffer[1].re, 1.9999999999999991);
+        assert_eq!(rbuffer[2].re, 0.9999999999999999);
     }
 
     #[test]

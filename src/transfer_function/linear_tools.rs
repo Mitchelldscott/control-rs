@@ -92,16 +92,19 @@ where
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
 pub fn lhp<T, const N: usize, const M: usize>(tf: &TransferFunction<T, N, M>) -> bool
 where
-    T: Copy + Zero + Float +  RealField,
+    T: Copy + Zero + Float + RealField,
 {
     if N <= 1 {
-        return false;   
+        return false;
     }
 
     let mut poles = [Complex::new(T::zero(), T::zero()); N]; // actually only ever need N-1...
     crate::polynomial::roots(tf.denominator.as_slice(), &mut poles);
 
-    poles.iter().take(N - 1).all(|&pole| !pole.re.is_nan() && pole.re < T::zero())
+    poles
+        .iter()
+        .take(N - 1)
+        .all(|&pole| !pole.re.is_nan() && pole.re < T::zero())
 }
 
 /// Helper function to create a state space model from a transfer function

@@ -12,7 +12,6 @@
 use nalgebra::{SMatrix, Scalar};
 use num_traits::{One, Zero};
 
-
 #[cfg(feature = "std")]
 use std::{
     fmt,
