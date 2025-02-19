@@ -1,3 +1,5 @@
+//! Miscellaneous tools to help work with transfer functions
+//! 
 use nalgebra::{Complex, RealField};
 use num_traits::{Float, Zero};
 
@@ -55,6 +57,48 @@ where
     }
 }
 
+/// Compute the roots of the characteristic equation
+///
+/// Calculates the eigen values of the companion matrix of the transfer function's denominator.
+/// The eigen values of the companion matrix are the roots of the characteristic equation (tf
+/// denominator).
+///
+/// # Arguments
+///
+///  * `tf` - the transfer function to check the poles of
+///
+/// # Returns
+///
+///  * `[complex<T>; N]` - poles of the tf
+///
+/// # Example
+///
+/// ```rust
+/// use control_rs::transfer_function::{TransferFunction, poles};
+///
+/// fn main() {
+///     // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
+///     let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
+///     let poles = poles(&tf); // contains 1 more element than it should
+/// }
+/// ```
+///
+/// ## References
+///
+/// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
+pub fn poles<T, const N: usize, const M: usize>(tf: &TransferFunction<T, N, M>) -> [Complex<T>; N]
+where
+    T: Copy + Zero + Float + RealField,
+{
+    let mut poles = [Complex::new(T::nan(), T::nan()); N]; // actually only ever need N-1...
+
+    if N > 1 {
+        crate::polynomial::roots(tf.denominator.as_slice(), &mut poles);
+    }
+
+    poles
+}
+
 /// Check if the system's poles lie in the left-half plane (LHP), a condition for stability
 ///
 /// Calculates the eigen values of the companion matrix of the transfer function's denominator.
@@ -94,14 +138,10 @@ pub fn lhp<T, const N: usize, const M: usize>(tf: &TransferFunction<T, N, M>) ->
 where
     T: Copy + Zero + Float + RealField,
 {
-    if N <= 1 {
+    if N == 1 {
         return false;
     }
-
-    let mut poles = [Complex::new(T::zero(), T::zero()); N]; // actually only ever need N-1...
-    crate::polynomial::roots(tf.denominator.as_slice(), &mut poles);
-
-    poles
+    poles(&tf)
         .iter()
         .take(N - 1)
         .all(|&pole| !pole.re.is_nan() && pole.re < T::zero())

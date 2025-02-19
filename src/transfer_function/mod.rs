@@ -26,6 +26,7 @@ use num_traits::{Float, Zero};
 pub mod linear_tools;
 pub use linear_tools::*;
 
+#[cfg(test)]
 pub mod tf_edge_case_test;
 
 use crate::frequency_tools::{FrequencyResponse, FrequencyTools};
@@ -131,9 +132,9 @@ where
             match coeff.is_zero() {
                 true => None,
                 _ => match order {
-                    0 => Some(format!("{coeff}")),
-                    1 => Some(format!("{coeff}{var}")),
-                    _ => Some(format!("{coeff}{var}^{order}")),
+                    0 => Some(format!("{coeff:.4}")),
+                    1 => Some(format!("{coeff:.4}{var}")),
+                    _ => Some(format!("{coeff:.4}{var}^{order}")),
                 },
             }
         }
@@ -178,7 +179,7 @@ where
             if i > 0 {
                 write!(f, ", ")?; // Add a comma separator
             }
-            write!(f, "{}", self.numerator[(i, 0)])?;
+            write!(f, "{:.4}", self.numerator[(i, 0)])?;
         }
         write!(f, "]")?;
 
@@ -188,7 +189,7 @@ where
             if i > 0 {
                 write!(f, ", ")?; // Add a comma separator
             }
-            write!(f, "{}", self.denominator[(i, 0)])?;
+            write!(f, "{:.4}", self.denominator[(i, 0)])?;
         }
         write!(f, "]")?;
 

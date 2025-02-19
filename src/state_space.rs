@@ -10,18 +10,18 @@
 //! Emami-Naeini (ch 7.1)
 //!
 use nalgebra::{SMatrix, Scalar};
-use num_traits::{One, Zero};
+use num_traits::{real::Real, One, Zero};
 
 #[cfg(feature = "std")]
 use std::{
     fmt,
-    ops::{Add, Div, Mul, Neg, Sub},
+    ops::{Add, Div, Mul, Neg},
 };
 
 #[cfg(not(feature = "std"))]
 use core::{
     fmt,
-    ops::{Add, Div, Mul, Neg, Sub},
+    ops::{Add, Div, Mul, Neg},
 };
 
 use super::DynamicModel;
@@ -92,7 +92,7 @@ pub struct StateSpace<T, const N: usize, const M: usize, const L: usize> {
 
 impl<T, const N: usize, const M: usize, const L: usize> StateSpace<T, N, M, L>
 where
-    T: 'static + Copy + PartialEq + fmt::Debug,
+    T: 'static + Real + PartialEq + fmt::Debug,
 {
     /// create a new state space model from lists of rows
     ///
@@ -144,14 +144,7 @@ where
 impl<T, Input, State, Output, const N: usize, const M: usize, const L: usize>
     DynamicModel<T, Input, State, Output> for StateSpace<T, N, M, L>
 where
-    T: 'static
-        + Add<Output = T>
-        + Sub<Output = T>
-        + Mul<Output = T>
-        + Div<Output = T>
-        + Copy
-        + PartialEq
-        + fmt::Debug,
+    T: 'static + Real + PartialEq + fmt::Debug,
     Input: Copy,
     State: Copy + Add<Output = State>,
     Output: Copy + Add<Output = Output>,
@@ -340,7 +333,6 @@ where
 }
 
 #[cfg(test)]
-#[cfg(feature = "std")]
 mod basic_ss_tests {
     // not as productive as it could be...
     use super::*;

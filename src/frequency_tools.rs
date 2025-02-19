@@ -11,7 +11,7 @@
 //! phase cross specific thresholds (e.g., gain crossover at 0 dB, phase crossover at -180°).
 //! - **Stability Margins:** Compute gain margins (dB) and phase margins (degrees) to assess
 //! system stability.
-//! - **Magnitude and Phase Response:** Evaluate transfer functions at logarithmically spaced
+//! - **Magnitude and Phase Response:** Evaluate systems at logarithmically spaced
 //! frequency points to compute magnitude and phase.
 //! - **Visualization Backend:** Generate html plots using plotlyrs.
 //!

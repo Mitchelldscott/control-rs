@@ -1,6 +1,6 @@
 //! # Control-rs
 //!
-//! Control-rs is a numerical modeling and control system synthesis library designed for embedded applications.
+//! Control-rs is a numerical modeling and control system library designed for embedded applications.
 //! Inspired by MATLAB, this crate provides a structured approach to system modeling, analysis, and control design
 //! while maintaining a lightweight footprint suitable for real-time and resource-constrained environments.
 //!
@@ -15,6 +15,7 @@
 //! a consistent interface for simulation, analysis, and synthesis. It is built to be extensible, modular, and
 //! suitable for embedded applications where computational efficiency is critical.
 #![cfg_attr(not(feature = "std"), no_std)]
+#![warn(missing_docs)]
 
 pub mod assertf;
 
@@ -65,7 +66,7 @@ where
     ///
     /// The time interval is assumed to be small enough the input will be constant for the
     /// duration of the integration. For simulations with time-varying input call this repeatedly
-    /// in a loop (convenience funtion coming soon).
+    /// in a loop.
     ///
     /// # Arguments
     ///
@@ -77,11 +78,11 @@ where
     ///
     /// # Returns
     ///
-    /// * `x` - state at tf
-    /// * `y` - system output at tf
+    /// * `x` - state at end time
+    /// * `y` - system output at end time
     fn rk4(&self, dt: T, t0: T, tf: T, x0: State, u: Input) -> State
     where
-        T: Copy + PartialEq + PartialOrd + From<u8> + Add<Output = T> + Div<Output = T>,
+        T: Copy + PartialOrd + PartialEq + From<u8> + Add<Output = T> + Div<Output = T>,
         State: Add<Output = State> + Mul<T, Output = State>,
     {
         let dt_2 = dt / T::from(2);

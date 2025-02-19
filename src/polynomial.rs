@@ -19,7 +19,7 @@ use num_traits::Float;
 ///
 /// ## Edge cases
 ///
-/// - If `len(coeff) <= 1`, the function will return a vector of NaNs since no roots can be determined.
+/// - If `len(coeff) < 1`, the function will return a vector of NaNs.
 /// - If the leading coefficient `coeff[0] == 0`, the polynomial is degenerate, and the function will attempt to handle the case by reducing the degree.
 /// - If all coefficients are zero except the first one, the function assumes the polynomial is a constant and returns NaNs for all roots.
 ///
@@ -42,14 +42,14 @@ pub fn roots<T: Copy + Float + RealField>(coeff: &[T], root_buffer: &mut [Comple
     // less than 1 coeff has no roots unless len = 1 and coeff[0] = 0 then root[0] = inf
     match coeff.len() {
         0 => {
-            root_buffer.fill(Complex::new(T::nan(), T::zero()));
+            root_buffer.fill(Complex::new(T::nan(), T::nan()));
             return;
         }
         1 => {
             if coeff[0].is_zero() {
                 root_buffer[0] = Complex::new(T::infinity(), T::zero());
             } else {
-                root_buffer.fill(Complex::new(T::nan(), T::zero()));
+                root_buffer.fill(Complex::new(T::nan(), T::nan()));
             }
             return;
         }
