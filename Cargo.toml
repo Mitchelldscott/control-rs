@@ -10,7 +10,7 @@ num-traits = { version = "0.2", default-features = false, features = ["libm"]  }
 plotly = { version = "0.10.0", optional = true}
 
 [features]
-default = []
+default = ["std"]
 std = ["plotly", "serde/std", "num-traits/std"]
 
 [dev-dependencies]
