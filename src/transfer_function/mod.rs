@@ -14,22 +14,22 @@
 //! > [MathWorks](https://www.mathworks.com/discovery/transfer-function.html)
 //!
 
-#[cfg(feature = "std")]
-use std::fmt;
+// #[cfg(feature = "std")]
+// use std::fmt;
 
-#[cfg(not(feature = "std"))]
-use core::fmt;
+// #[cfg(not(feature = "std"))]
+// use core::fmt;
 
-use nalgebra::{ArrayStorage, Complex, RealField, SMatrix};
-use num_traits::{Float, Zero};
+use nalgebra::{ArrayStorage, Complex, Dim, RawStorage, RealField};
+use num_traits::Float;
 
 pub mod linear_tools;
 pub use linear_tools::*;
 
-#[cfg(test)]
-pub mod tf_edge_case_test;
-
-use crate::frequency_tools::{FrequencyResponse, FrequencyTools};
+use crate::{
+    frequency_tools::{FrequencyResponse, FrequencyTools},
+    polynomial::Polynomial,
+};
 
 /// # Transfer Function
 ///
@@ -51,14 +51,15 @@ use crate::frequency_tools::{FrequencyResponse, FrequencyTools};
 /// ## References
 ///
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 3.1
-pub struct TransferFunction<T, const N: usize, const M: usize> {
+pub struct TransferFunction<T, D1: Dim, D2: Dim, S1, S2> {
     /// coefficients of the numerator `[bn, ... b2, b1]`
-    pub numerator: SMatrix<T, M, 1>,
+    pub numerator: Polynomial<T, D1, S1>,
     /// coefficients of the denominator `[an, ... a1, a0]`
-    pub denominator: SMatrix<T, N, 1>,
+    pub denominator: Polynomial<T, D2, S2>,
 }
 
-impl<T, const N: usize, const M: usize> TransferFunction<T, N, M>
+impl<T, D1: Dim, D2: Dim, const N: usize, const M: usize>
+    TransferFunction<T, D1, D2, ArrayStorage<T, M, 1>, ArrayStorage<T, N, 1>>
 where
     T: 'static + Copy + PartialEq,
 {
@@ -86,15 +87,17 @@ where
     /// ```
     pub const fn new(numerator: [T; M], denominator: [T; N]) -> Self {
         TransferFunction {
-            numerator: SMatrix::from_array_storage(ArrayStorage([numerator])),
-            denominator: SMatrix::from_array_storage(ArrayStorage([denominator])),
+            numerator: Polynomial::new(numerator),
+            denominator: Polynomial::new(denominator),
         }
     }
 }
 
-impl<T, const N: usize, const M: usize> FrequencyTools<T, 1, 1> for TransferFunction<T, N, M>
+impl<T, D1: Dim, D2: Dim, S1, S2> FrequencyTools<T, 1, 1> for TransferFunction<T, D1, D2, S1, S2>
 where
     T: Float + RealField + From<i16>,
+    S1: RawStorage<T, D1>,
+    S2: RawStorage<T, D2>,
 {
     fn frequency_response<const L: usize>(&self, response: &mut FrequencyResponse<T, L, 1, 1>) {
         // Evaluate the transfer function at each frequency
@@ -103,116 +106,142 @@ where
             .enumerate()
             .for_each(|(i, frequency)| {
                 let s = Complex::new(T::zero(), *frequency); // s = jω
-                let numerator: Complex<T> = self
-                    .numerator
-                    .iter()
-                    .rev()
-                    .fold(Complex::zero(), |acc, &coeff| acc * s + coeff);
-                let denominator: Complex<T> = self
-                    .denominator
-                    .iter()
-                    .rev()
-                    .fold(Complex::zero(), |acc, &coeff| acc * s + coeff);
-                response.responses[0][i] = numerator / denominator;
+                response.responses[0][i] =
+                    self.numerator.evaluate(s) / self.denominator.evaluate(s);
             })
     }
 }
 
-#[cfg(feature = "std")]
-impl<T, const N: usize, const M: usize> fmt::Display for TransferFunction<T, N, M>
-where
-    T: 'static + Copy + PartialEq + Zero + fmt::Debug + fmt::Display,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fn polynomial_term<T: fmt::Display + Zero>(
-            coeff: T,
-            var: &str,
-            order: usize,
-        ) -> Option<String> {
-            match coeff.is_zero() {
-                true => None,
-                _ => match order {
-                    0 => Some(format!("{coeff:.4}")),
-                    1 => Some(format!("{coeff:.4}{var}")),
-                    _ => Some(format!("{coeff:.4}{var}^{order}")),
-                },
-            }
-        }
-        let num_str = (0..self.numerator.len())
-            .filter_map(|i| polynomial_term(self.numerator[i], "s", M - i - 1))
-            .collect::<Vec<_>>()
-            .join(" + ");
-        let den_str = (0..self.denominator.len())
-            .filter_map(|i| polynomial_term(self.denominator[i], "s", N - i - 1))
-            .collect::<Vec<_>>()
-            .join(" + ");
+// impl<T, const N1: usize, const M1: usize, const N2: usize, const M2: usize>
+//     Mul for TransferFunction<T, N1, M1>
+// where
+//     T: Scalar + Copy + Default + std::ops::AddAssign + std::ops::Mul<Output = T>,
+// {
+//     type Output = TransferFunction<T, { N1 + N2 - 1 }, { M1 + M2 - 1 }>;
 
-        let (n_align, d_align, d_bar) = match den_str.len() > num_str.len() {
-            true => (
-                " ".repeat((den_str.len() - num_str.len()).max(0) / 2),
-                "".to_string(),
-                "-".repeat(den_str.len()),
-            ),
-            false => (
-                "".to_string(),
-                " ".repeat((num_str.len() - den_str.len()).max(0) / 2),
-                "-".repeat(num_str.len()),
-            ),
-        };
+//     fn mul(self, rhs: Self) -> Self::Output {
+//         let mut new_numerator = SMatrix::<T, { M1 + M2 - 1 }, 1>::zeros();
+//         let mut new_denominator = SMatrix::<T, { N1 + N2 - 1 }, 1>::zeros();
 
-        write!(
-            f,
-            "TransferFunction:\n{n_align}{num_str}\n{d_bar}\n{d_align}{den_str}\n"
-        )
-    }
-}
+//         // Polynomial multiplication for numerator
+//         for i in 0..M1 {
+//             for j in 0..M2 {
+//                 new_numerator[(i + j, 0)] += self.numerator[(i, 0)] * rhs.numerator[(j, 0)];
+//             }
+//         }
 
-#[cfg(not(feature = "std"))]
-impl<T, const N: usize, const M: usize> fmt::Display for TransferFunction<T, N, M>
-where
-    T: 'static + Copy + PartialEq + Zero + fmt::Debug + fmt::Display,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Format the numerator coefficients
-        write!(f, "Numerator: [")?;
-        for i in 0..M {
-            if i > 0 {
-                write!(f, ", ")?; // Add a comma separator
-            }
-            write!(f, "{:.4}", self.numerator[(i, 0)])?;
-        }
-        write!(f, "]")?;
+//         // Polynomial multiplication for denominator
+//         for i in 0..N1 {
+//             for j in 0..N2 {
+//                 new_denominator[(i + j, 0)] += self.denominator[(i, 0)] * rhs.denominator[(j, 0)];
+//             }
+//         }
 
-        // Format the denominator coefficients
-        write!(f, " | Denominator: [")?;
-        for i in 0..N {
-            if i > 0 {
-                write!(f, ", ")?; // Add a comma separator
-            }
-            write!(f, "{:.4}", self.denominator[(i, 0)])?;
-        }
-        write!(f, "]")?;
+//         TransferFunction {
+//             numerator: new_numerator,
+//             denominator: new_denominator,
+//         }
+//     }
+// }
 
-        Ok(())
-    }
-}
+// #[cfg(feature = "std")]
+// impl<T, const N: usize, const M: usize> fmt::Display for TransferFunction<T, N, M>
+// where
+//     T: 'static + Copy + PartialEq + Zero + fmt::Debug + fmt::Display,
+// {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         fn polynomial_term<T: fmt::Display + Zero>(
+//             coeff: T,
+//             var: &str,
+//             order: usize,
+//         ) -> Option<String> {
+//             match coeff.is_zero() {
+//                 true => None,
+//                 _ => match order {
+//                     0 => Some(format!("{coeff:.4}")),
+//                     1 => Some(format!("{coeff:.4}{var}")),
+//                     _ => Some(format!("{coeff:.4}{var}^{order}")),
+//                 },
+//             }
+//         }
+//         let num_str = (0..self.numerator.len())
+//             .filter_map(|i| polynomial_term(self.numerator[i], "s", M - i - 1))
+//             .collect::<Vec<_>>()
+//             .join(" + ");
+//         let den_str = (0..self.denominator.len())
+//             .filter_map(|i| polynomial_term(self.denominator[i], "s", N - i - 1))
+//             .collect::<Vec<_>>()
+//             .join(" + ");
+
+//         let (n_align, d_align, d_bar) = match den_str.len() > num_str.len() {
+//             true => (
+//                 " ".repeat((den_str.len() - num_str.len()).max(0) / 2),
+//                 "".to_string(),
+//                 "-".repeat(den_str.len()),
+//             ),
+//             false => (
+//                 "".to_string(),
+//                 " ".repeat((num_str.len() - den_str.len()).max(0) / 2),
+//                 "-".repeat(num_str.len()),
+//             ),
+//         };
+
+//         write!(
+//             f,
+//             "TransferFunction:\n{n_align}{num_str}\n{d_bar}\n{d_align}{den_str}\n"
+//         )
+//     }
+// }
+
+// #[cfg(not(feature = "std"))]
+// impl<T, const N: usize, const M: usize> fmt::Display for TransferFunction<T, N, M>
+// where
+//     T: 'static + Copy + PartialEq + Zero + fmt::Debug + fmt::Display,
+// {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         // Format the numerator coefficients
+//         write!(f, "Numerator: [")?;
+//         for i in 0..M {
+//             if i > 0 {
+//                 write!(f, ", ")?; // Add a comma separator
+//             }
+//             write!(f, "{:.4}", self.numerator[(i, 0)])?;
+//         }
+//         write!(f, "]")?;
+
+//         // Format the denominator coefficients
+//         write!(f, " | Denominator: [")?;
+//         for i in 0..N {
+//             if i > 0 {
+//                 write!(f, ", ")?; // Add a comma separator
+//             }
+//             write!(f, "{:.4}", self.denominator[(i, 0)])?;
+//         }
+//         write!(f, "]")?;
+
+//         Ok(())
+//     }
+// }
 
 #[cfg(test)]
 mod basic_tf_tests {
     //! Basic test cases to make sure the TransferFunction is usable
+    use nalgebra::{U1, U2};
+
     use super::*;
 
     #[test]
     fn initialize_integrator() {
-        let tf = TransferFunction::new([1.0], [1.0, 0.0]);
+        let tf: TransferFunction<f64, U1, U2, ArrayStorage<f64, 1, 1>, ArrayStorage<f64, 2, 1>> =
+            TransferFunction::new([1.0], [1.0, 0.0]);
         assert_eq!(
-            tf.numerator,
-            nalgebra::Matrix1::new(1.0),
+            tf.numerator.coefficients,
+            ArrayStorage([[1.0]]),
             "TF numerator incorrect"
         );
         assert_eq!(
-            tf.denominator,
-            nalgebra::Matrix2x1::new(1.0, 0.0),
+            tf.denominator.coefficients,
+            ArrayStorage([[1.0, 0.0]]),
             "TF denominator incorrect"
         );
     }
@@ -239,3 +268,6 @@ mod basic_tf_tests {
         assert!(lhp(&tf), "TF is not LHP stable");
     }
 }
+
+#[cfg(test)]
+pub mod tf_edge_case_test;

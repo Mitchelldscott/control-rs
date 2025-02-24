@@ -1,6 +1,15 @@
 //! Miscellaneous tools to help work with transfer functions
-//! 
-use nalgebra::{Complex, RealField};
+//!
+
+// #[cfg(feature = "std")]
+// use std::fmt;
+
+// #[cfg(not(feature = "std"))]
+// use core::fmt;
+
+use nalgebra::{RealField, Dim};
+// use nalgebra::{Complex, DefaultAllocator, Dim, DimNameDiff, DimNameSub, Matrix, RawStorage, RealField, U1};
+// use num_traits::{Float, Num, Zero};
 use num_traits::{Float, Zero};
 
 use crate::TransferFunction;
@@ -43,61 +52,55 @@ use crate::TransferFunction;
 ///     println!("DC Gain: {gain:.2}");
 /// }
 /// ```
-pub fn dcgain<T, const N: usize, const M: usize>(tf: &TransferFunction<T, N, M>) -> T
+pub fn dcgain<T, D1: Dim, D2: Dim, S1, S2>(tf: &TransferFunction<T, D1, D2, S1, S2>) -> T
 where
     T: Float,
 {
-    let num_constant = tf.numerator[M - 1]; // Get constant term of numerator
-    let denom_constant = tf.denominator[N - 1]; // Get constant term of denominator
-
-    if denom_constant.is_zero() {
+    let denominator_constant = tf.denominator.constant();
+    if denominator_constant.is_zero() {
         T::infinity()
     } else {
-        num_constant / denom_constant
+        tf.numerator.constant() / denominator_constant
     }
 }
 
-/// Compute the roots of the characteristic equation
-///
-/// Calculates the eigen values of the companion matrix of the transfer function's denominator.
-/// The eigen values of the companion matrix are the roots of the characteristic equation (tf
-/// denominator).
-///
-/// # Arguments
-///
-///  * `tf` - the transfer function to check the poles of
-///
-/// # Returns
-///
-///  * `[complex<T>; N]` - poles of the tf
-///
-/// # Example
-///
-/// ```rust
-/// use control_rs::transfer_function::{TransferFunction, poles};
-///
-/// fn main() {
-///     // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
-///     let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
-///     let poles = poles(&tf); // contains 1 more element than it should
-/// }
-/// ```
-///
-/// ## References
-///
-/// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
-pub fn poles<T, const N: usize, const M: usize>(tf: &TransferFunction<T, N, M>) -> [Complex<T>; N]
-where
-    T: Copy + Zero + Float + RealField,
-{
-    let mut poles = [Complex::new(T::nan(), T::nan()); N]; // actually only ever need N-1...
-
-    if N > 1 {
-        crate::polynomial::roots(tf.denominator.as_slice(), &mut poles);
-    }
-
-    poles
-}
+// /// Compute the roots of the characteristic equation
+// ///
+// /// Calculates the eigen values of the companion matrix of the transfer function's denominator.
+// /// The eigen values of the companion matrix are the roots of the characteristic equation (tf
+// /// denominator).
+// ///
+// /// # Arguments
+// ///
+// ///  * `tf` - the transfer function to check the poles of
+// ///
+// /// # Returns
+// ///
+// ///  * `[complex<T>; N]` - poles of the tf
+// ///
+// /// # Example
+// ///
+// /// ```rust
+// /// use control_rs::transfer_function::{TransferFunction, poles};
+// ///
+// /// fn main() {
+// ///     // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
+// ///     let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
+// ///     let poles = poles(&tf);
+// /// }
+// /// ```
+// ///
+// /// ## References
+// ///
+// /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
+// pub fn poles<T, D1: Dim, D2: Dim, D3: Dim, S1, S2>(tf: &TransferFunction<T, D1, D2, S1, S2>) -> Option<Matrix<Complex<T>, D3, U1, _>> 
+// where 
+//     T: 'static + Copy + Num + fmt::Debug,
+//     D2: DimNameSub<U1>,
+//     S2: RawStorage<T, D2>,
+// {
+//     tf.denominator.roots()
+// }
 
 /// Check if the system's poles lie in the left-half plane (LHP), a condition for stability
 ///
@@ -134,16 +137,16 @@ where
 /// ## References
 ///
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
-pub fn lhp<T, const N: usize, const M: usize>(tf: &TransferFunction<T, N, M>) -> bool
+pub fn lhp<T, D1: Dim, D2: Dim, S1, S2>(tf: &TransferFunction<T, D1, D2, S1, S2>) -> bool
 where
     T: Copy + Zero + Float + RealField,
 {
-    if N == 1 {
+    if tf.denominator.num_coefficients() <= 1 {
         return false;
     }
-    poles(&tf)
+    tf.denominator
+        .roots()
         .iter()
-        .take(N - 1)
         .all(|&pole| !pole.re.is_nan() && pole.re < T::zero())
 }
 
@@ -170,26 +173,22 @@ where
 ///     let (num, den) = as_monic(&tf);
 /// }
 /// ```
-pub fn as_monic<T, const N: usize, const M: usize>(
-    tf: &TransferFunction<T, N, M>,
-) -> ([T; M], [T; N])
+pub fn as_monic<T, D1: Dim, D2: Dim, S1, S2>(
+    tf: &TransferFunction<T, D1, D2, S1, S2>,
+) -> TransferFunction<T, D1, D2, S1, S2>
 where
     T: Copy + Zero + Float,
 {
-    let mut num = [T::zero(); M];
-    let mut den = [T::zero(); N];
-    // Ensure the leading coefficient of the denominator is non-zero
-    let lead_den = tf.denominator[0];
+    let mut numerator = *tf.numerator;
+    let mut denominator = *tf.denominator;
+    
+    let lead_den = tf.denominator.coefficient(0);
 
-    // Scale numerator coefficients by the leading denominator coefficient
-    for (i, coeff) in tf.numerator.iter().enumerate() {
-        num[i] = *coeff / lead_den;
+    if !lead_den.is_zero() {
+        for i in 0..tf.numerator.num_coefficients() {
+            numerator.set_coefficient(i, tf.numerator.coefficient(i) / lead_den);
+        }
     }
 
-    // Scale denominator coefficients by the leading denominator coefficient
-    for (i, coeff) in tf.denominator.iter().enumerate() {
-        den[i] = *coeff / lead_den;
-    }
-
-    return (num, den);
+    return TransferFunction { numerator, denominator };
 }
