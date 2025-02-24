@@ -2,8 +2,179 @@
 //! # Polynomial trait and default implementations
 //!
 //!
-use nalgebra::{Complex, DMatrix, RealField};
-use num_traits::Float;
+use nalgebra::{allocator::Allocator, Complex, Const, DMatrix, DefaultAllocator, DimDiff, DimSub, OMatrix, RealField, U1};
+use num_traits::{Float, Num};
+
+#[cfg(feature = "std")]
+use std::{fmt, ops::{Add, Mul, Neg}};
+
+#[cfg(not(feature = "std"))]
+use core::{fmt, ops::{Add, Mul, Neg}};
+
+/// static array of coefficients for a polynomial of degree `D - 1` and variable `V`.
+pub struct Polynomial<T, const D: usize, const V: u8> {
+    // coefficients of the polynomial stored in descending degree order
+    coefficients: [T; D]
+}
+
+impl<T, const D: usize, const V: u8> Polynomial<T, D, V> {
+    /// Create a new polynomial with the given coefficients.
+    ///
+    /// # Arguments
+    ///
+    /// * `coefficients` - An array of coefficients of the polynomial in descending degree order.
+    ///
+    /// # Returns
+    ///
+    /// * `Polynomial<T, D, V>` - A new polynomial with the given coefficients.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use control_rs::polynomial::Polynomial;
+    ///
+    /// let p = Polynomial::<f64, 3, 1>::new([1.0, 2.0, 3.0]);
+    /// ```
+    pub fn new(coefficients: [T; D]) -> Self {
+        Polynomial { coefficients }
+    }
+}
+
+impl<T: Copy + Num, const D: usize, const V: u8> Polynomial<T, D, V> {
+    /// Evaluate the polynomial at the given value.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The value at which to evaluate the polynomial.
+    ///
+    /// # Returns
+    ///
+    /// * `T` - The value of the polynomial at the given value.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use control_rs::polynomial::Polynomial;
+    ///
+    /// let p = Polynomial::<f64, 3, 1>::new([1.0, 2.0, 3.0]);
+    /// let value = p.evaluate(2.0);
+    /// ```
+    pub fn evaluate<U>(&self, value: U) -> U
+    where
+        U: Copy + Num + Add<T, Output = U> + Mul<U, Output = U>,
+    {
+        self.coefficients.iter().fold(U::zero(), |acc, &c| acc * value + c)
+    }
+
+    /// Compute the derivative of the polynomial.
+    ///
+    /// # Returns
+    ///
+    /// * `Polynomial<T, D - 1, V>` - The derivative of the polynomial.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use control_rs::polynomial::Polynomial;
+    ///
+    /// let p = Polynomial::<f64, 3, 1>::new([1.0, 2.0, 3.0]);
+    /// let derivative: Polynomial::<f64, 2, 1> = p.derivative();
+    /// ```
+    pub fn derivative<const D1: usize>(&self) -> Polynomial<T, D1, V>
+    where
+        T: From<usize>,
+    {
+        let mut derivative_coefficients = [T::zero(); D1];
+        for i in 0..D1 {
+            derivative_coefficients[i] = self.coefficients[i] * T::from(D1 - i);
+        }
+        Polynomial::new(derivative_coefficients)
+    }
+
+    /// Constructs the companion matrix of the polynomial.
+    ///
+    /// The companion matrix is useful for finding polynomial roots using eigenvalue decomposition.
+    ///
+    /// # Returns
+    ///
+    /// * `OMatrix<T, Const<D>, Const<D>>` - The companion matrix representation of the polynomial.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use control_rs::polynomial::Polynomial;
+    ///
+    /// let p = Polynomial::<f64, 3, 1>::new([1.0, -6.0, 11.0, -6.0]);
+    /// let companion_matrix = p.companion();
+    /// ```
+    pub fn companion(&self) -> OMatrix<T, Const<D>, Const<D>> 
+    where 
+        T: 'static + Neg<Output = T> + fmt::Debug,
+    {
+        OMatrix::<T, Const<D>, Const<D>>::from_fn(|i, j| {
+            if i == 0 {
+                -self.coefficients[j]
+            } else {
+                if i + 1 == j {
+                    T::one()
+                } else {
+                    T::zero()
+                }
+            }
+        })
+    }
+
+    /// Computes the roots of the polynomial.
+    ///
+    /// Edge cases:
+    /// - all coefficients are zero: all roots are infinite
+    /// - if there are two coefficients and the lead is non-zero, the root is -coeff[1]/coeff[0]
+    /// 
+    /// For very high order polynomials this may be inefficient, especially for degenerate cases.
+    /// User should consider cases where all/many coeff = 0 and avoid calling this. Would be nice if
+    /// nalgebra handled large/sparse matrix eigenvalues.
+    ///
+    /// # Returns
+    ///
+    /// * `OMatrix<Complex<T>, Const<D>, U1>` - A column vector containing the computed roots.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use control_rs::polynomial::Polynomial;
+    ///
+    /// let p = Polynomial::<f64, 3, 1>::new([1.0, -6.0, 11.0, -6.0]);
+    /// let roots = p.roots();
+    /// ```
+    pub fn roots(&self) -> OMatrix<Complex<T>, Const<D>, U1>
+    where 
+        T: RealField + Float,
+        Const<D>: DimSub<U1>,
+        DefaultAllocator: Allocator<Const<D>, DimDiff<Const<D>, U1>> + Allocator<DimDiff<Const<D>, U1>> + Allocator<Const<D>, Const<D>> + Allocator<Const<D>>,
+    {
+        let num_zeros = self.coefficients.iter().fold(0, |acc, &c| match c == T::zero() {
+            true => acc + 1,
+            false => acc,
+        });
+        
+        if num_zeros == D {
+            return OMatrix::<Complex<T>, Const<D>, U1>::from_element(Complex::new(T::infinity(), T::infinity()));
+        }
+
+        if D <= 2 {
+            if self.coefficients[0].is_zero() || D == 1 {
+                return OMatrix::<Complex<T>, Const<D>, U1>::from_element(Complex::new(T::nan(), T::nan()));
+            } else {
+                let mut roots = OMatrix::<Complex<T>, Const<D>, U1>::from_element(Complex::new(T::nan(), T::nan()));
+                roots[0] = Complex::new(-self.coefficients[1] / self.coefficients[0], T::zero());
+                roots
+            }
+        }
+        else {
+            self.companion().complex_eigenvalues()
+        }
+    }
+}
 
 /// Computes the roots of a univariate polynomial of degree `N` by calculating
 /// the eigenvalues of its companion matrix. Also provides some edge case checks
