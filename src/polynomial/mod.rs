@@ -16,7 +16,7 @@ use core::{
     ops::{Add, Mul, Neg},
 };
 
-use nalgebra::{ArrayStorage, Complex, Const, DefaultAllocator, Dim, DimName, DimNameDiff, DimNameSub, Dyn, Matrix, RawStorage, RawStorageMut, SMatrix, VecStorage, U1};
+use nalgebra::{allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, Dim, DimName, DimNameDiff, DimNameSub, Dyn, Matrix, OMatrix, RawStorage, RawStorageMut, SMatrix, VecStorage, U1};
 use num_traits::{Float, Num, Zero};
 
 pub mod tools;
@@ -119,18 +119,17 @@ where
 //     }
 // }
 
-pub fn companion<T, D1, D2, S1, S2>(polynomial: Polynomial<T, D1, S1>) -> Matrix<T, D2, D2, S2> 
+pub fn companion<T, D, S1, S2>(polynomial: &Polynomial<T, D, S1>) -> OMatrix<T, D, D> 
 where 
     T: 'static + Copy + Num + Neg<Output = T> + fmt::Debug,
-    D1: DimNameSub<U1>,
-    DimNameDiff<D1, U1>: DimName,
-    D2: DimName,
-    S1: RawStorage<T, D1>,
-    S2: RawStorage<T, D2, D2>,
+    D: DimName,
+    S1: RawStorage<T, D>,
+    S2: RawStorage<T, D, D>,
+    DefaultAllocator: Allocator<D, D> + Allocator<D>,
 {
-    SMatrix::<T, D2, D2>::from_fn(|i, j| {
+    OMatrix::<T, D, D>::from_fn(|i, j| {
         if i == 0 {
-            -polynomial.coefficient(j + 1)
+            -polynomial.coefficient(j)
         } else {
             if i + 1 == j {
                 T::one()
