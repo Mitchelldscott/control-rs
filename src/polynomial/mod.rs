@@ -10,13 +10,13 @@ use num_traits::{Float, Num};
 #[cfg(feature = "std")]
 use std::{
     fmt,
-    ops::{Add, Mul, Neg},
+    ops::{Add, Mul, Neg, Index},
 };
 
 #[cfg(not(feature = "std"))]
 use core::{
     fmt,
-    ops::{Add, Mul, Neg},
+    ops::{Add, Mul, Neg, Index},
 };
 
 /// static array of coefficients for a polynomial of degree `D - 1`.
@@ -32,11 +32,12 @@ use core::{
 /// 
 /// * `T` - Type of the coefficients
 /// * `D` - Length of the coefficient array, NOT the degree!
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Polynomial<T, const D: usize> {
-    // string indicating the variable the polynomial represents
-    variable: String,
-    // coefficients of the polynomial stored in descending degree order
-    coefficients: [T; D],
+    /// string indicating the variable the polynomial represents
+    pub variable: &'static str,
+    /// coefficients of the polynomial stored in descending degree order
+    pub coefficients: [T; D],
 }
 
 impl<T, const D: usize> Polynomial<T, D> {
@@ -57,11 +58,19 @@ impl<T, const D: usize> Polynomial<T, D> {
     ///
     /// let p = Polynomial::<f64, 3>::new(b'x', [1.0, 2.0, 3.0]);
     /// ```
-    pub fn new(variable: &str, coefficients: [T; D]) -> Self {
+    pub const fn new(variable: &'static str, coefficients: [T; D]) -> Self {
         Polynomial {
-            variable: String::from(variable),
+            variable,
             coefficients,
         }
+    }
+}
+
+impl<T: Copy, const D: usize> Polynomial<T, D> {
+    /// Get the constant term of the polynomial.
+    pub fn constant(&self) -> T {
+        assert!(D > 0, "Polynomial length 0 does not have a constant term");
+        self.coefficients[D - 1]
     }
 }
 
@@ -85,7 +94,7 @@ impl<T: Copy + Default, const D: usize> Default for Polynomial<T, D> {
     /// ```
     fn default() -> Self {
         Polynomial {
-            variable: String::from("x"),
+            variable: "x",
             coefficients: [T::default(); D],
         }
     }
@@ -133,14 +142,14 @@ impl<T: Copy + Num, const D: usize> Polynomial<T, D> {
     /// let p = Polynomial::new(b'x', [1.0, 2.0, 3.0]);
     /// let derivative: Polynomial::<f64, 2, 1> = p.derivative();
     /// ```
-    pub fn derivative<const D1: usize>(&self) -> Polynomial<T, D1> {
+    pub fn derivative<const D1: usize>(&self, variable: &'static str) -> Polynomial<T, D1> {
         let mut coefficients = [T::zero(); D1];
         for i in 0..D1 {
             coefficients[i] = (0..D1 - i).fold(T::zero(), |acc, j| acc + self.coefficients[j]);
         }
 
         Polynomial {
-            variable: self.variable.clone() + "'",
+            variable,
             coefficients,
         }
     }
@@ -244,26 +253,34 @@ impl<T: Copy + Num, const D: usize> Polynomial<T, D> {
     }
 }
 
+impl<T, const D: usize> Index<usize> for Polynomial<T, D> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.coefficients[index]
+    }
+}
+
 impl<T, const D: usize> fmt::Display for Polynomial<T, D>
 where
-    T: fmt::Display + From<u8> + Copy + Num + PartialOrd + Neg<Output = T>,
+    T: Copy + Num + PartialOrd + Neg<Output = T> + fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, &coeff) in self.coefficients.iter().enumerate() {
-            if coeff == T::from(0) {
+            if coeff == T::zero() {
                 continue;
             }
 
             if i > 0 {
-                write!(f, " {} ", if coeff >= T::from(0) { "+" } else { "-" })?;
-            } else if coeff < T::from(0) {
+                write!(f, " {} ", if coeff >= T::zero() { "+" } else { "-" })?;
+            } else if coeff < T::zero() {
                 write!(f, "-")?;
             }
 
-            let abs_coeff = if coeff < T::from(0) { -coeff } else { coeff };
+            let abs_coeff = if coeff < T::zero() { -coeff } else { coeff };
             let exp = D - 1 - i;
 
-            if abs_coeff != T::from(1) || exp == 0 {
+            if abs_coeff != T::one() || exp == 0 {
                 write!(f, "{}", abs_coeff)?;
             }
 

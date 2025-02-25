@@ -33,7 +33,7 @@ fn validate_derivative<T, const D: usize, const D1: usize>(
 ) where
     T: Copy + Num + Scalar,
 {
-    let result = polynomial.derivative();
+    let result = polynomial.derivative("x'");
     assert_eq!(
         result.coefficients,
         expected.coefficients,

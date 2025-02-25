@@ -47,13 +47,11 @@ pub fn dcgain<T, const N: usize, const M: usize>(tf: &TransferFunction<T, N, M>)
 where
     T: Float,
 {
-    let num_constant = tf.numerator[M - 1]; // Get constant term of numerator
-    let denom_constant = tf.denominator[N - 1]; // Get constant term of denominator
-
-    if denom_constant.is_zero() {
+    let denominator_constant = tf.denominator.constant();
+    if denominator_constant.is_zero() {
         T::infinity()
     } else {
-        num_constant / denom_constant
+        tf.numerator.constant() / denominator_constant
     }
 }
 
@@ -173,22 +171,22 @@ where
 /// ```
 pub fn as_monic<T, const N: usize, const M: usize>(
     tf: &TransferFunction<T, N, M>,
-) -> ([T; M], [T; N])
+) -> ([T; N], [T; M])
 where
     T: Copy + Zero + Float,
 {
-    let mut num = [T::zero(); M];
-    let mut den = [T::zero(); N];
+    let mut num = [T::zero(); N];
+    let mut den = [T::zero(); M];
     // Ensure the leading coefficient of the denominator is non-zero
     let lead_den = tf.denominator[0];
 
     // Scale numerator coefficients by the leading denominator coefficient
-    for (i, coeff) in tf.numerator.iter().enumerate() {
+    for (i, coeff) in tf.numerator.coefficients.iter().enumerate() {
         num[i] = *coeff / lead_den;
     }
 
     // Scale denominator coefficients by the leading denominator coefficient
-    for (i, coeff) in tf.denominator.iter().enumerate() {
+    for (i, coeff) in tf.denominator.coefficients.iter().enumerate() {
         den[i] = *coeff / lead_den;
     }
 
