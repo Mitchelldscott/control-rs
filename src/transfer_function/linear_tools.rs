@@ -1,5 +1,5 @@
 //! Miscellaneous tools to help work with transfer functions
-//! 
+//!
 use nalgebra::{Complex, RealField};
 use num_traits::{Float, Zero};
 
@@ -86,14 +86,15 @@ where
 /// ## References
 ///
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
-pub fn poles<T, const N: usize, const M: usize>(tf: &TransferFunction<T, N, M>) -> [Complex<T>; N]
+pub fn poles<T, const N: usize, const M: usize>(_tf: &TransferFunction<T, N, M>) -> [Complex<T>; N]
 where
     T: Copy + Zero + Float + RealField,
 {
-    let mut poles = [Complex::new(T::nan(), T::nan()); N]; // actually only ever need N-1...
+    // mut
+    let poles = [Complex::new(T::nan(), T::nan()); N]; // actually only ever need N-1...
 
     if N > 1 {
-        crate::polynomial::roots(tf.denominator.as_slice(), &mut poles);
+        // crate::polynomial::roots(tf.denominator.as_slice(), &mut poles);
     }
 
     poles

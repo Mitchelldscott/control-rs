@@ -23,7 +23,7 @@
 //! DC Gain: 0.9090909090909091
 //! LHP: true
 //! ```
-use control_rs::{transfer_function::*, state_space::*, DynamicModel};
+use control_rs::{state_space::*, transfer_function::*, DynamicModel};
 use nalgebra::{Vector1, Vector2};
 
 // Define motor parameters
@@ -42,7 +42,11 @@ type MotorOutput = Vector1<f64>;
 const SIMSTEPS: usize = 100;
 type SimData = [(f64, f64, f64, f64); SIMSTEPS];
 
-fn sim<M: DynamicModel<f64, MotorInput, MotorState, MotorOutput>>(model: M, dt: f64, mut x: MotorState) -> SimData {
+fn sim<M: DynamicModel<f64, MotorInput, MotorState, MotorOutput>>(
+    model: M,
+    dt: f64,
+    mut x: MotorState,
+) -> SimData {
     let mut sim = [(0.0, x[0], x[1], model.h(x, 1.0)[(0, 0)]); SIMSTEPS];
     for i in 1..SIMSTEPS {
         x = model.rk4(0.01, 0.0, 0.1, x, 1.0);
@@ -52,30 +56,30 @@ fn sim<M: DynamicModel<f64, MotorInput, MotorState, MotorOutput>>(model: M, dt: 
     sim
 }
 
-#[cfg(feature="std")]
+#[cfg(feature = "std")]
 fn plot(sim: SimData) {
-    use plotly::{Plot, Scatter, Layout};
+    use plotly::{Layout, Plot, Scatter};
 
     // Extract time and state values
     let time: Vec<f64> = sim.iter().map(|(t, _, _, _)| *t).collect();
     let state1: Vec<f64> = sim.iter().map(|(_, x, _, _)| *x).collect();
     let state2: Vec<f64> = sim.iter().map(|(_, _, x, _)| *x).collect();
     let output: Vec<f64> = sim.iter().map(|(_, _, _, x)| *x).collect();
-    
+
     // Create plot traces
     let trace1 = Scatter::new(time.clone(), state1).name("State 1");
     let trace2 = Scatter::new(time.clone(), state2).name("State 2");
     let trace3 = Scatter::new(time, output).name("Output");
-    
+
     // Create subplots
     let mut plot = Plot::new();
     let layout = Layout::new();
-    
+
     plot.set_layout(layout);
     plot.add_trace(trace1);
     plot.add_trace(trace2);
     plot.add_trace(trace3);
-    
+
     plot.show();
 }
 
@@ -83,7 +87,8 @@ fn main() {
     // Numerator: [Km]
     // Denominator: JLs^2 + (JR + bL)s + bR + Km^2
     // let motor_tf = TransferFunction::new([Km], [J * L, (J * R + L * b), (R * b) + (Km * Km)]);
-    let motor_tf = TransferFunction::new([10.0 * Km], [J * L, (J * R + L * b), (R * b) + (Km * Km)]);
+    let motor_tf =
+        TransferFunction::new([10.0 * Km], [J * L, (J * R + L * b), (R * b) + (Km * Km)]);
 
     println!("DC Motor {motor_tf}");
     println!("DC Gain: {:?}", dcgain(&motor_tf));
@@ -97,7 +102,7 @@ fn main() {
     // simulate for 100 steps
     let sim_data = sim(motor_ss, 0.1, MotorState::new(0.0, 0.0));
 
-    #[cfg(feature="std")]
+    #[cfg(feature = "std")]
     plot(sim_data);
 
     // let combined_tf = feedback(motor_tf, 1.0);

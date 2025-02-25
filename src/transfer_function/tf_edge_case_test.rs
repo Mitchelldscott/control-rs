@@ -17,14 +17,11 @@ const CRITICALLY_DAMPED_TF: TransferFunction<f64, 3, 1> =
 
 const UNSTABLE_TF: TransferFunction<f64, 3, 1> = TransferFunction::new([1.0], [1.0, -2.0, 1.0]);
 
-const ZP_CANCEL_TF: TransferFunction<f64, 2, 2> =
-    TransferFunction::new([1.0, -1.0], [1.0, -1.0]);
+const ZP_CANCEL_TF: TransferFunction<f64, 2, 2> = TransferFunction::new([1.0, -1.0], [1.0, -1.0]);
 
-const HIGH_ORDER_TF: TransferFunction<f64, 20, 20> =
-    TransferFunction::new([1.0; 20], [1.0; 20]);
+const HIGH_ORDER_TF: TransferFunction<f64, 20, 20> = TransferFunction::new([1.0; 20], [1.0; 20]);
 
-const LOW_DAMPED_TF: TransferFunction<f64, 3, 1> =
-    TransferFunction::new([1.0], [1.0, 0.1, 1.0]);
+const LOW_DAMPED_TF: TransferFunction<f64, 3, 1> = TransferFunction::new([1.0], [1.0, 0.1, 1.0]);
 
 #[test]
 fn improper_tests() {
@@ -159,4 +156,3 @@ fn poorly_damped_tests() {
         "as_monic for LOW_DAMPED_TF"
     );
 }
-
