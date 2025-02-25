@@ -45,21 +45,21 @@ use crate::{
 /// # Generic Arguments
 ///
 /// * `T` - type of the coefficients
-/// * `N` - order of the denominator
 /// * `M` - order of the numerator
+/// * `N` - order of the denominator
 ///
 /// ## References
 ///
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 3.1
-pub struct TransferFunction<T, const D1: usize, const D2: usize> {
+pub struct TransferFunction<T, const M: usize, const N: usize> {
     /// coefficients of the numerator `[bn, ... b2, b1]`
-    pub numerator: Polynomial<T, D1>,
+    pub numerator: Polynomial<T, M>,
     /// coefficients of the denominator `[an, ... a1, a0]`
-    pub denominator: Polynomial<T, D2>,
+    pub denominator: Polynomial<T, N>,
 }
 
-impl<T, const D1: usize, const D2: usize>
-    TransferFunction<T, D1, D2>
+impl<T, const M: usize, const N: usize>
+    TransferFunction<T, M, N>
 where
     T: 'static + Copy + PartialEq,
 {
@@ -74,7 +74,6 @@ where
     ///
     /// * `TransferFunction` - a new TransferFunction object
     ///
-    ///
     /// # Example
     ///
     /// ```
@@ -85,7 +84,7 @@ where
     ///     println!("{tf}");
     /// }
     /// ```
-    pub const fn new(numerator: [T; D1], denominator: [T; D2]) -> Self {
+    pub const fn new(numerator: [T; M], denominator: [T; N]) -> Self {
         TransferFunction {
             numerator: Polynomial::new("s", numerator),
             denominator: Polynomial::new("s", denominator),
@@ -93,7 +92,7 @@ where
     }
 }
 
-impl<T, const D1: usize, const D2: usize> FrequencyTools<T, 1, 1> for TransferFunction<T, D1, D2>
+impl<T, const M: usize, const N: usize> FrequencyTools<T, 1, 1> for TransferFunction<T, M, N>
 where
     T: Float + RealField + From<i16>,
 {
@@ -110,7 +109,7 @@ where
     }
 }
 
-impl<T, const D1: usize, const D2: usize> fmt::Display for TransferFunction<T, D1, D2>
+impl<T, const M: usize, const N: usize> fmt::Display for TransferFunction<T, M, N>
 where
     T: 'static + Copy + Num + PartialEq + PartialOrd + Neg<Output = T> + fmt::Debug + fmt::Display,
 {
@@ -138,36 +137,6 @@ where
     }
 }
 
-#[cfg(not(feature = "std"))]
-impl<T, const N: usize, const M: usize> fmt::Display for TransferFunction<T, N, M>
-where
-    T: 'static + Copy + PartialEq + Zero + fmt::Debug + fmt::Display,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Format the numerator coefficients
-        write!(f, "Numerator: [")?;
-        for i in 0..M {
-            if i > 0 {
-                write!(f, ", ")?; // Add a comma separator
-            }
-            write!(f, "{:.4}", self.numerator[(i, 0)])?;
-        }
-        write!(f, "]")?;
-
-        // Format the denominator coefficients
-        write!(f, " | Denominator: [")?;
-        for i in 0..N {
-            if i > 0 {
-                write!(f, ", ")?; // Add a comma separator
-            }
-            write!(f, "{:.4}", self.denominator[(i, 0)])?;
-        }
-        write!(f, "]")?;
-
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod basic_tf_tests {
     //! Basic test cases to make sure the TransferFunction is usable
@@ -191,17 +160,17 @@ mod basic_tf_tests {
     #[test]
     fn tf_as_monic() {
         let tf = TransferFunction::new([2.0], [2.0, 0.0]);
-        let (num, den) = as_monic(&tf);
-        assert_eq!(num, [1.0], "TF numerator incorrect");
-        assert_eq!(den, [1.0, 0.0], "TF denominator incorrect");
+        let monic_tf = as_monic(&tf);
+        assert_eq!(monic_tf.numerator.coefficients, [1.0], "TF numerator incorrect");
+        assert_eq!(monic_tf.denominator.coefficients, [1.0, 0.0], "TF denominator incorrect");
     }
 
     #[test]
     fn monic_tf_as_monic() {
         let tf = TransferFunction::new([1.0, 1.0], [1.0, 0.0]);
-        let (num, den) = as_monic(&tf);
-        assert_eq!(num, [1.0, 1.0], "TF numerator incorrect");
-        assert_eq!(den, [1.0, 0.0], "TF denominator incorrect");
+        let monic_tf = as_monic(&tf);
+        assert_eq!(monic_tf.numerator.coefficients, [1.0, 1.0], "TF numerator incorrect");
+        assert_eq!(monic_tf.denominator.coefficients, [1.0, 0.0], "TF denominator incorrect");
     }
 
     #[test]

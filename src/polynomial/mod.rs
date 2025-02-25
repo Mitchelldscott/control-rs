@@ -5,19 +5,26 @@
 use nalgebra::{
     allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimSub, OMatrix, RealField, U1,
 };
-use num_traits::{Float, Num};
+use num_traits::Num;
 
 #[cfg(feature = "std")]
 use std::{
     fmt,
-    ops::{Add, Mul, Neg, Index},
+    ops::{Add, Sub, Mul, Div, Neg, Index},
 };
 
 #[cfg(not(feature = "std"))]
 use core::{
     fmt,
-    ops::{Add, Mul, Neg, Index},
+    ops::{Add, Sub, Mul, Div, Neg, Index},
 };
+
+
+#[cfg(test)]
+mod edge_case_test;
+
+#[cfg(test)]
+mod fmt_tests;
 
 /// static array of coefficients for a polynomial of degree `D - 1`.
 /// 
@@ -153,7 +160,12 @@ impl<T: Copy + Num, const D: usize> Polynomial<T, D> {
             coefficients,
         }
     }
+}
 
+impl<T, const D:usize> Polynomial<T, D> 
+where 
+    T: 'static + Copy + Num + Neg<Output = T> + fmt::Debug
+{
     /// Constructs the companion matrix of the polynomial.
     ///
     /// The companion matrix is useful for finding polynomial roots using eigenvalue decomposition.
@@ -170,10 +182,7 @@ impl<T: Copy + Num, const D: usize> Polynomial<T, D> {
     /// let p = Polynomial::<f64, 3, 1>::new([1.0, -6.0, 11.0, -6.0]);
     /// let companion_matrix = p.companion();
     /// ```
-    pub fn companion(&self) -> OMatrix<T, Const<D>, Const<D>>
-    where
-        T: 'static + Neg<Output = T> + fmt::Debug,
-    {
+    pub fn companion(&self) -> OMatrix<T, Const<D>, Const<D>> {
         OMatrix::<T, Const<D>, Const<D>>::from_fn(|i, j| {
             if i == 0 {
                 -self.coefficients[j]
@@ -209,57 +218,45 @@ impl<T: Copy + Num, const D: usize> Polynomial<T, D> {
     /// let p = Polynomial::<f64, 3, 1>::new([1.0, -6.0, 11.0, -6.0]);
     /// let roots = p.roots();
     /// ```
-    pub fn roots(&self) -> OMatrix<Complex<T>, Const<D>, U1>
+    pub fn roots(&self) -> Option<OMatrix<Complex<T>, Const<D>, U1>>
     where
-        T: RealField + Float,
+        T: RealField,
         Const<D>: DimSub<U1>,
         DefaultAllocator: Allocator<Const<D>, DimDiff<Const<D>, U1>>
             + Allocator<DimDiff<Const<D>, U1>>
             + Allocator<Const<D>, Const<D>>
             + Allocator<Const<D>>,
     {
-        let num_zeros = self
+        if D <= 1 || self
             .coefficients
             .iter()
-            .fold(0, |acc, &c| match c == T::zero() {
-                true => acc + 1,
-                false => acc,
-            });
-
-        if num_zeros == D {
-            return OMatrix::<Complex<T>, Const<D>, U1>::from_element(Complex::new(
-                T::infinity(),
-                T::infinity(),
-            ));
+            .fold(true, |acc, &c| match c == T::zero() {
+                true => acc,
+                false => false,
+        }) {
+            return None;
         }
 
-        if D <= 2 {
-            if self.coefficients[0].is_zero() || D == 1 {
-                return OMatrix::<Complex<T>, Const<D>, U1>::from_element(Complex::new(
-                    T::nan(),
-                    T::nan(),
-                ));
+        if D == 2 {
+            if self.coefficients[0].is_zero() {
+                None
             } else {
                 let mut roots = OMatrix::<Complex<T>, Const<D>, U1>::from_element(Complex::new(
-                    T::nan(),
-                    T::nan(),
+                    T::zero(),
+                    T::zero(),
                 ));
                 roots[0] = Complex::new(-self.coefficients[1] / self.coefficients[0], T::zero());
-                roots
+                Some(roots)
             }
         } else {
-            self.companion().complex_eigenvalues()
+            Some(self.companion().complex_eigenvalues())
         }
     }
 }
 
-impl<T, const D: usize> Index<usize> for Polynomial<T, D> {
-    type Output = T;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.coefficients[index]
-    }
-}
+// ===============================================================================================
+//      Polynomial Display Implementation
+// ===============================================================================================
 
 impl<T, const D: usize> fmt::Display for Polynomial<T, D>
 where
@@ -296,8 +293,84 @@ where
     }
 }
 
-#[cfg(test)]
-mod edge_case_test;
+// ===============================================================================================
+//      Polynomial Operator Implementations
+// ===============================================================================================
 
-#[cfg(test)]
-mod fmt_tests;
+//
+//  Index
+//
+
+impl<T, const D: usize> Index<usize> for Polynomial<T, D> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.coefficients[index]
+    }
+}
+
+//
+//  Scalar Math
+//
+
+impl<T, U, const D: usize> Add<U> for Polynomial<T, D>
+where
+    T: Copy + Add<U, Output = T>,
+{
+    type Output = Self;
+
+    fn add(self, rhs: U) -> Self::Output {
+        let mut new_poly = self;
+        if D > 0 {
+            new_poly.coefficients[D-1] = self.coefficients[D-1] + rhs;
+        }
+        new_poly
+    }
+}
+
+impl<T, U, const D: usize> Sub<U> for Polynomial<T, D>
+where
+    T: Copy + Sub<U, Output = T>,
+{
+    type Output = Self;
+
+    fn sub(self, rhs: U) -> Self::Output {
+        let mut new_poly = self;
+        if D > 0 {
+            new_poly.coefficients[D-1] = self.coefficients[D-1] - rhs;
+        }
+        new_poly
+    }
+}
+
+impl<T, U, const D: usize> Mul<U> for Polynomial<T, D>
+where
+    U: Copy,
+    T: Copy + Mul<U, Output = T>,
+{
+    type Output = Polynomial<T, D>;
+
+    fn mul(self, rhs: U) -> Self::Output {
+        let mut new_poly = self;
+        for i in 0..D {
+            new_poly.coefficients[i] = self.coefficients[i] * rhs;
+        }
+        new_poly
+    }
+}
+
+impl<T, U, const D: usize> Div<U> for Polynomial<T, D>
+where
+    U: Copy,
+    T: Copy + Div<U, Output = T>,
+{
+    type Output = Self;
+
+    fn div(self, rhs: U) -> Self::Output {
+        let mut new_poly = self;
+        for i in 0..D {
+            new_poly.coefficients[i] = self.coefficients[i] / rhs;
+        }
+        new_poly
+    }
+}
