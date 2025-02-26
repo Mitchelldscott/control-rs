@@ -1,7 +1,7 @@
 //! Miscellaneous tools to help work with transfer functions
 //!
 use nalgebra::{
-    allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimSub, OMatrix, RealField, U1,
+    allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimName, DimSub, OMatrix, RealField, U1
 };
 use num_traits::{Float, Zero};
 
@@ -88,17 +88,16 @@ where
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
 pub fn poles<T, const M: usize, const N: usize>(
     tf: &TransferFunction<T, M, N>,
-) -> Option<OMatrix<Complex<T>, Const<N>, U1>>
+) -> OMatrix<Complex<T>, DimDiff<Const<N>, U1>, U1>
 where
     T: Copy + Zero + Float + RealField,
     Const<N>: DimSub<U1>,
-    DefaultAllocator: Allocator<Const<N>, DimDiff<Const<N>, U1>>
-        + Allocator<DimDiff<Const<N>, U1>>
-        + Allocator<Const<N>, Const<N>>
-        + Allocator<Const<N>>,
+    DimDiff<Const<N>, U1>: DimName + DimSub<U1>,
+    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>> 
+        + Allocator<DimDiff<Const<N>, U1>, DimDiff<DimDiff<Const<N>, U1>, U1>> 
+        + Allocator<DimDiff<DimDiff<Const<N>, U1>, U1>> + Allocator<DimDiff<Const<N>, U1>>,
 {
-    // tf.denominator.roots()
-    None
+    tf.denominator.roots()
 }
 
 /// Check if the system's poles lie in the left-half plane (LHP), a condition for stability
@@ -140,21 +139,14 @@ pub fn lhp<T, const M: usize, const N: usize>(tf: &TransferFunction<T, M, N>) ->
 where
     T: Copy + Zero + Float + RealField,
     Const<N>: DimSub<U1>,
-    DefaultAllocator: Allocator<Const<N>, DimDiff<Const<N>, U1>>
-        + Allocator<DimDiff<Const<N>, U1>>
-        + Allocator<Const<N>, Const<N>>
-        + Allocator<Const<N>>,
+    DimDiff<Const<N>, U1>: DimName + DimSub<U1>,
+    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>> 
+        + Allocator<DimDiff<Const<N>, U1>, DimDiff<DimDiff<Const<N>, U1>, U1>> 
+        + Allocator<DimDiff<DimDiff<Const<N>, U1>, U1>> + Allocator<DimDiff<Const<N>, U1>>,
 {
-    if N == 1 {
-        false
-    } else if let Some(poles) = poles(&tf) {
-        poles
-            .iter()
-            .take(N - 1)
-            .all(|&pole| !pole.re.is_nan() && pole.re < T::zero())
-    } else {
-        false
-    }
+    poles(&tf) 
+        .iter()
+        .all(|&pole| !pole.re.is_nan() && pole.re < T::zero())
 }
 
 /// Helper function to create a state space model from a transfer function

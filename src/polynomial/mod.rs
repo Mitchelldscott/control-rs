@@ -5,18 +5,18 @@
 use nalgebra::{
     allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimName, DimSub, OMatrix, RealField, U1
 };
-use num_traits::Num;
+use num_traits::{Float, Num};
 
 #[cfg(feature = "std")]
 use std::{
     fmt,
-    ops::{Add, Div, Index, Mul, Neg, Sub},
+    ops::{Add, Sub, Mul, Div, Neg, Index, IndexMut},
 };
 
 #[cfg(not(feature = "std"))]
 use core::{
     fmt,
-    ops::{Add, Div, Index, Mul, Neg, Sub},
+    ops::{Add, Sub, Mul, Div, Neg, Index, IndexMut},
 };
 
 #[cfg(test)]
@@ -199,7 +199,7 @@ where
     pub fn companion(&self) -> OMatrix<T, DimDiff<Const<D>, U1>, DimDiff<Const<D>, U1>> 
     where 
         Const<D>: DimSub<U1>,
-        <Const<D> as DimSub<U1>>::Output: DimName,
+        DimDiff<Const<D>, U1>: DimName,
         DefaultAllocator: Allocator<DimDiff<Const<D>, U1>, DimDiff<Const<D>, U1>>,
     {
         // return companion;
@@ -243,9 +243,9 @@ where
     /// let p = Polynomial::<f64, 3, 1>::new([1.0, -6.0, 11.0, -6.0]);
     /// let roots = p.roots();
     /// ```
-    pub fn roots(&self) -> Option<OMatrix<Complex<T>, DimDiff<Const<D>, U1>, U1>>
+    pub fn roots(&self) -> OMatrix<Complex<T>, DimDiff<Const<D>, U1>, U1>
     where
-        T: RealField,
+        T: RealField + Float,
         Const<D>: DimSub<U1>,
         DimDiff<Const<D>, U1>: DimName + DimSub<U1>,
         DefaultAllocator: Allocator<DimDiff<Const<D>, U1>, DimDiff<Const<D>, U1>>
@@ -253,33 +253,33 @@ where
             + Allocator<DimDiff<DimDiff<Const<D>, U1>, U1>>
             + Allocator<DimDiff<Const<D>, U1>>,
     {
-        if D <= 1
-            || self
-                .coefficients
+        if self.coefficients
                 .iter()
                 .fold(true, |acc, &c| match c == T::zero() {
                     true => acc,
                     false => false,
                 })
         {
-            return None;
+            return OMatrix::<Complex<T>, DimDiff<Const<D>, U1>, U1>::from_element(Complex::new(
+                T::infinity(),
+                T::infinity(),
+            ));
         }
 
         if D == 2 {
             if self.coefficients[0].is_zero() {
-                None
+                OMatrix::<Complex<T>, DimDiff<Const<D>, U1>, U1>::from_element(Complex::new(
+                    T::nan(),
+                    T::nan(),
+                ))
             } else {
-                Some(
-                    OMatrix::<Complex<T>, DimDiff<Const<D>, U1>, U1>::from_element(Complex::new(
-                        -self.coefficients[1] / self.coefficients[0],
-                        T::zero(),
-                    ))
-                )
+                OMatrix::<Complex<T>, DimDiff<Const<D>, U1>, U1>::from_element(Complex::new(
+                    -self.coefficients[1] / self.coefficients[0],
+                    T::zero(),
+                ))
             }
         } else {
-            let monic = *self / self[0];
-            let companion = monic.companion();
-            Some(companion.complex_eigenvalues())
+            self.companion().complex_eigenvalues()
         }
     }
 }
@@ -336,6 +336,12 @@ impl<T, const D: usize> Index<usize> for Polynomial<T, D> {
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.coefficients[index]
+    }
+}
+
+impl<T, const D: usize> IndexMut<usize> for Polynomial<T, D> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.coefficients[index]
     }
 }
 

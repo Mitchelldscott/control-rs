@@ -55,7 +55,7 @@ fn validate_companion<T, const D: usize, S: RawStorage<T, DimDiff<Const<D>, U1>,
 fn validate_roots<T, const D: usize>(
     name: &str,
     polynomial: &Polynomial<T, D>,
-    expected: Option<OMatrix<Complex<T>, DimDiff<Const<D>, U1>, U1>>,
+    expected: OMatrix<Complex<T>, DimDiff<Const<D>, U1>, U1>,
 ) where
     T: Scalar + fmt::Display + RealField + Float,
     Const<D>: DimSub<U1>,
@@ -76,7 +76,7 @@ fn validate<T, U, const D: usize, const D1: usize, const N: usize, S>(
     expected_evaluation: [U; N],
     expected_derivative: Polynomial<T, D1>,
     expected_companion: Matrix<T, DimDiff<Const<D>, U1>, DimDiff<Const<D>, U1>, S>,
-    expected_roots: Option<OMatrix<Complex<T>, DimDiff<Const<D>, U1>, U1>>,
+    expected_roots: OMatrix<Complex<T>, DimDiff<Const<D>, U1>, U1>,
 ) where
     T: Scalar + fmt::Display + RealField + Float,
     U: Copy + Num + Add<T, Output = U> + Mul<U, Output = U> + Scalar,
@@ -178,9 +178,9 @@ fn unit_quadratic_i16() {
         [4.0, 1.0, 0.0, 1.0, 4.0],
         Polynomial::new("x'", []),
         SMatrix::<f32, 2, 2>::new(0.0, 0.0, 1.0, 0.0),
-        Some(OMatrix::<Complex<f32>, U2, U1>::new(
+        OMatrix::<Complex<f32>, U2, U1>::new(
             Complex::zero(),
             Complex::zero(),
-        )),
+        ),
     );
 }
