@@ -8,18 +8,14 @@ Numerical model synthesis and analysis tools for embedded developers.
 
 This crate aims to facilitate a data-driven approach to system modeling and controller design. It is built around several numerical model formats, including:
 
+* Univariate Polynomial
+* Multivariate Polynomial
 * Transfer Function
 * State-Space Representation
-* Nonlinear Function
 
 Each model format implements traits that provide a common interface for simulation, analysis, and synthesis.
 
-The crate organization is currently done so each numerical model has its own module that include implementations of common traits as well as re-exports of useful functions and types.
-
-> Currently all models are defined at the top of the module (i.e. `mod.rs` or `<module>.rs`)
->
-> * Common traits should also be impl here (Need a std flag to enable/disable building plotting/viz functions)
-> * Useful tools and functions should be re-exported from a submodule
+The crate organization is currently done so each model has its own module that implmements common traits as well as re-exports functions, types and tests from sub-modules.
 
 ## Installation (Not Supported... haven't published the crate yet, clone this repo instead)
 
@@ -84,7 +80,7 @@ Examples are either based on a textbook problem or demo a practical application.
 
 * Located in the tests/ directory.
 * Designed to verify high-level functionality of the tools.
-* Example: Confirming that a simple model maintains consistency across different model formats.
+* Example: Confirm that a simple model maintains consistency across different model formats.
 
 ## Documentation
 
