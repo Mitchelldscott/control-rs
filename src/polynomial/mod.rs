@@ -3,22 +3,21 @@
 //!
 //!
 use nalgebra::{
-    allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimSub, OMatrix, RealField, U1,
+    allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimName, DimSub, OMatrix, RealField, U1
 };
 use num_traits::Num;
 
 #[cfg(feature = "std")]
 use std::{
     fmt,
-    ops::{Add, Sub, Mul, Div, Neg, Index},
+    ops::{Add, Div, Index, Mul, Neg, Sub},
 };
 
 #[cfg(not(feature = "std"))]
 use core::{
     fmt,
-    ops::{Add, Sub, Mul, Div, Neg, Index},
+    ops::{Add, Div, Index, Mul, Neg, Sub},
 };
-
 
 #[cfg(test)]
 mod edge_case_test;
@@ -27,16 +26,16 @@ mod edge_case_test;
 mod fmt_tests;
 
 /// static array of coefficients for a polynomial of degree `D - 1`.
-/// 
-/// This struct stores the coefficients of a polynomial a(s): 
+///
+/// This struct stores the coefficients of a polynomial a(s):
 /// <pre>
 /// a(s) = a_0 * s^(D-1) + a_1 * s^(D-2) + ... + a_(D-2)] * s + a_(D-1)]
 /// </pre>
-/// 
+///
 /// The coefficients are stored in descending degree order (i.e. `[a_0, a_1... a_(D-1)]`).
-/// 
+///
 /// # Generic Arguments
-/// 
+///
 /// * `T` - Type of the coefficients
 /// * `D` - Length of the coefficient array, NOT the degree!
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -162,17 +161,32 @@ impl<T: Copy + Num, const D: usize> Polynomial<T, D> {
     }
 }
 
-impl<T, const D:usize> Polynomial<T, D> 
-where 
-    T: 'static + Copy + Num + Neg<Output = T> + fmt::Debug
+impl<T, const D: usize> Polynomial<T, D>
+where
+    T: 'static + Copy + Num + Neg<Output = T> + fmt::Debug,
 {
     /// Constructs the companion matrix of the polynomial.
     ///
-    /// The companion matrix is useful for finding polynomial roots using eigenvalue decomposition.
+    /// The companion matrix is a square matrix whose eigenvalues are the roots of the polynomial.
+    /// It is constructed from an identity matrix, a zero column and a row of the polynomial's 
+    /// coefficients scaled by the highest term.
+    /// 
+    /// <pre>
+    /// |  a[1..D] / a[0]  |
+    /// |     I      0     |
+    /// </pre>
+    /// <pre>
+    /// |  -a_1/a_0  -a_2/a_0  -a_3/a_0  ...  -a_(D-2)/a_0  -a_(D-1)/a_0  |
+    /// |     1         0         0      ...       0            0         |
+    /// |     0         1         0      ...       0            0         |
+    /// |     0         0         1      ...       0            0         |
+    /// |    ...       ...       ...     ...      ...          ...        |
+    /// |     0         0         0      ...       1            0         |
+    /// </pre>
     ///
     /// # Returns
     ///
-    /// * `OMatrix<T, Const<D>, Const<D>>` - The companion matrix representation of the polynomial.
+    /// * `OMatrix<T, DimDiff<Const<D>, U1>, DimDiff<Const<D>, U1>>` - The companion matrix representation of the polynomial.
     ///
     /// # Example
     ///
@@ -182,12 +196,18 @@ where
     /// let p = Polynomial::<f64, 3, 1>::new([1.0, -6.0, 11.0, -6.0]);
     /// let companion_matrix = p.companion();
     /// ```
-    pub fn companion(&self) -> OMatrix<T, Const<D>, Const<D>> {
-        OMatrix::<T, Const<D>, Const<D>>::from_fn(|i, j| {
+    pub fn companion(&self) -> OMatrix<T, DimDiff<Const<D>, U1>, DimDiff<Const<D>, U1>> 
+    where 
+        Const<D>: DimSub<U1>,
+        <Const<D> as DimSub<U1>>::Output: DimName,
+        DefaultAllocator: Allocator<DimDiff<Const<D>, U1>, DimDiff<Const<D>, U1>>,
+    {
+        // return companion;
+        OMatrix::<T, DimDiff<Const<D>, U1>, DimDiff<Const<D>, U1>>::from_fn(|i, j| {
             if i == 0 {
-                -self.coefficients[j]
+                -self[j+1] / self[0]
             } else {
-                if i - 1 == j {
+                if i == j + 1 {
                     T::one()
                 } else {
                     T::zero()
@@ -195,7 +215,12 @@ where
             }
         })
     }
+}
 
+impl<T, const D: usize> Polynomial<T, D>
+where
+    T: 'static + Copy + Num + Neg<Output = T> + fmt::Debug,
+{
     /// Computes the roots of the polynomial.
     ///
     /// Edge cases:
@@ -218,22 +243,25 @@ where
     /// let p = Polynomial::<f64, 3, 1>::new([1.0, -6.0, 11.0, -6.0]);
     /// let roots = p.roots();
     /// ```
-    pub fn roots(&self) -> Option<OMatrix<Complex<T>, Const<D>, U1>>
+    pub fn roots(&self) -> Option<OMatrix<Complex<T>, DimDiff<Const<D>, U1>, U1>>
     where
         T: RealField,
         Const<D>: DimSub<U1>,
-        DefaultAllocator: Allocator<Const<D>, DimDiff<Const<D>, U1>>
-            + Allocator<DimDiff<Const<D>, U1>>
-            + Allocator<Const<D>, Const<D>>
-            + Allocator<Const<D>>,
+        DimDiff<Const<D>, U1>: DimName + DimSub<U1>,
+        DefaultAllocator: Allocator<DimDiff<Const<D>, U1>, DimDiff<Const<D>, U1>>
+            + Allocator<DimDiff<Const<D>, U1>, DimDiff<DimDiff<Const<D>, U1>, U1>>
+            + Allocator<DimDiff<DimDiff<Const<D>, U1>, U1>>
+            + Allocator<DimDiff<Const<D>, U1>>,
     {
-        if D <= 1 || self
-            .coefficients
-            .iter()
-            .fold(true, |acc, &c| match c == T::zero() {
-                true => acc,
-                false => false,
-        }) {
+        if D <= 1
+            || self
+                .coefficients
+                .iter()
+                .fold(true, |acc, &c| match c == T::zero() {
+                    true => acc,
+                    false => false,
+                })
+        {
             return None;
         }
 
@@ -241,15 +269,17 @@ where
             if self.coefficients[0].is_zero() {
                 None
             } else {
-                let mut roots = OMatrix::<Complex<T>, Const<D>, U1>::from_element(Complex::new(
-                    T::zero(),
-                    T::zero(),
-                ));
-                roots[0] = Complex::new(-self.coefficients[1] / self.coefficients[0], T::zero());
-                Some(roots)
+                Some(
+                    OMatrix::<Complex<T>, DimDiff<Const<D>, U1>, U1>::from_element(Complex::new(
+                        -self.coefficients[1] / self.coefficients[0],
+                        T::zero(),
+                    ))
+                )
             }
         } else {
-            Some(self.companion().complex_eigenvalues())
+            let monic = *self / self[0];
+            let companion = monic.companion();
+            Some(companion.complex_eigenvalues())
         }
     }
 }
@@ -322,7 +352,7 @@ where
     fn add(self, rhs: U) -> Self::Output {
         let mut new_poly = self;
         if D > 0 {
-            new_poly.coefficients[D-1] = self.coefficients[D-1] + rhs;
+            new_poly.coefficients[D - 1] = self.coefficients[D - 1] + rhs;
         }
         new_poly
     }
@@ -337,7 +367,7 @@ where
     fn sub(self, rhs: U) -> Self::Output {
         let mut new_poly = self;
         if D > 0 {
-            new_poly.coefficients[D-1] = self.coefficients[D-1] - rhs;
+            new_poly.coefficients[D - 1] = self.coefficients[D - 1] - rhs;
         }
         new_poly
     }

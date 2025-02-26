@@ -58,8 +58,7 @@ pub struct TransferFunction<T, const M: usize, const N: usize> {
     pub denominator: Polynomial<T, N>,
 }
 
-impl<T, const M: usize, const N: usize>
-    TransferFunction<T, M, N>
+impl<T, const M: usize, const N: usize> TransferFunction<T, M, N>
 where
     T: 'static + Copy + PartialEq,
 {
@@ -161,16 +160,32 @@ mod basic_tf_tests {
     fn tf_as_monic() {
         let tf = TransferFunction::new([2.0], [2.0, 0.0]);
         let monic_tf = as_monic(&tf);
-        assert_eq!(monic_tf.numerator.coefficients, [1.0], "TF numerator incorrect");
-        assert_eq!(monic_tf.denominator.coefficients, [1.0, 0.0], "TF denominator incorrect");
+        assert_eq!(
+            monic_tf.numerator.coefficients,
+            [1.0],
+            "TF numerator incorrect"
+        );
+        assert_eq!(
+            monic_tf.denominator.coefficients,
+            [1.0, 0.0],
+            "TF denominator incorrect"
+        );
     }
 
     #[test]
     fn monic_tf_as_monic() {
         let tf = TransferFunction::new([1.0, 1.0], [1.0, 0.0]);
         let monic_tf = as_monic(&tf);
-        assert_eq!(monic_tf.numerator.coefficients, [1.0, 1.0], "TF numerator incorrect");
-        assert_eq!(monic_tf.denominator.coefficients, [1.0, 0.0], "TF denominator incorrect");
+        assert_eq!(
+            monic_tf.numerator.coefficients,
+            [1.0, 1.0],
+            "TF numerator incorrect"
+        );
+        assert_eq!(
+            monic_tf.denominator.coefficients,
+            [1.0, 0.0],
+            "TF denominator incorrect"
+        );
     }
 
     #[test]

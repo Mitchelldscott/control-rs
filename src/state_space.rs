@@ -405,7 +405,10 @@ mod basic_ss_tests {
     fn control_cannonical_test() {
         let tf = TransferFunction::new([2.0, 4.0], [1.0, 1.0, 4.0, 0.0, 0.0]);
         let monic_tf = as_monic(&tf);
-        let (num, den) = (monic_tf.numerator.coefficients, monic_tf.denominator.coefficients);
+        let (num, den) = (
+            monic_tf.numerator.coefficients,
+            monic_tf.denominator.coefficients,
+        );
 
         assert_eq!(
             den[0], 1.0,

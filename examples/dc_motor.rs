@@ -95,7 +95,10 @@ fn main() {
     println!("System Poles: {:?}", poles(&motor_tf));
 
     let monic_tf = as_monic(&motor_tf);
-        let (num, den) = (monic_tf.numerator.coefficients, monic_tf.denominator.coefficients);
+    let (num, den) = (
+        monic_tf.numerator.coefficients,
+        monic_tf.denominator.coefficients,
+    );
     let motor_ss: StateSpace<f64, 2, 1, 1> = control_canonical(num, den);
 
     println!("DC Motor {motor_ss}");
