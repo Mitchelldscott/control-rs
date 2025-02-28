@@ -352,7 +352,7 @@ where
 
 impl<T, D, S> Polynomial<T, D, S>
 where
-    T: 'static + Copy + Num + Neg<Output = T> + fmt::Debug + RealField + Float + Default,
+    T: 'static + Copy + Num + Neg<Output = T> + fmt::Debug + RealField + Float,
     D: DimSub<U1>,
     DimDiff<D, U1>: DimName + DimSub<U1>,
     S: RawStorage<T, D>,
