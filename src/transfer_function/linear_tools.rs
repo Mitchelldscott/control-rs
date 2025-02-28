@@ -169,7 +169,7 @@ where
 ///
 /// # Returns
 ///
-/// * `TransferFunction` - transferfunction scaled by denominator[0]
+/// * `TransferFunction` - transferfunction scaled by `self.denominator[0]`
 ///
 /// # Example
 ///

@@ -1,14 +1,15 @@
 //! # Control-rs
 //!
 //! Control-rs is a numerical modeling and control system library designed for embedded applications.
-//! Inspired by MATLAB, this crate provides a structured approach to system modeling, analysis, and control design
-//! while maintaining a lightweight footprint suitable for real-time and resource-constrained environments.
+//! Inspired by MATLAB's control systems toolbox, this crate provides a structured approach to 
+//! system modeling, analysis, and control design while maintaining a lightweight footprint suitable 
+//! for real-time and resource-constrained environments.
 //!
 //! ## Features
-//! - **Modeling:** Support for Transfer Function, State-Space, and Nonlinear system representations.
-//! - **Analysis:** Tools for frequency response, stability analysis, and controllability/observability checks.
-//! - **Synthesis:** Methods for controller design, including LQR, pole placement, and robust control techniques.
-//! - **Simulation:** Step response, impulse response, and custom signal simulation utilities.
+//! - **Modeling:** Support for Polynomial, Transfer Function, State-Space, and other nonlinear representations.
+//! - **Analysis:** Tools for classical, modern and robust system analysis.
+//! - **Synthesis:** Direct and data-driven methods for controller design.
+//! - **Simulation:** Easy model integration and data vizualization.
 //!
 //! ## Design Philosophy
 //! This crate is structured around core numerical model representations, each implementing traits that ensure
@@ -35,6 +36,67 @@ use std::ops::{Add, Div, Mul};
 
 #[cfg(not(feature = "std"))]
 use core::ops::{Add, Div, Mul};
+
+/// # Numerical Function trait
+///
+/// This trait provides a universal interface for evalutating numerical models.
+///
+/// model must be in the form:
+/// <pre>
+/// y = f(x)
+/// </pre>
+pub trait NumericalFunction {
+    /// type of the input value
+    type Input;
+    /// type of the output value
+    type Output;
+
+    /// Evaluates the function for the given input
+    fn evaluate(&self, x: Self::Input) -> Self::Output;
+}
+
+/// trait for all dynamic systems (i.e. systems with state and output equations).
+pub trait DynamicSystem {
+    /// type of the input to the system
+    type Input;
+    /// type of the state of the system
+    type State;
+    /// type of the output of the system
+    type Output;
+    /// a numerical function whose input is (state, input) and output is the state update
+    type DynamicFunction: NumericalFunction<Input = (Self::State, Self::Input), Output = Self::State>;
+    /// a numerical function whose input is (state, input) and output is the systems output
+    type OutputFunction: NumericalFunction<Input = (Self::State, Self::Input), Output = Self::Output>;
+}
+
+/// # Nonlinear Model
+///
+/// This allows users to implement a linearization of a nonlinear model. This also provides a
+/// trait bound for algorithms that use linearization.
+///
+/// # Generic Arguments
+///
+/// * `T` - type of the state, input and output values
+/// * `Input` - type of the input vector
+/// * `State` - type of the state vector
+/// * `Output` - type of the output vector
+///
+/// ## References
+///
+/// - *Nonlinear Systems*, Khalil, Ch. 2: Nonlinear Models.
+///
+/// ## TODO:
+/// - [ ] add generic linearization so users don't need to define a custom one (derive?)
+pub trait NLModel<T, Input, State, Output, const N: usize, const M: usize, const L: usize>:
+    DynamicModel<T, Input, State, Output>
+where
+    Input: Copy,
+    State: Copy,
+    Output: Copy,
+{
+    /// Linearizes the system about a nominal state and input
+    fn linearize(&self, x: State, u: Input) -> StateSpace<T, N, M, L>;
+}
 
 /// # Dynamic Model
 ///
@@ -103,33 +165,4 @@ where
         }
         x
     }
-}
-
-/// # Nonlinear Model
-///
-/// This allows users to implement a linearization of a nonlinear model. This also provides a
-/// trait bound for algorithms that use linearization.
-///
-/// # Generic Arguments
-///
-/// * `T` - type of the state, input and output values
-/// * `Input` - type of the input vector
-/// * `State` - type of the state vector
-/// * `Output` - type of the output vector
-///
-/// ## References
-///
-/// - *Nonlinear Systems*, Khalil, Ch. 2: Nonlinear Models.
-///
-/// ## TODO:
-/// - [ ] add generic linearization so users don't need to define a custom one (derive?)
-pub trait NLModel<T, Input, State, Output, const N: usize, const M: usize, const L: usize>:
-    DynamicModel<T, Input, State, Output>
-where
-    Input: Copy,
-    State: Copy,
-    Output: Copy,
-{
-    /// Linearizes the system about a nominal state and input
-    fn linearize(&self, x: State, u: Input) -> StateSpace<T, N, M, L>;
 }

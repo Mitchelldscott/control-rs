@@ -1,6 +1,4 @@
-//! This module is meant to provide a type export similar to [nalgebra::SMatrix]. SPolynomial will
-//! implement Polynomial functions using an ArrayStorage.
-//! 
+//! Statically sized Polynomial
 
 use super::*;
 
@@ -9,9 +7,9 @@ use super::*;
 pub type SPolynomial<T, const D: usize> = Polynomial<T, Const<D>, ArrayStorage<T, D, 1>>;
 
 impl<T, const D: usize> SPolynomial<T, D> {
-    /// Create a new [ArrayStorage] based [Polynomial]
+    /// Create an [ArrayStorage] based [Polynomial]
     /// 
-    /// This function uses a static array to initialize the coefficientsof a polynomial. It is
+    /// This function uses a static array to initialize the coefficients of a polynomial. It is
     /// assumed the coefficients are sorted from highest to lowest degree, so the largest index
     /// refers to the constant term.
     /// 
@@ -31,8 +29,6 @@ impl<T, const D: usize> SPolynomial<T, D> {
         }
     }
 
-    /// returns the coefficients as a slice.
-    /// 
     /// wrapper for [ArrayStorage::as_slice()]
     /// 
     /// # Returns

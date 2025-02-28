@@ -1,6 +1,4 @@
-//! This module is meant to provide a type export similar to [nalgebra::DMatrix]. DPolynomial will
-//! implement Polynomial functions using a VecStorage.
-//! 
+//! Dynamically sized Polynomial
 
 use super::*;
 use nalgebra::{Dyn, VecStorage};
@@ -11,10 +9,11 @@ pub type DPolynomial<T> = Polynomial<T, Dyn, VecStorage<T, Dyn, U1>>;
 
 
 impl<T> DPolynomial<T> {
-    /// Create a new Vec based [Polynomial]
+    /// Create a [VecStorage] based [Polynomial]
     /// 
-    /// This function uses a [Vec] to initialize the coefficients
-    /// of a polynomial.
+    /// This function uses a [Vec] to initialize the coefficients of a polynomial. It is
+    /// assumed the coefficients are sorted from highest to lowest degree, so the largest index
+    /// refers to the constant term.
     /// 
     /// # Arguments
     /// 
@@ -23,7 +22,7 @@ impl<T> DPolynomial<T> {
     /// 
     /// # Returns
     /// 
-    /// * `Polynomial` - A polynomial using [nalgebra::VecStorage]
+    /// * `Polynomial` - dynamic polynomial 
     pub fn from_vec(variable: &'static str, coefficients: Vec<T>) -> Self {
         Self {
             variable,
@@ -32,9 +31,7 @@ impl<T> DPolynomial<T> {
         }
     }
 
-    /// returns the coefficients as a slice.
-    /// 
-    /// wrapper for [nalgebra::VecStorage::as_slice()]
+    /// wrapper for [VecStorage::as_slice()]
     /// 
     /// # Returns
     /// 

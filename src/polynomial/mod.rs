@@ -1,7 +1,7 @@
 //!
-//! # Polynomial trait and default implementations
-//!
-//!
+//! # Polynomial struct and helpful tools
+//! 
+//! Mostly a copy of [nalgebra::Matrix] implementation with the specifics of a polynomial.
 use nalgebra::{
     allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, Dim, DimDiff, DimName,
     DimSub, OMatrix, RawStorage, RawStorageMut, RealField, U1,
@@ -56,7 +56,7 @@ mod fmt_tests;
 /// a(s) = a_0 * s^(D-1) + a_1 * s^(D-2) + ... + a_(D-2) * s + a_(D-1)
 /// </pre>
 ///
-/// The coefficients are stored in descending degree order (i.e. `[[a_0, a_1... a_(D-1)]]*[[s^(D-1)`], [s^(D-2)], ... [1]]).
+/// The coefficients are stored in descending degree order.
 ///
 /// # Generic Arguments
 ///
@@ -78,7 +78,7 @@ mod fmt_tests;
 pub struct Polynomial<T, D, S> {
     /// string indicating the variable the polynomial represents
     pub variable: &'static str,
-    /// coefficients of the polynomial stored in descending degree order
+    /// coefficients of the polynomial `[a0, a1, ... an]`, stored [highest -> lowest degree]
     pub coefficients: S,
     _phantom: PhantomData<(T, D)>,
 }
@@ -90,12 +90,11 @@ where
 {
     /// Returns the number of coefficients in the polynomial (degree + 1).
     /// 
-    /// This function relies on the `nalgebra::RawStorage` trait to access the
-    /// the number of rows. Zero coeff are still counted, until a sparse polynomial is implmented.
+    /// This function relies on the [RawStorage] trait to access the the number of rows.
     /// 
     /// # Returns
     /// 
-    /// * `num_coeff` - number of coefficients including zeros
+    /// * `num_coeff` - number of coefficients (including zeros)
     pub fn num_coefficients(&self) -> usize {
         self.coefficients.shape().0.value()
     }
@@ -325,7 +324,7 @@ where
     ///
     /// # Returns
     ///
-    /// * `OMatrix<T, DimDiff<Const<D>, U1>, DimDiff<Const<D>, U1>>` - The companion matrix representation of the polynomial.
+    /// * `OMatrix<T, DimDiff<D, U1>, DimDiff<D, U1>>` - The companion matrix representation of the polynomial.
     ///
     /// # Example
     ///
@@ -353,7 +352,7 @@ where
 
 impl<T, D, S> Polynomial<T, D, S>
 where
-    T: 'static + Copy + Num + Neg<Output = T> + fmt::Debug + RealField + Float,
+    T: 'static + Copy + Num + Neg<Output = T> + fmt::Debug + RealField + Float + Default,
     D: DimSub<U1>,
     DimDiff<D, U1>: DimName + DimSub<U1>,
     S: RawStorage<T, D>,
@@ -365,8 +364,11 @@ where
     /// Computes the roots of the polynomial.
     ///
     /// Edge cases:
+    /// - if the leadng coeff is zero this should reduce the order and recurse, having issues with trait bounds (currently returning NaN)
     /// - all coefficients are zero: all roots are infinite
-    /// - if there are two coefficients and the lead is non-zero, the root is -coeff[1]/coeff[0]
+    /// - if there are two coefficients and the lead is non-zero: the root is `-coeff[1]/coeff[0]`
+    /// - if all but the first coeff are zero: all roots are zero
+    /// 
     ///
     /// For very high order polynomials this may be inefficient, especially for degenerate cases.
     /// User should consider cases where all/many coeff = 0 and avoid calling this. Would be nice if
@@ -412,7 +414,7 @@ where
                     ))
                 } else {
                     // need to know more specifics about what matrices work with complex_eigenvalues,
-                    // the current cases fixed an infinite loops in the test, but certianly not a solution
+                    // the current cases fixed an infinite loops in the test, but certianly not a garuanteed solution
                     self.companion().complex_eigenvalues()
                 }
             }

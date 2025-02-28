@@ -35,26 +35,25 @@ use crate::{
 ///
 /// <pre>
 /// G(s) = b(s) / a(s)
-/// a(s) = (s^N + a_N s^(N-1) + ... + a_1)
-/// b(s) = (b_N s^(N-1) + b_(N-1) s^(N-2) + ... + b_1)
+/// a(s) = (a_0 * s^(N-1) + a_1 * s^(N-2) + ... + a_(N-1))
+/// b(s) = (b_0 * s^(M-1) + b_1 * s^(M-2) + ... + b_(M-1))
 /// </pre>
 ///
-/// Stores two nalgebra vectors representing coefficients of polynomials, one for the numerator
-/// and one for the denominator.
+/// Stores two polynomials, one for the numerator and one for the denominator.
 ///
 /// # Generic Arguments
 ///
 /// * `T` - type of the coefficients
-/// * `M` - order of the numerator
-/// * `N` - order of the denominator
+/// * `M` - number of coefficients in the numerator
+/// * `N` - number of coefficients in the denominator
 ///
 /// ## References
 ///
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 3.1
 pub struct TransferFunction<T, M, N, S1, S2> {
-    /// coefficients of the numerator `[bn, ... b2, b1]`
+    /// coefficients of the numerator `[b0, b1, ... bm]`
     pub numerator: Polynomial<T, M, S1>,
-    /// coefficients of the denominator `[an, ... a1, a0]`
+    /// coefficients of the denominator `[a0, a1, ... an]`
     pub denominator: Polynomial<T, N, S2>,
 }
 
@@ -65,12 +64,12 @@ impl<T, const M: usize, const N: usize>
     ///
     /// # Arguments
     ///
-    /// * `numerator` - coefficients of the numerator `[bm, ... b2, b1]`
-    /// * `denominator` - coefficients of the denominator `[an, ... a1, a0]`
+    /// * `numerator` - coefficients of the numerator `[b0, b1, ... bm]`
+    /// * `denominator` - coefficients of the denominator `[a0, a1, ... an]`
     ///
     /// # Returns
     ///
-    /// * `TransferFunction` - a new TransferFunction object
+    /// * `TransferFunction` - static TransferFunction
     ///
     /// # Example
     ///
@@ -128,7 +127,6 @@ fn formatted_length<T: fmt::Display>(value: &T) -> usize {
     counter.length
 }
 
-// Usage example:
 impl<T, M, N, S1, S2> fmt::Display for TransferFunction<T, M, N, S1, S2>
 where
     T: Copy + Num + PartialOrd + Neg<Output = T> + fmt::Display,
