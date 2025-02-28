@@ -28,6 +28,7 @@ pub use transfer_function::TransferFunction;
 pub mod frequency_tools;
 
 pub mod polynomial;
+pub use polynomial::Polynomial;
 
 #[cfg(feature = "std")]
 use std::ops::{Add, Div, Mul};

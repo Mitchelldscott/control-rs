@@ -4,7 +4,7 @@
 //!
 use nalgebra::{
     allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, Dim, DimDiff, DimName,
-    DimSub, Dyn, OMatrix, RawStorage, RawStorageMut, RealField, VecStorage, U1,
+    DimSub, OMatrix, RawStorage, RawStorageMut, RealField, U1,
 };
 use num_traits::{Float, Num};
 
@@ -22,6 +22,22 @@ use core::{
     ops::{Add, Div, Index, IndexMut, Mul, Neg, Sub},
 };
 
+// ===============================================================================================
+//      Polynomial Sub-Modules
+// ===============================================================================================
+
+pub mod array_polynomial;
+pub use array_polynomial::SPolynomial;
+
+#[cfg(feature="std")]
+pub mod vec_polynomial;
+#[cfg(feature="std")]
+pub use vec_polynomial::DPolynomial;
+
+// ===============================================================================================
+//      Polynomial Tests
+// ===============================================================================================
+
 #[cfg(test)]
 mod edge_case_test;
 
@@ -29,19 +45,35 @@ mod edge_case_test;
 #[cfg(feature="std")]
 mod fmt_tests;
 
-/// static array of coefficients for a polynomial of degree `D - 1`.
+// ===============================================================================================
+//      Polynomial Base Implementation
+// ===============================================================================================
+
+/// Stores coefficients and implements tools for a polynomial degree `D - 1`.
 ///
 /// This struct stores the coefficients of a polynomial a(s):
 /// <pre>
-/// a(s) = a_0 * s^(D-1) + a_1 * s^(D-2) + ... + a_(D-2)] * s + a_(D-1)]
+/// a(s) = a_0 * s^(D-1) + a_1 * s^(D-2) + ... + a_(D-2) * s + a_(D-1)
 /// </pre>
 ///
-/// The coefficients are stored in descending degree order (i.e. `[a_0, a_1... a_(D-1)]`).
+/// The coefficients are stored in descending degree order (i.e. `[[a_0, a_1... a_(D-1)]]*[[s^(D-1)`], [s^(D-2)], ... [1]]).
 ///
 /// # Generic Arguments
 ///
 /// * `T` - Type of the coefficients
-/// * `D` - Length of the coefficient array, NOT the degree!
+/// * `D` - Length of the coefficient array, ***NOT the degree!***
+/// 
+/// # Example
+/// ```rust
+/// use control_rs::Polynomial;
+/// use nalgebra::{ArrayStorage, U3};
+/// #[cfg(feature = "std")]
+/// use std::marker::PhantomData;
+/// #[cfg(not(feature = "std"))]
+/// use core::marker::PhantomData;
+/// 
+/// let quadratic = Polynomial::new("x", [1, 0, 0]);
+/// ```
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Polynomial<T, D, S> {
     /// string indicating the variable the polynomial represents
@@ -77,7 +109,7 @@ where
 {
     /// Returns a copy of the coefficient at the given index.
     /// 
-    /// This is a wrapper for the index function, the Copy trait bound allows this 
+    /// This is a wrapper for the index trait impl, the Copy trait bound allows this 
     /// function to copy the value at index rather than returning a refernce to the value.
     /// 
     /// Coefficients are sorted high degree -> low degree, should add a function to look up terms
@@ -92,6 +124,14 @@ where
     /// # Returns
     /// 
     /// * `coeff` - the coefficient at the index
+    /// 
+    /// # Example
+    /// ```rust
+    /// use control_rs::Polynomial;
+    /// let p = Polynomial::new("x", [1, 0, 0]);
+    /// // forces T to be Copy, won't compile otherwise
+    /// assert_eq!(p.coefficient(0), 1, "reference had the wrong value");
+    /// ```
     pub fn coefficient(&self, index: usize) -> T {
         self[index]
     }
@@ -116,75 +156,6 @@ where
     /// * `coeff` - the constant coefficient
     pub fn constant(&self) -> T {
         self[self.num_coefficients() - 1]
-    }
-}
-
-impl<T, const D: usize> Polynomial<T, Const<D>, ArrayStorage<T, D, 1>> {
-    /// Create a new Array based [Polynomial]
-    /// 
-    /// This function uses a static array to initialize the coefficients
-    /// of a polynomial.
-    /// 
-    /// # Arguments
-    /// 
-    /// * `variable` - the variable of the polynomial
-    /// * `coefficients` - an array of the coefficients, length = degree + 1
-    /// 
-    /// # Returns
-    /// 
-    /// * `Polynomial` - A polynomial using [nalgebra::ArrayStorage]
-    pub const fn new(variable: &'static str, coefficients: [T; D]) -> Self {
-        Self {
-            variable,
-            coefficients: ArrayStorage([coefficients]),
-            _phantom: PhantomData,
-        }
-    }
-
-    /// returns the coefficients as a slice.
-    /// 
-    /// wrapper for [nalgebra::ArrayStorage::as_slice()]
-    /// 
-    /// # Returns
-    /// 
-    /// * `coeffs` - slice of coefficients sorted from high degree -> low degree
-    pub fn coefficients(&self) -> &[T] {
-        self.coefficients.as_slice()
-    }
-}
-
-#[cfg(feature="std")]
-impl<T> Polynomial<T, Dyn, VecStorage<T, Dyn, Const<1>>> {
-    /// Create a new Vec based [Polynomial]
-    /// 
-    /// This function uses a [Vec] to initialize the coefficients
-    /// of a polynomial.
-    /// 
-    /// # Arguments
-    /// 
-    /// * `variable` - the variable of the polynomial
-    /// * `coefficients` - a vec of the coefficients, length = degree + 1
-    /// 
-    /// # Returns
-    /// 
-    /// * `Polynomial` - A polynomial using [nalgebra::VecStorage]
-    pub fn from_vec(variable: &'static str, coefficients: Vec<T>) -> Self {
-        Self {
-            variable,
-            coefficients: VecStorage::new(Dyn(coefficients.len()), U1, coefficients),
-            _phantom: PhantomData,
-        }
-    }
-
-    /// returns the coefficients as a slice.
-    /// 
-    /// wrapper for [nalgebra::VecStorage::as_slice()]
-    /// 
-    /// # Returns
-    /// 
-    /// * `coeffs` - slice of coefficients sorted from high degree -> low degree
-    pub fn coefficients(&self) -> &[T] {
-        self.coefficients.as_slice()
     }
 }
 
@@ -604,47 +575,5 @@ where
         }
 
         Ok(())
-    }
-}
-
-impl<T, D, S> Polynomial<T, D, S> 
-where 
-    T: Copy + PartialOrd + Num + Neg<Output = T> + fmt::Display,
-    D: Dim,
-    S: RawStorage<T, D>,
-{
-    /// helper function for formating, this returns the length of the formated string.
-    pub fn str_len(&self) -> usize {
-        let mut length = 0;
-        let num_coeff = self.num_coefficients();
-
-        for i in 0..num_coeff {
-            let coeff = self[i];
-            if coeff == T::zero() {
-                continue;
-            }
-
-            if i > 0 {
-                length += 3; // " + " or " - "
-            } else if coeff < T::zero() {
-                length += 1; // Leading "-"
-            }
-
-            let abs_coeff = if coeff < T::zero() { -coeff } else { coeff };
-            let exp = num_coeff - 1 - i;
-
-            if abs_coeff != T::one() || exp == 0 {
-                length += abs_coeff.to_string().len();
-            }
-
-            if exp > 0 {
-                length += self.variable.len(); // Variable name length
-                if exp > 1 {
-                    length += 1 + exp.to_string().len(); // "^" + exponent length
-                }
-            }
-        }
-
-        length
     }
 }
