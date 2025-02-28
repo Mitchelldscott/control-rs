@@ -103,32 +103,32 @@ mod tf_frequency_tool_tests {
     /// Test gain and phase margins.
     #[test]
     fn test_margins() {
-        let tf = TransferFunction::new([10.0], [1.0, 5.0, 25.0]);
+        let tf = TransferFunction::new([10.0], [1.0, -5.0]);
         // Frequencies to evaluate (in rad/s)
         let freqs = [
-            0.1,  // Below cutoff frequency
-            1.0,  // At cutoff frequency
-            10.0, // Above cutoff frequency
+            0.0,
+            0.1, 
+            1.0,  
+            10.0, 
         ];
 
         // Call the bode function
         let mut response = FrequencyResponse::default([freqs]);
         tf.frequency_response(&mut response);
+
         let margins = Margin::new(&response);
 
-        // Expected values (computed analytically or using a control software tool):
-        let expected_gain_crossover = 0.9501331101922844; // Approximate value where |H(jω)| = 1
-        let expected_phase_margin = -19.222925946529347; // 45 degrees at gain crossover frequency
-
         if let FrequencyMargin {
-            phase_crossover: None,
+            phase_crossover: Some(phase_crossover),
             gain_crossover: Some(gain_crossover),
             phase_margin: Some(phase_margin),
-            gain_margin: None,
+            gain_margin: Some(gain_margin),
         } = margins.0[0][0]
         {
-            assert_f64!(eq, gain_crossover, expected_gain_crossover, 0.1);
-            assert_f64!(eq, phase_margin, expected_phase_margin, 0.1);
+            assert_f64!(eq, phase_crossover, 0.0, 0.1);
+            assert_f64!(eq, gain_crossover, 8.66, 0.1);
+            assert_f64!(eq, phase_margin, 60.0, 2.5); // wide error range because crossover is imprecise with such few points.
+            assert_f64!(eq, gain_margin, -6.02, 0.01);
         } else {
             panic!(
                 "Failed to compute gain and phase margins {:?}",

@@ -50,33 +50,6 @@ pub struct Polynomial<T, D, S> {
     _phantom: PhantomData<(T, D)>,
 }
 
-// impl<T, D, S> Polynomial<T, D, S> {
-//     /// Create a new polynomial with the given coefficients.
-//     ///
-//     /// # Arguments
-//     ///
-//     /// * `coefficients` - An array of coefficients of the polynomial in descending degree order.
-//     ///
-//     /// # Returns
-//     ///
-//     /// * `Polynomial<T, D>` - A new polynomial with the given coefficients.
-//     ///
-//     /// # Example
-//     ///
-//     /// ```rust
-//     /// use control_rs::polynomial::Polynomial;
-//     ///
-//     /// let p = Polynomial::<f64, 3>::new(b'x', [1.0, 2.0, 3.0]);
-//     /// ```
-//     pub const fn new(variable: &'static str, coefficients: S) -> Self {
-//         Polynomial {
-//             variable,
-//             coefficients,
-//             _phantom: PhantomData,
-//         }
-//     }
-// }
-
 impl<T, D, S> Polynomial<T, D, S>
 where
     D: Dim,
@@ -232,8 +205,8 @@ where
     ///
     /// ```rust
     /// use control_rs::polynomial::Polynomial;
-    ///
-    /// let p = Polynomial::<i32, 6>::default();
+    /// use nalgebra::{U2, ArrayStorage};
+    /// let p: Polynomial<i32, U2, ArrayStorage<i32, 2, 1>> = Polynomial::default();
     /// ```
     fn default() -> Self {
         Polynomial {
@@ -296,9 +269,10 @@ where
     ///
     /// ```rust
     /// use control_rs::polynomial::Polynomial;
-    ///
-    /// let p = Polynomial::new(b'x', [1.0, 2.0, 3.0]);
-    /// let derivative: Polynomial::<f64, U2> = p.derivative();
+    /// use nalgebra::ArrayStorage;
+    /// 
+    /// let p = Polynomial::new("x", [1.0, 2.0, 3.0]);
+    /// let derivative = p.derivative::<ArrayStorage<f32, 2, 1>>("x'");
     /// ```
     pub fn derivative<S2>(&self, variable: &'static str) -> Polynomial<T, DimDiff<D, U1>, S2>
     where
@@ -311,7 +285,7 @@ where
             _phantom: PhantomData,
         };
         for i in 0..new_dim {
-            derivative[i] = (0..new_dim - 1).fold(T::zero(), |acc, _| acc + self[i]);
+            derivative[i] = (i..new_dim).fold(T::zero(), |acc, _| acc + self[i]);
         }
 
         derivative
@@ -327,9 +301,10 @@ where
     ///
     /// ```rust
     /// use control_rs::polynomial::Polynomial;
+    /// use nalgebra::{U2, ArrayStorage};
     ///
-    /// let p = Polynomial::new(b'x', [1.0, 2.0, 3.0]);
-    /// let derivative: Polynomial::<f64, U2> = p.derivative();
+    /// let p = Polynomial::new("x", [1.0, 2.0, 3.0]);
+    /// let reduced_p: Polynomial<f32, U2, ArrayStorage<f32, 2, 1>> = p.reduce_order("x'");
     /// ```
     pub fn reduce_order<S2>(&self, variable: &'static str) -> Polynomial<T, DimDiff<D, U1>, S2>
     where
@@ -384,7 +359,7 @@ where
     /// ```rust
     /// use control_rs::polynomial::Polynomial;
     ///
-    /// let p = Polynomial::<f64, 3, 1>::new([1.0, -6.0, 11.0, -6.0]);
+    /// let p = Polynomial::new("var", [1.0, -6.0, 11.0, -6.0]);
     /// let companion_matrix = p.companion();
     /// ```
     pub fn companion(&self) -> OMatrix<T, DimDiff<D, U1>, DimDiff<D, U1>> {
@@ -433,7 +408,7 @@ where
     /// ```rust
     /// use control_rs::polynomial::Polynomial;
     ///
-    /// let p = Polynomial::<f64, 3, 1>::new([1.0, -6.0, 11.0, -6.0]);
+    /// let p = Polynomial::new("x", [1.0, -6.0, 11.0, -6.0]);
     /// let roots = p.roots();
     /// ```
     pub fn roots(&self) -> OMatrix<Complex<T>, DimDiff<D, U1>, U1> {

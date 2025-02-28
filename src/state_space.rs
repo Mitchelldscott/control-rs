@@ -406,8 +406,8 @@ mod basic_ss_tests {
         let tf = TransferFunction::new([2.0, 4.0], [1.0, 1.0, 4.0, 0.0, 0.0]);
         let monic_tf = as_monic(&tf);
         let (num, den) = (
-            monic_tf.numerator.coefficients(),
-            monic_tf.denominator.coefficients(),
+            monic_tf.numerator,
+            monic_tf.denominator.reduce_order("s"),
         );
 
         assert_eq!(
@@ -416,7 +416,7 @@ mod basic_ss_tests {
         );
 
         let ss =
-            control_canonical::<f64, 4, 1, 1>(num.try_into().unwrap(), den.try_into().unwrap());
+            control_canonical::<f64, 4, 2, 4>(num.coefficients().try_into().unwrap(), den.coefficients().try_into().unwrap());
 
         assert_eq!(
             ss.a,

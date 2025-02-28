@@ -197,7 +197,7 @@ impl<T> FrequencyMargin<T> {
                 // index in the magnitude array
                 let mag_at_crossover =
                     first_crossover::<T>(&magnitudes, frequencies, wc, L).unwrap();
-                Some(<T as From<i16>>::from(20) * ComplexField::log10(-mag_at_crossover))
+                Some(<T as From<i16>>::from(20) * -ComplexField::log10(mag_at_crossover))
             }
             None => None,
         };
