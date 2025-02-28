@@ -120,26 +120,57 @@ where
     S2: RawStorage<T, N>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let num_str = format!("{}", self.numerator);
-        let den_str = format!("{}", self.denominator);
+        // let num_str = format!("{}", self.numerator);
+        // let den_str = format!("{}", self.denominator);
 
-        let (n_align, d_align, d_bar) = match den_str.len() > num_str.len() {
-            true => (
-                " ".repeat((den_str.len() - num_str.len()).max(0) / 2),
-                "".to_string(),
-                "-".repeat(den_str.len()),
-            ),
-            false => (
-                "".to_string(),
-                " ".repeat((num_str.len() - den_str.len()).max(0) / 2),
-                "-".repeat(num_str.len()),
-            ),
+        // let (n_align, d_align, d_bar) = match den_str.len() > num_str.len() {
+        //     true => (
+        //         " ".repeat((den_str.len() - num_str.len()).max(0) / 2),
+        //         "".to_string(),
+        //         "-".repeat(den_str.len()),
+        //     ),
+        //     false => (
+        //         "".to_string(),
+        //         " ".repeat((num_str.len() - den_str.len()).max(0) / 2),
+        //         "-".repeat(num_str.len()),
+        //     ),
+        // };
+
+        // write!(
+        //     f,
+        //     "TransferFunction:\n{n_align}{num_str}\n{d_bar}\n{d_align}{den_str}\n"
+        // )
+        // Assuming self.numerator and self.denominator have `.str_len()` methods
+        let num_len = self.numerator.str_len();
+        let den_len = self.denominator.str_len();
+
+        let (n_align, d_align, bar_len) = if den_len > num_len {
+            ((den_len - num_len) / 2, 0, den_len)
+        } else {
+            (0, (num_len - den_len) / 2, num_len)
         };
 
-        write!(
-            f,
-            "TransferFunction:\n{n_align}{num_str}\n{d_bar}\n{d_align}{den_str}\n"
-        )
+        write!(f, "Transfer Function:\n")?;
+
+        // Write numerator with padding
+        for _ in 0..n_align {
+            write!(f, " ")?;
+        }
+        write!(f, "{}\n", self.numerator)?;
+
+        // Write division bar
+        for _ in 0..bar_len {
+            write!(f, "-")?;
+        }
+        write!(f, "\n")?;
+
+        // Write denominator with padding
+        for _ in 0..d_align {
+            write!(f, " ")?;
+        }
+        write!(f, "{}\n", self.denominator)?;
+
+        Ok(())
     }
 }
 

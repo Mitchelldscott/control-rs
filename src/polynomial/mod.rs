@@ -26,6 +26,7 @@ use core::{
 mod edge_case_test;
 
 #[cfg(test)]
+#[cfg(feature="std")]
 mod fmt_tests;
 
 /// static array of coefficients for a polynomial of degree `D - 1`.
@@ -152,6 +153,7 @@ impl<T, const D: usize> Polynomial<T, Const<D>, ArrayStorage<T, D, 1>> {
     }
 }
 
+#[cfg(feature="std")]
 impl<T> Polynomial<T, Dyn, VecStorage<T, Dyn, Const<1>>> {
     /// Create a new Vec based [Polynomial]
     /// 
@@ -602,5 +604,47 @@ where
         }
 
         Ok(())
+    }
+}
+
+impl<T, D, S> Polynomial<T, D, S> 
+where 
+    T: Copy + PartialOrd + Num + Neg<Output = T> + fmt::Display,
+    D: Dim,
+    S: RawStorage<T, D>,
+{
+    /// helper function for formating, this returns the length of the formated string.
+    pub fn str_len(&self) -> usize {
+        let mut length = 0;
+        let num_coeff = self.num_coefficients();
+
+        for i in 0..num_coeff {
+            let coeff = self[i];
+            if coeff == T::zero() {
+                continue;
+            }
+
+            if i > 0 {
+                length += 3; // " + " or " - "
+            } else if coeff < T::zero() {
+                length += 1; // Leading "-"
+            }
+
+            let abs_coeff = if coeff < T::zero() { -coeff } else { coeff };
+            let exp = num_coeff - 1 - i;
+
+            if abs_coeff != T::one() || exp == 0 {
+                length += abs_coeff.to_string().len();
+            }
+
+            if exp > 0 {
+                length += self.variable.len(); // Variable name length
+                if exp > 1 {
+                    length += 1 + exp.to_string().len(); // "^" + exponent length
+                }
+            }
+        }
+
+        length
     }
 }

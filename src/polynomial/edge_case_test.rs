@@ -278,8 +278,6 @@ fn unit_cubic_f64() {
         SMatrix::<f64, 3, 3>::new(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0),
     );
 
-    println!("{:?}", polynomial.companion());
-
     // cannot call roots on polynomial where T: !RealField
     // validate_roots(
     //     "linear",
