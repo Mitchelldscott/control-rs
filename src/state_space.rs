@@ -406,8 +406,8 @@ mod basic_ss_tests {
         let tf = TransferFunction::new([2.0, 4.0], [1.0, 1.0, 4.0, 0.0, 0.0]);
         let monic_tf = as_monic(&tf);
         let (num, den) = (
-            monic_tf.numerator.coefficients,
-            monic_tf.denominator.coefficients,
+            monic_tf.numerator.coefficients(),
+            monic_tf.denominator.coefficients(),
         );
 
         assert_eq!(
@@ -415,7 +415,8 @@ mod basic_ss_tests {
             "Transfer Function denominator is not monic\n{tf}"
         );
 
-        let ss: StateSpace<_, 4, 1, 1> = control_canonical(num, den);
+        let ss =
+            control_canonical::<f64, 4, 1, 1>(num.try_into().unwrap(), den.try_into().unwrap());
 
         assert_eq!(
             ss.a,

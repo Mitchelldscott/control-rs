@@ -99,7 +99,7 @@ fn main() {
         monic_tf.numerator.coefficients,
         monic_tf.denominator.coefficients,
     );
-    let motor_ss: StateSpace<f64, 2, 1, 1> = control_canonical(num, den);
+    let motor_ss: StateSpace<f64, 2, 1, 1> = control_canonical(num.0[0], den.0[0]);
 
     println!("DC Motor {motor_ss}");
 

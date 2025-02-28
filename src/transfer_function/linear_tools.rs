@@ -1,7 +1,8 @@
 //! Miscellaneous tools to help work with transfer functions
 //!
 use nalgebra::{
-    allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimName, DimSub, OMatrix, RealField, U1
+    allocator::Allocator, Complex, DefaultAllocator, Dim, DimDiff, DimName, DimSub, OMatrix,
+    RawStorage, RawStorageMut, RealField, U1,
 };
 use num_traits::{Float, Zero};
 
@@ -45,9 +46,13 @@ use crate::TransferFunction;
 ///     println!("DC Gain: {gain:.2}");
 /// }
 /// ```
-pub fn dcgain<T, const M: usize, const N: usize>(tf: &TransferFunction<T, M, N>) -> T
+pub fn dcgain<T, M, N, S1, S2>(tf: &TransferFunction<T, M, N, S1, S2>) -> T
 where
     T: Float,
+    M: Dim + DimSub<U1>,
+    N: Dim + DimSub<U1>,
+    S1: RawStorage<T, M>,
+    S2: RawStorage<T, N>,
 {
     let denominator_constant = tf.denominator.constant();
     if denominator_constant.is_zero() {
@@ -86,16 +91,18 @@ where
 /// ## References
 ///
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
-pub fn poles<T, const M: usize, const N: usize>(
-    tf: &TransferFunction<T, M, N>,
-) -> OMatrix<Complex<T>, DimDiff<Const<N>, U1>, U1>
+pub fn poles<T, M, N, S1, S2>(
+    tf: &TransferFunction<T, M, N, S1, S2>,
+) -> OMatrix<Complex<T>, DimDiff<N, U1>, U1>
 where
     T: Copy + Zero + Float + RealField,
-    Const<N>: DimSub<U1>,
-    DimDiff<Const<N>, U1>: DimName + DimSub<U1>,
-    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>> 
-        + Allocator<DimDiff<Const<N>, U1>, DimDiff<DimDiff<Const<N>, U1>, U1>> 
-        + Allocator<DimDiff<DimDiff<Const<N>, U1>, U1>> + Allocator<DimDiff<Const<N>, U1>>,
+    N: DimSub<U1>,
+    DimDiff<N, U1>: DimName + DimSub<U1>,
+    S2: RawStorage<T, N>,
+    DefaultAllocator: Allocator<DimDiff<N, U1>, DimDiff<N, U1>>
+        + Allocator<DimDiff<N, U1>, DimDiff<DimDiff<N, U1>, U1>>
+        + Allocator<DimDiff<DimDiff<N, U1>, U1>>
+        + Allocator<DimDiff<N, U1>>,
 {
     tf.denominator.roots()
 }
@@ -135,16 +142,18 @@ where
 /// ## References
 ///
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
-pub fn lhp<T, const M: usize, const N: usize>(tf: &TransferFunction<T, M, N>) -> bool
+pub fn lhp<T, M, N, S1, S2>(tf: &TransferFunction<T, M, N, S1, S2>) -> bool
 where
     T: Copy + Zero + Float + RealField,
-    Const<N>: DimSub<U1>,
-    DimDiff<Const<N>, U1>: DimName + DimSub<U1>,
-    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>> 
-        + Allocator<DimDiff<Const<N>, U1>, DimDiff<DimDiff<Const<N>, U1>, U1>> 
-        + Allocator<DimDiff<DimDiff<Const<N>, U1>, U1>> + Allocator<DimDiff<Const<N>, U1>>,
+    N: DimSub<U1>,
+    DimDiff<N, U1>: DimName + DimSub<U1>,
+    S2: RawStorage<T, N>,
+    DefaultAllocator: Allocator<DimDiff<N, U1>, DimDiff<N, U1>>
+        + Allocator<DimDiff<N, U1>, DimDiff<DimDiff<N, U1>, U1>>
+        + Allocator<DimDiff<DimDiff<N, U1>, U1>>
+        + Allocator<DimDiff<N, U1>>,
 {
-    poles(&tf) 
+    poles(&tf)
         .iter()
         .all(|&pole| !pole.re.is_nan() && pole.re < T::zero())
 }
@@ -173,11 +182,15 @@ where
 ///     let (num, den) = (monic_tf.numerator.coefficients, monic_tf.denominator.coefficients);
 /// }
 /// ```
-pub fn as_monic<T, const M: usize, const N: usize>(
-    tf: &TransferFunction<T, M, N>,
-) -> TransferFunction<T, M, N>
+pub fn as_monic<T, M, N, S1, S2>(
+    tf: &TransferFunction<T, M, N, S1, S2>,
+) -> TransferFunction<T, M, N, S1, S2>
 where
     T: Copy + Zero + Float,
+    N: Dim,
+    M: Dim,
+    S1: RawStorageMut<T, M> + Copy,
+    S2: RawStorageMut<T, N> + Copy,
 {
     TransferFunction {
         numerator: tf.numerator / tf.denominator[0],

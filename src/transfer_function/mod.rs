@@ -20,7 +20,7 @@ use std::{fmt, ops::Neg};
 #[cfg(not(feature = "std"))]
 use core::{fmt, ops::Neg};
 
-use nalgebra::{Complex, RealField};
+use nalgebra::{ArrayStorage, Complex, Const, Dim, RawStorage, RealField, U1};
 use num_traits::{Float, Num};
 
 pub mod linear_tools;
@@ -51,16 +51,15 @@ use crate::{
 /// ## References
 ///
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 3.1
-pub struct TransferFunction<T, const M: usize, const N: usize> {
+pub struct TransferFunction<T, M, N, S1, S2> {
     /// coefficients of the numerator `[bn, ... b2, b1]`
-    pub numerator: Polynomial<T, M>,
+    pub numerator: Polynomial<T, M, S1>,
     /// coefficients of the denominator `[an, ... a1, a0]`
-    pub denominator: Polynomial<T, N>,
+    pub denominator: Polynomial<T, N, S2>,
 }
 
-impl<T, const M: usize, const N: usize> TransferFunction<T, M, N>
-where
-    T: 'static + Copy + PartialEq,
+impl<T, const M: usize, const N: usize>
+    TransferFunction<T, Const<M>, Const<N>, ArrayStorage<T, M, 1>, ArrayStorage<T, N, 1>>
 {
     /// Create a new transfer function from arrays of coefficients
     ///
@@ -91,9 +90,13 @@ where
     }
 }
 
-impl<T, const M: usize, const N: usize> FrequencyTools<T, 1, 1> for TransferFunction<T, M, N>
+impl<T, M, N, S1, S2> FrequencyTools<T, 1, 1> for TransferFunction<T, M, N, S1, S2>
 where
     T: Float + RealField + From<i16>,
+    M: Dim,
+    N: Dim,
+    S1: RawStorage<T, M, U1>,
+    S2: RawStorage<T, N, U1>,
 {
     fn frequency_response<const L: usize>(&self, response: &mut FrequencyResponse<T, L, 1, 1>) {
         // Evaluate the transfer function at each frequency
@@ -108,9 +111,13 @@ where
     }
 }
 
-impl<T, const M: usize, const N: usize> fmt::Display for TransferFunction<T, M, N>
+impl<T, M, N, S1, S2> fmt::Display for TransferFunction<T, M, N, S1, S2>
 where
-    T: 'static + Copy + Num + PartialEq + PartialOrd + Neg<Output = T> + fmt::Debug + fmt::Display,
+    T: Copy + Num + PartialOrd + Neg<Output = T> + fmt::Display,
+    M: Dim,
+    N: Dim,
+    S1: RawStorage<T, M>,
+    S2: RawStorage<T, N>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let num_str = format!("{}", self.numerator);
@@ -161,12 +168,12 @@ mod basic_tf_tests {
         let tf = TransferFunction::new([2.0], [2.0, 0.0]);
         let monic_tf = as_monic(&tf);
         assert_eq!(
-            monic_tf.numerator.coefficients,
+            monic_tf.numerator.coefficients(),
             [1.0],
             "TF numerator incorrect"
         );
         assert_eq!(
-            monic_tf.denominator.coefficients,
+            monic_tf.denominator.coefficients(),
             [1.0, 0.0],
             "TF denominator incorrect"
         );
@@ -177,12 +184,12 @@ mod basic_tf_tests {
         let tf = TransferFunction::new([1.0, 1.0], [1.0, 0.0]);
         let monic_tf = as_monic(&tf);
         assert_eq!(
-            monic_tf.numerator.coefficients,
+            monic_tf.numerator.coefficients(),
             [1.0, 1.0],
             "TF numerator incorrect"
         );
         assert_eq!(
-            monic_tf.denominator.coefficients,
+            monic_tf.denominator.coefficients(),
             [1.0, 0.0],
             "TF denominator incorrect"
         );

@@ -26,6 +26,6 @@ fn high_order() {
 
 #[test]
 fn empty() {
-    let polynomial: Polynomial<i16, 0> = Polynomial::new("x", []);
+    let polynomial: Polynomial<f64, Const<0>, ArrayStorage<f64, 0, 1>> = Polynomial::new("x", []);
     assert_eq!(format!("{}", polynomial), "");
 }
