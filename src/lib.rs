@@ -2,19 +2,20 @@
 //!
 //! Control-rs is a numerical modeling and control system library designed for embedded applications.
 //! Inspired by MATLAB's control systems toolbox, this crate provides a structured approach to 
-//! system modeling, analysis, and control design while maintaining a lightweight footprint suitable 
+//! system modeling, analysis, and numerical design while maintaining a lightweight footprint suitable 
 //! for real-time and resource-constrained environments.
 //!
 //! ## Features
-//! - **Modeling:** Support for Polynomial, Transfer Function, State-Space, and other nonlinear representations.
-//! - **Analysis:** Tools for classical, modern and robust system analysis.
-//! - **Synthesis:** Direct and data-driven methods for controller design.
-//! - **Simulation:** Easy model integration and data vizualization.
+//! - **Modeling:** Support for Polynomial, Transfer Function, State-Space, and other nonlinear representations
+//! - **Analysis:** Tools for classical, modern and robust system analysis
+//! - **Synthesis:** Direct and data-driven methods to create models
+//! - **Simulation:** Easy model integration and data vizualization
 //!
 //! ## Design Philosophy
 //! This crate is structured around core numerical model representations, each implementing traits that ensure
-//! a consistent interface for simulation, analysis, and synthesis. It is built to be extensible, modular, and
-//! suitable for embedded applications where computational efficiency is critical.
+//! a consistent interface for simulation, analysis, and synthesis. This is all done to provide a clean interface
+//! for users to turn models into datasets and datasets into models. There is no IDE or GUI, because this crate is 
+//! meant to be used in the field (In the future a separate crate may provide a visualization dashboard). 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![warn(missing_docs)]
 
@@ -45,28 +46,17 @@ use core::ops::{Add, Div, Mul};
 /// <pre>
 /// y = f(x)
 /// </pre>
-pub trait NumericalFunction {
-    /// type of the input value
-    type Input;
-    /// type of the output value
-    type Output;
-
+pub trait NumericalFunction<T> {
     /// Evaluates the function for the given input
-    fn evaluate(&self, x: Self::Input) -> Self::Output;
+    fn __evaluate(&self, x: T) -> T;
 }
 
 /// trait for all dynamic systems (i.e. systems with state and output equations).
-pub trait DynamicSystem {
-    /// type of the input to the system
-    type Input;
-    /// type of the state of the system
-    type State;
-    /// type of the output of the system
-    type Output;
+pub trait DynamicSystem<T> {
     /// a numerical function whose input is (state, input) and output is the state update
-    type DynamicFunction: NumericalFunction<Input = (Self::State, Self::Input), Output = Self::State>;
+    type DynamicFunction: NumericalFunction<T>;
     /// a numerical function whose input is (state, input) and output is the systems output
-    type OutputFunction: NumericalFunction<Input = (Self::State, Self::Input), Output = Self::Output>;
+    type OutputFunction: NumericalFunction<T>;
 }
 
 /// # Nonlinear Model

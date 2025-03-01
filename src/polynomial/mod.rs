@@ -6,7 +6,7 @@ use nalgebra::{
     allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, Dim, DimDiff, DimName,
     DimSub, OMatrix, RawStorage, RawStorageMut, RealField, U1,
 };
-use num_traits::{Float, Num};
+use num_traits::{Float, Num, One, Zero};
 
 #[cfg(feature = "std")]
 use std::{
@@ -21,6 +21,8 @@ use core::{
     marker::PhantomData,
     ops::{Add, Div, Index, IndexMut, Mul, Neg, Sub},
 };
+
+use crate::NumericalFunction;
 
 // ===============================================================================================
 //      Polynomial Sub-Modules
@@ -40,6 +42,9 @@ pub use vec_polynomial::DPolynomial;
 
 #[cfg(test)]
 mod edge_case_test;
+
+#[cfg(test)]
+mod op_tests;
 
 #[cfg(test)]
 #[cfg(feature="std")]
@@ -66,12 +71,6 @@ mod fmt_tests;
 /// # Example
 /// ```rust
 /// use control_rs::Polynomial;
-/// use nalgebra::{ArrayStorage, U3};
-/// #[cfg(feature = "std")]
-/// use std::marker::PhantomData;
-/// #[cfg(not(feature = "std"))]
-/// use core::marker::PhantomData;
-/// 
 /// let quadratic = Polynomial::new("x", [1, 0, 0]);
 /// ```
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -191,7 +190,7 @@ where
 
 impl<T, D, S> Polynomial<T, D, S>
 where
-    T: Copy + Num,
+    T: Copy,
     D: Dim,
     S: RawStorage<T, D>,
 {
@@ -215,12 +214,24 @@ where
     /// ```
     pub fn evaluate<U>(&self, value: U) -> U
     where
-        U: Copy + Num + Add<T, Output = U> + Mul<U, Output = U>,
+        U: Copy + Zero + One + Add<T, Output = U> + Mul<U, Output = U>,
     {
         (0..self.num_coefficients()).fold(U::zero(), |acc, irow| {
             // safe becuase nrows is from shape() and irow is in 0..nrows
             acc * value + self[irow]
         })
+    }
+}
+
+impl<T, U, D, S> NumericalFunction<U> for Polynomial<T, D, S> 
+where
+    T: Copy,
+    U: Copy + One + Zero + Add<T, Output = U> + Mul<U, Output = U>,
+    D: Dim,
+    S: RawStorage<T, D>,
+{
+    fn __evaluate(&self, x: U) -> U {
+        self.evaluate(x)
     }
 }
 
