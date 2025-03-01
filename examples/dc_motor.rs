@@ -86,9 +86,7 @@ fn plot(sim: SimData) {
 fn main() {
     // Numerator: [Km]
     // Denominator: JLs^2 + (JR + bL)s + bR + Km^2
-    // let motor_tf = TransferFunction::new([Km], [J * L, (J * R + L * b), (R * b) + (Km * Km)]);
-    let motor_tf =
-        TransferFunction::new([10.0 * Km], [J * L, (J * R + L * b), (R * b) + (Km * Km)]);
+    let motor_tf = TransferFunction::new([Km], [J * L, (J * R + L * b), (R * b) + (Km * Km)]);
 
     println!("DC Motor {motor_tf}");
     println!("DC Gain: {:?}", dcgain(&motor_tf));
@@ -108,6 +106,24 @@ fn main() {
 
     #[cfg(feature = "std")]
     plot(sim_data);
+
+    // simulates adding a simple feedforward controller that scales the input by the inverse of the dcgain
+    // for this simple model that will make the dcgain = 1.
+    // In reality this drives the motor state to the value of the input voltage, additional gain can
+    // scale a the output value to an appropriate speed.
+    let compensated_motor_tf =
+        TransferFunction::new([Km / dcgain(&motor_tf)], [J * L, (J * R + L * b), (R * b) + (Km * Km)]);
+
+    let monic_tf = as_monic(&compensated_motor_tf);
+    let compensated_motor_ss: StateSpace<f64, 2, 1, 1> = control_canonical(monic_tf.numerator.coefficients.0[0], monic_tf.denominator.coefficients.0[0]);
+
+    println!("DC Motor with gain compensation {compensated_motor_ss}");
+
+    // simulate for 100 steps
+    let compensated_sim_data = sim(compensated_motor_ss, 0.1, MotorState::new(0.0, 0.0));
+
+    #[cfg(feature = "std")]
+    plot(compensated_sim_data);
 
     // let combined_tf = feedback(motor_tf, 1.0);
 
