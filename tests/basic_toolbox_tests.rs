@@ -105,12 +105,7 @@ mod tf_frequency_tool_tests {
     fn test_margins() {
         let tf = TransferFunction::new([10.0], [1.0, -5.0]);
         // Frequencies to evaluate (in rad/s)
-        let freqs = [
-            0.0,
-            0.1, 
-            1.0,  
-            10.0, 
-        ];
+        let freqs = [0.0, 0.1, 1.0, 10.0];
 
         // Call the bode function
         let mut response = FrequencyResponse::default([freqs]);

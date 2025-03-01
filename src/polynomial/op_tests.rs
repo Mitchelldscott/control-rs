@@ -16,9 +16,12 @@ fn validate_scalar_post_add<T, U, D, S>(
 {
     // Compute the result of adding the value to the polynomial
     let result = *polynomial + value;
-    
+
     // Check if the resulting polynomial matches the expected one
-    assert_eq!(result.coefficients, expected.coefficients, "{name}: ({polynomial}) + {value} = {result}");
+    assert_eq!(
+        result.coefficients, expected.coefficients,
+        "{name}: ({polynomial}) + {value} = {result}"
+    );
 }
 
 fn validate_scalar_post_sub<T, U, D, S>(
@@ -35,9 +38,12 @@ fn validate_scalar_post_sub<T, U, D, S>(
 {
     // Compute the result of adding the value to the polynomial
     let result = *polynomial - value;
-    
+
     // Check if the resulting polynomial matches the expected one
-    assert_eq!(result.coefficients, expected.coefficients, "{name}: ({polynomial}) - {value} = {result}");
+    assert_eq!(
+        result.coefficients, expected.coefficients,
+        "{name}: ({polynomial}) - {value} = {result}"
+    );
 }
 
 fn validate_scalar_post_mul<T, U, D, S>(
@@ -54,9 +60,12 @@ fn validate_scalar_post_mul<T, U, D, S>(
 {
     // Compute the result of adding the value to the polynomial
     let result = *polynomial * value;
-    
+
     // Check if the resulting polynomial matches the expected one
-    assert_eq!(result.coefficients, expected.coefficients, "{name}: ({polynomial}) * {value} = {result}");
+    assert_eq!(
+        result.coefficients, expected.coefficients,
+        "{name}: ({polynomial}) * {value} = {result}"
+    );
 }
 
 fn validate_scalar_post_div<T, U, D, S>(
@@ -73,28 +82,70 @@ fn validate_scalar_post_div<T, U, D, S>(
 {
     // Compute the result of adding the value to the polynomial
     let result = *polynomial / value;
-    
-    // Check if the resulting polynomial matches the expected one
-    assert_eq!(result.coefficients, expected.coefficients, "{name}: ({polynomial}) / {value} = {result}");
-}
 
+    // Check if the resulting polynomial matches the expected one
+    assert_eq!(
+        result.coefficients, expected.coefficients,
+        "{name}: ({polynomial}) / {value} = {result}"
+    );
+}
 
 #[test]
 fn linear_f32() {
     let polynomial = Polynomial::new("x", [1.0, 0.0]);
-    validate_scalar_post_add("linear_f32", &polynomial, 1.0, Polynomial::new("x", [1.0, 1.0]));
-    validate_scalar_post_sub("linear_f32", &polynomial, 1.0, Polynomial::new("x", [1.0, -1.0]));
-    validate_scalar_post_mul("linear_f32", &polynomial, 10.0, Polynomial::new("x", [10.0, 0.0]));
-    validate_scalar_post_div("linear_f32", &polynomial, 10.0, Polynomial::new("x", [0.1, 0.0]));
+    validate_scalar_post_add(
+        "linear_f32",
+        &polynomial,
+        1.0,
+        Polynomial::new("x", [1.0, 1.0]),
+    );
+    validate_scalar_post_sub(
+        "linear_f32",
+        &polynomial,
+        1.0,
+        Polynomial::new("x", [1.0, -1.0]),
+    );
+    validate_scalar_post_mul(
+        "linear_f32",
+        &polynomial,
+        10.0,
+        Polynomial::new("x", [10.0, 0.0]),
+    );
+    validate_scalar_post_div(
+        "linear_f32",
+        &polynomial,
+        10.0,
+        Polynomial::new("x", [0.1, 0.0]),
+    );
 }
 
 #[test]
 fn cubic_i32() {
     let polynomial = Polynomial::new("x", [1, 0, 0, 0]);
-    validate_scalar_post_add("linear_f32", &polynomial, 1, Polynomial::new("x", [1, 0, 0, 1]));
-    validate_scalar_post_sub("linear_f32", &polynomial, 1, Polynomial::new("x", [1, 0, 0, -1]));
-    validate_scalar_post_mul("linear_f32", &polynomial, 10, Polynomial::new("x", [10, 0, 0, 0]));
-    validate_scalar_post_div("linear_f32", &polynomial, 10, Polynomial::new("x", [0, 0, 0, 0]));
+    validate_scalar_post_add(
+        "linear_f32",
+        &polynomial,
+        1,
+        Polynomial::new("x", [1, 0, 0, 1]),
+    );
+    validate_scalar_post_sub(
+        "linear_f32",
+        &polynomial,
+        1,
+        Polynomial::new("x", [1, 0, 0, -1]),
+    );
+    validate_scalar_post_mul(
+        "linear_f32",
+        &polynomial,
+        10,
+        Polynomial::new("x", [10, 0, 0, 0]),
+    );
+    validate_scalar_post_div(
+        "linear_f32",
+        &polynomial,
+        10,
+        Polynomial::new("x", [0, 0, 0, 0]),
+    );
 }
 
 #[test]

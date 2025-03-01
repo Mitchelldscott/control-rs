@@ -1,8 +1,8 @@
 //! # Control-rs
 //!
 //! Control-rs is a numerical modeling and control system library designed for embedded applications.
-//! Inspired by MATLAB's control systems toolbox, this crate provides a structured approach to 
-//! system modeling, analysis, and numerical design while maintaining a lightweight footprint suitable 
+//! Inspired by MATLAB's control systems toolbox, this crate provides a structured approach to
+//! system modeling, analysis, and numerical design while maintaining a lightweight footprint suitable
 //! for real-time and resource-constrained environments.
 //!
 //! ## Features
@@ -14,8 +14,8 @@
 //! ## Design Philosophy
 //! This crate is structured around core numerical model representations, each implementing traits that ensure
 //! a consistent interface for simulation, analysis, and synthesis. This is all done to provide a clean interface
-//! for users to turn models into datasets and datasets into models. There is no IDE or GUI, because this crate is 
-//! meant to be used in the field (In the future a separate crate may provide a visualization dashboard). 
+//! for users to turn models into datasets and datasets into models. There is no IDE or GUI, because this crate is
+//! meant to be used in the field (In the future a separate crate may provide a visualization dashboard).
 #![cfg_attr(not(feature = "std"), no_std)]
 #![warn(missing_docs)]
 

@@ -1,6 +1,6 @@
 //!
 //! # Polynomial struct and helpful tools
-//! 
+//!
 //! Mostly a copy of [nalgebra::Matrix] implementation with the specifics of a polynomial.
 use nalgebra::{
     allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, Dim, DimDiff, DimName,
@@ -31,9 +31,9 @@ use crate::NumericalFunction;
 pub mod array_polynomial;
 pub use array_polynomial::SPolynomial;
 
-#[cfg(feature="std")]
+#[cfg(feature = "std")]
 pub mod vec_polynomial;
-#[cfg(feature="std")]
+#[cfg(feature = "std")]
 pub use vec_polynomial::DPolynomial;
 
 // ===============================================================================================
@@ -47,7 +47,7 @@ mod edge_case_test;
 mod op_tests;
 
 #[cfg(test)]
-#[cfg(feature="std")]
+#[cfg(feature = "std")]
 mod fmt_tests;
 
 // ===============================================================================================
@@ -67,7 +67,7 @@ mod fmt_tests;
 ///
 /// * `T` - Type of the coefficients
 /// * `D` - Length of the coefficient array, ***NOT the degree!***
-/// 
+///
 /// # Example
 /// ```rust
 /// use control_rs::Polynomial;
@@ -88,11 +88,11 @@ where
     S: RawStorage<T, D>,
 {
     /// Returns the number of coefficients in the polynomial (degree + 1).
-    /// 
+    ///
     /// This function relies on the [RawStorage] trait to access the the number of rows.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `num_coeff` - number of coefficients (including zeros)
     pub fn num_coefficients(&self) -> usize {
         self.coefficients.shape().0.value()
@@ -106,23 +106,23 @@ where
     S: RawStorage<T, D>,
 {
     /// Returns a copy of the coefficient at the given index.
-    /// 
-    /// This is a wrapper for the index trait impl, the Copy trait bound allows this 
+    ///
+    /// This is a wrapper for the index trait impl, the Copy trait bound allows this
     /// function to copy the value at index rather than returning a refernce to the value.
-    /// 
+    ///
     /// Coefficients are sorted high degree -> low degree, should add a function to look up terms
-    /// by degree. 
-    /// 
+    /// by degree.
+    ///
     /// This will panic if the index is invalid.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `index` - the index of the coefficient
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `coeff` - the coefficient at the index
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// use control_rs::Polynomial;
@@ -142,15 +142,15 @@ where
     S: RawStorage<T, D>,
 {
     /// Returns a copy of the constant coefficient.
-    /// 
-    /// This is a wrapper for the index function, the Copy trait bound allows this 
+    ///
+    /// This is a wrapper for the index function, the Copy trait bound allows this
     /// function to copy the value at index rather than returning a refernce to the value.
-    /// 
+    ///
     /// The constant term of the polynomial is the last term in the storage. This is just
     /// a convienience function.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `coeff` - the constant coefficient
     pub fn constant(&self) -> T {
         self[self.num_coefficients() - 1]
@@ -223,7 +223,7 @@ where
     }
 }
 
-impl<T, U, D, S> NumericalFunction<U> for Polynomial<T, D, S> 
+impl<T, U, D, S> NumericalFunction<U> for Polynomial<T, D, S>
 where
     T: Copy,
     U: Copy + One + Zero + Add<T, Output = U> + Mul<U, Output = U>,
@@ -253,7 +253,7 @@ where
     /// ```rust
     /// use control_rs::polynomial::Polynomial;
     /// use nalgebra::ArrayStorage;
-    /// 
+    ///
     /// let p = Polynomial::new("x", [1.0, 2.0, 3.0]);
     /// let derivative = p.derivative::<ArrayStorage<f32, 2, 1>>("x'");
     /// ```
@@ -379,7 +379,7 @@ where
     /// - all coefficients are zero: all roots are infinite
     /// - if there are two coefficients and the lead is non-zero: the root is `-coeff[1]/coeff[0]`
     /// - if all but the first coeff are zero: all roots are zero
-    /// 
+    ///
     ///
     /// For very high order polynomials this may be inefficient, especially for degenerate cases.
     /// User should consider cases where all/many coeff = 0 and avoid calling this. Would be nice if
@@ -546,7 +546,6 @@ where
         new_poly
     }
 }
-
 
 // ===============================================================================================
 //      Polynomial Display Implementation

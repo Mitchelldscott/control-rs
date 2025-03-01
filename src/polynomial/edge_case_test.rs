@@ -44,8 +44,7 @@ fn validate_evaluate<T, U, D, S>(
                 !imaginary_result.im.is_zero(),
                 "{name}.evaluate(Complex<0,1>).im == {imaginary_result:?}"
             );
-        }
-        else{ 
+        } else {
             assert!(
                 imaginary_result.im.is_zero(),
                 "{name}.evaluate(Complex<0,1>).im == {imaginary_result:?}"
@@ -252,8 +251,14 @@ fn offset_quadratic_f64() {
         Polynomial::new("x'", [2.0, 0.0]),
         SMatrix::<f64, 2, 2>::new(0.0, 2.0, 1.0, 0.0),
         OMatrix::<Complex<f64>, U2, U1>::new(
-            Complex { re: -1.414213562373095, im: 0.0 }, 
-            Complex { re: 1.414213562373095, im: 0.0 }
+            Complex {
+                re: -1.414213562373095,
+                im: 0.0,
+            },
+            Complex {
+                re: 1.414213562373095,
+                im: 0.0,
+            },
         ),
     );
 }

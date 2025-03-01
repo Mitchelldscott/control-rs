@@ -111,11 +111,16 @@ fn main() {
     // for this simple model that will make the dcgain = 1.
     // In reality this drives the motor state to the value of the input voltage, additional gain can
     // scale a the output value to an appropriate speed.
-    let compensated_motor_tf =
-        TransferFunction::new([Km / dcgain(&motor_tf)], [J * L, (J * R + L * b), (R * b) + (Km * Km)]);
+    let compensated_motor_tf = TransferFunction::new(
+        [Km / dcgain(&motor_tf)],
+        [J * L, (J * R + L * b), (R * b) + (Km * Km)],
+    );
 
     let monic_tf = as_monic(&compensated_motor_tf);
-    let compensated_motor_ss: StateSpace<f64, 2, 1, 1> = control_canonical(monic_tf.numerator.coefficients.0[0], monic_tf.denominator.coefficients.0[0]);
+    let compensated_motor_ss: StateSpace<f64, 2, 1, 1> = control_canonical(
+        monic_tf.numerator.coefficients.0[0],
+        monic_tf.denominator.coefficients.0[0],
+    );
 
     println!("DC Motor with gain compensation {compensated_motor_ss}");
 
