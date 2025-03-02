@@ -1,21 +1,13 @@
 # Control-rs
 
-Numerical model synthesis and analysis tools for embedded developers.
+Control-rs is a numerical modeling and control system library designed for embedded applications. Inspired by MATLAB’s control systems toolbox, this crate provides a structured approach to system modeling, analysis, and numerical design while maintaining a lightweight footprint suitable for real-time and resource-constrained environments.
 
-> *This repository is inspired by MATLAB but built specifically for embedded projects. The goal is to recreate MATLab's documentation and modelling tools using Cargo, this repo should be as much a reference as it is a tool.*
+## Features
 
-## Overview
-
-This crate aims to facilitate a data-driven approach to system modeling and controller design. It is built around several numerical model formats, including:
-
-* Univariate Polynomial
-* Multivariate Polynomial
-* Transfer Function
-* State-Space Representation
-
-Each model format implements traits that provide a common interface for simulation, analysis, and synthesis.
-
-The crate organization is currently done so each model has its own module that implmements common traits as well as re-exports functions, types and tests from sub-modules.
+* **Modeling**: Support for Polynomial, Transfer Function, State-Space, and other nonlinear representations
+* **Analysis**: Tools for classical, modern and robust system analysis
+* **Synthesis**: Direct and data-driven methods to create models
+* **Simulation**: Easy model integration and data vizualization
 
 ## Installation (Not Supported... haven't published the crate yet, clone this repo instead)
 
