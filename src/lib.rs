@@ -6,7 +6,7 @@
 //! for real-time and resource-constrained environments.
 //!
 //! ## Features
-//! - **Modeling:** Support for Polynomial, Transfer Function, State-Space, and other nonlinear representations
+//! - **Modeling:** Support for Polynomial, Transfer Function, State-Space, and custom representations
 //! - **Analysis:** Tools for classical, modern and robust system analysis
 //! - **Synthesis:** Direct and data-driven methods to create models
 //! - **Simulation:** Easy model integration and data vizualization
@@ -16,6 +16,9 @@
 //! a consistent interface for simulation, analysis, and synthesis. This is all done to provide a clean interface
 //! for users to turn models into datasets and datasets into models. There is no IDE or GUI, because this crate is
 //! meant to be used in the field (In the future a separate crate may provide a visualization dashboard).
+//!
+//! ***A lot of docs were written by throwing bullet points into ChatGPT, some hallucinations may have snuck in.
+//! Please report any you find.***
 #![cfg_attr(not(feature = "std"), no_std)]
 #![warn(missing_docs)]
 
@@ -76,7 +79,9 @@ pub trait DynamicSystem<T> {
 /// - *Nonlinear Systems*, Khalil, Ch. 2: Nonlinear Models.
 ///
 /// ## TODO:
+/// - [ ] move generics to type aliases, the <> are too full
 /// - [ ] add generic linearization so users don't need to define a custom one (derive?)
+/// - [ ] add LinearModel trait so custom models can be linearized to other forms (linear multivariate polynomial?)
 pub trait NLModel<T, Input, State, Output, const N: usize, const M: usize, const L: usize>:
     DynamicModel<T, Input, State, Output>
 where

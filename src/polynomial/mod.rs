@@ -3,8 +3,8 @@
 //!
 //! Mostly a copy of [nalgebra::Matrix] implementation with the specifics of a polynomial.
 use nalgebra::{
-    allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, Dim, DimDiff, DimName,
-    DimSub, OMatrix, RawStorage, RawStorageMut, RealField, U1,
+    allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, Dim, DimDiff, DimMin,
+    DimMinimum, DimName, DimSub, Matrix, OMatrix, RawStorage, RawStorageMut, RealField, Scalar, U1,
 };
 use num_traits::{Float, Num, One, Zero};
 
@@ -96,6 +96,26 @@ where
     /// * `num_coeff` - number of coefficients (including zeros)
     pub fn num_coefficients(&self) -> usize {
         self.coefficients.shape().0.value()
+    }
+
+    /// Construct a polynomial from a [Matrix].
+    ///
+    /// should this be from_data(data: S) instead?
+    ///
+    /// # Arguments
+    ///
+    /// * `variable` - variable of the polynomial
+    /// * `matrix` - column matrix containing the coefficients
+    ///
+    /// # Returns
+    ///
+    /// * `polynomial` - polynomial built from the matrix's data
+    pub fn from_matrix(variable: &'static str, matrix: Matrix<T, D, U1, S>) -> Self {
+        Polynomial {
+            variable,
+            coefficients: matrix.data,
+            _phantom: PhantomData,
+        }
     }
 }
 
@@ -436,6 +456,57 @@ where
                 T::nan(),
             ))
         }
+    }
+}
+
+impl<T, const D: usize, S> Polynomial<T, Const<D>, S>
+where
+    T: Scalar + One + Zero + RealField,
+{
+    /// Fits a polynomial to the given data points using the least squares method.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - An array of input values of shape `[T; N]`, where `N` is the number of data points.
+    /// * `y` - An array of corresponding output values of shape `[T; N]`.
+    ///
+    /// # Returns
+    /// A `Polynomial<T, D, S>` that approximates the relationship between `x` and `y`
+    /// using a least squares fit.
+    ///
+    /// # Generic Arguments
+    /// - `N`: The number of data points in the X,y set
+    ///
+    /// # Example
+    /// ```
+    /// let x = [1.0, 2.0, 3.0, 4.0];
+    /// let y = [2.1, 3.9, 6.2, 8.1];
+    /// let poly = fit(x, y);
+    /// println!("{:?}", poly);
+    /// ```
+    pub fn fit<const N: usize>(
+        variable: &'static str,
+        x: [T; N],
+        y: [T; N],
+    ) -> Polynomial<T, Const<D>, ArrayStorage<T, D, 1>>
+    where
+        Const<N>: DimMin<Const<D>>,
+        DimMinimum<Const<N>, Const<D>>: DimSub<U1>,
+        DefaultAllocator: Allocator<DimMinimum<Const<N>, Const<D>>, Const<D>>
+            + Allocator<Const<N>, DimMinimum<Const<N>, Const<D>>>
+            + Allocator<DimMinimum<Const<N>, Const<D>>>
+            + Allocator<DimDiff<DimMinimum<Const<N>, Const<D>>, U1>>,
+    {
+        let degree = D - 1;
+        let h = OMatrix::<T, Const<N>, U1>::from_row_slice(&y);
+        let vandermonde = OMatrix::<T, Const<N>, Const<D>>::from_fn(|i, j| {
+            (0..degree - j).fold(T::one(), |acc, _| acc * x[i].clone())
+        });
+        let coeff_estimate = vandermonde
+            .svd(true, true)
+            .solve(&h, T::RealField::from_f64(1e-10).unwrap())
+            .expect("Least squares solution failed");
+        Polynomial::from_matrix(variable, coeff_estimate)
     }
 }
 
