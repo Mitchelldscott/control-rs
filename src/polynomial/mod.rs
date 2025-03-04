@@ -1,7 +1,7 @@
 //!
 //! # Polynomial struct and helpful tools
 //!
-//! Mostly a copy of [nalgebra::Matrix] implementation with the specifics of a polynomial.
+//! Mostly a copy of [Matrix] implementation with the specifics of a polynomial.
 use nalgebra::{
     allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, Dim, DimDiff, DimMin,
     DimMinimum, DimName, DimSub, Matrix, OMatrix, RawStorage, RawStorageMut, RealField, Scalar, U1,
@@ -526,6 +526,7 @@ where
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
+        // also need to check if storage is contiguous for sparse polynomial?
         assert!(index < self.num_coefficients(), "Index out of bounds");
         unsafe { self.coefficients.get_unchecked(index, 0) }
     }
