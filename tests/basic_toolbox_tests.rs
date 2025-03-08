@@ -2,15 +2,9 @@
 mod basic_model_tests {
 
     use control_rs::{
-        state_space::{control_canonical, zoh, StateSpace},
-        DynamicModel, NLModel,
+        integrators::runge_kutta4, state_space::{control_canonical, zoh, StateSpace}, DynamicModel, NLModel
     };
     use nalgebra::{Matrix2x1, Vector2};
-
-    // Define dimensions for the test
-    const N: usize = 2; // State dimension
-    const M: usize = 1; // Control dimension
-    const L: usize = 1; // Measurement dimension
 
     type ScalarType = f32;
 
@@ -24,22 +18,22 @@ mod basic_model_tests {
         control: ParticleInput,
     }
 
-    impl DynamicModel<ScalarType, ParticleInput, ParticleState, ParticleOutput> for Particle1D {
-        fn f(&self, state: ParticleState, input: ParticleInput) -> ParticleState {
+    impl DynamicModel<ParticleInput, ParticleState, ParticleOutput> for Particle1D {
+        fn dynamics(&self, state: ParticleState, input: ParticleInput) -> ParticleState {
             ParticleState::new(state[1], input - 0.1 * state[1])
         }
 
-        fn h(&self, state: ParticleState, _input: ParticleInput) -> ParticleOutput {
+        fn output(&self, state: ParticleState, _input: ParticleInput) -> ParticleOutput {
             state[0]
         }
     }
-
-    impl NLModel<ScalarType, ParticleInput, ParticleState, ParticleOutput, N, M, L> for Particle1D {
+    use nalgebra::SMatrix;
+    impl NLModel<ParticleInput, ParticleState, ParticleOutput, SMatrix<ScalarType,2,2>, SMatrix<ScalarType,2,1>, SMatrix<ScalarType,1,2>, SMatrix<ScalarType,1,1>> for Particle1D {
         fn linearize(
             &self,
             _state: ParticleState,
             _input: ParticleInput,
-        ) -> StateSpace<ScalarType, N, M, L> {
+        ) -> StateSpace<SMatrix<ScalarType,2,2>, SMatrix<ScalarType,2,1>, SMatrix<ScalarType,1,2>, SMatrix<ScalarType,1,1>> {
             control_canonical([1.0], [0.1, 0.0])
         }
     }
@@ -69,11 +63,11 @@ mod basic_model_tests {
         // simulate for 100 steps
         for i in 0..100 {
             // NL
-            x = model.rk4(dt / int_steps as ScalarType, 0.0, dt, x, control);
+            x = runge_kutta4(&model, x, control, 0.0, dt, dt / int_steps as ScalarType);
 
             // Continuous State-Space
             for _ in 0..int_steps {
-                xss += ss.f(xss, control) * dt / int_steps as ScalarType;
+                xss += ss.dynamics(xss, control) * dt / int_steps as ScalarType;
             }
 
             assert!(
@@ -84,7 +78,7 @@ mod basic_model_tests {
             );
 
             // Discrete State-Space
-            xssd = ssd.f(xssd, control);
+            xssd = ssd.dynamics(xssd, control);
 
             assert!(
                 (x - xssd).norm() < 6e-5,

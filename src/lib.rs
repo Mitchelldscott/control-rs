@@ -34,11 +34,7 @@ pub mod frequency_tools;
 pub mod polynomial;
 pub use polynomial::Polynomial;
 
-#[cfg(feature = "std")]
-use std::ops::{Add, Div, Mul};
-
-#[cfg(not(feature = "std"))]
-use core::ops::{Add, Div, Mul};
+pub mod integrators;
 
 /// # Numerical Function trait
 ///
@@ -51,14 +47,6 @@ use core::ops::{Add, Div, Mul};
 pub trait NumericalFunction<T> {
     /// Evaluates the function for the given input
     fn __evaluate(&self, x: T) -> T;
-}
-
-/// trait for all dynamic systems (i.e. systems with state and output equations).
-pub trait DynamicSystem<T> {
-    /// a numerical function whose input is (state, input) and output is the state update
-    type DynamicFunction: NumericalFunction<T>;
-    /// a numerical function whose input is (state, input) and output is the systems output
-    type OutputFunction: NumericalFunction<T>;
 }
 
 /// # Nonlinear Model
@@ -81,15 +69,10 @@ pub trait DynamicSystem<T> {
 /// - [ ] move generics to type aliases, the <> are too full
 /// - [ ] add generic linearization so users don't need to define a custom one (derive?)
 /// - [ ] add LinearModel trait so custom models can be linearized to other forms (linear multivariate polynomial?)
-pub trait NLModel<T, Input, State, Output, const N: usize, const M: usize, const L: usize>:
-    DynamicModel<T, Input, State, Output>
-where
-    Input: Copy,
-    State: Copy,
-    Output: Copy,
-{
+pub trait NLModel<Input, State, Output, A, B, C, D>:
+    DynamicModel<Input, State, Output> {
     /// Linearizes the system about a nominal state and input
-    fn linearize(&self, x: State, u: Input) -> StateSpace<T, N, M, L>;
+    fn linearize(&self, x: State, u: Input) -> StateSpace<A, B, C, D>;
 }
 
 /// # Dynamic Model
@@ -98,65 +81,18 @@ where
 ///
 /// model must be in the form:
 /// <pre>
-/// dx = f(x, u)
+/// ẋ = f(x, u)
 /// y = h(x, u)
 /// </pre>
 ///
 /// # Generic Arguments
 ///
-/// * `T` - type of the state, input and output values
-/// * `Input` - type of the input vector
-/// * `State` - type of the state vector
-/// * `Output` - type of the output vector
-pub trait DynamicModel<T, Input, State, Output>
-where
-    Input: Copy,
-    State: Copy,
-    Output: Copy,
-{
+/// * `Input` - type of the input variable(s)
+/// * `State` - type of the state variable(s)
+/// * `Output` - type of the output variable(s)
+pub trait DynamicModel<Input, State, Output> {
     /// Evaluates the dynamics of the state for the given state and input
-    fn f(&self, x: State, u: Input) -> State;
+    fn dynamics(&self, x: State, u: Input) -> State;
     /// Evaluates the model's output for the given state and input
-    fn h(&self, x: State, u: Input) -> Output;
-
-    /// Simulate the system for a given time interval
-    ///
-    /// The time interval is assumed to be small enough the input will be constant for the
-    /// duration of the integration. For simulations with time-varying input call this repeatedly
-    /// in a loop.
-    ///
-    /// # Arguments
-    ///
-    /// * `dt` - length of a step
-    /// * `t0` - start time
-    /// * `tf` - end time
-    /// * `x0` - initial state
-    /// * `u` - input
-    ///
-    /// # Returns
-    ///
-    /// * `x` - state at end time
-    /// * `y` - system output at end time
-    fn rk4(&self, dt: T, t0: T, tf: T, x0: State, u: Input) -> State
-    where
-        T: Copy + PartialOrd + PartialEq + From<u8> + Add<Output = T> + Div<Output = T>,
-        State: Add<Output = State> + Mul<T, Output = State>,
-    {
-        let dt_2 = dt / T::from(2);
-        let dt_3 = dt / T::from(3);
-        let dt_6 = dt / T::from(6);
-
-        let mut t = t0;
-        let mut x = x0;
-
-        while t < tf {
-            let k1 = self.f(x, u);
-            let k2 = self.f(x + k1 * dt_2, u);
-            let k3 = self.f(x + k2 * dt_2, u);
-            let k4 = self.f(x + k3 * dt_2, u);
-            x = x + k1 * dt_6 + k2 * dt_3 + k3 * dt_3 + k4 * dt_6;
-            t = t + dt;
-        }
-        x
-    }
+    fn output(&self, x: State, u: Input) -> Output;
 }

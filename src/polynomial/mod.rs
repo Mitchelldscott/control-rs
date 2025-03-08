@@ -36,6 +36,8 @@ pub mod vec_polynomial;
 #[cfg(feature = "std")]
 pub use vec_polynomial::DPolynomial;
 
+// pub mod sparse_polynomial;
+
 // ===============================================================================================
 //      Polynomial Tests
 // ===============================================================================================
@@ -74,18 +76,19 @@ mod fmt_tests;
 /// let quadratic = Polynomial::new("x", [1, 0, 0]);
 /// ```
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct Polynomial<T, D, S> {
+pub struct Polynomial<T, D, S, N = U1> {
     /// string indicating the variable the polynomial represents
     pub variable: &'static str,
     /// coefficients of the polynomial `[a0, a1, ... an]`, stored [highest -> lowest degree]
     pub coefficients: S,
-    _phantom: PhantomData<(T, D)>,
+    _phantom: PhantomData<(T, D, N)>,
 }
 
-impl<T, D, S> Polynomial<T, D, S>
+impl<T, D, S, N> Polynomial<T, D, S, N>
 where
     D: Dim,
-    S: RawStorage<T, D>,
+    N: Dim,
+    S: RawStorage<T, D, N>,
 {
     /// Returns the number of coefficients in the polynomial (degree + 1).
     ///
@@ -110,7 +113,7 @@ where
     /// # Returns
     ///
     /// * `polynomial` - polynomial built from the matrix's data
-    pub fn from_matrix(variable: &'static str, matrix: Matrix<T, D, U1, S>) -> Self {
+    pub fn from_matrix(variable: &'static str, matrix: Matrix<T, D, N, S>) -> Self {
         Polynomial {
             variable,
             coefficients: matrix.data,
@@ -119,11 +122,12 @@ where
     }
 }
 
-impl<T, D, S> Polynomial<T, D, S>
+impl<T, D, S, N> Polynomial<T, D, S, N>
 where
     T: Copy,
     D: Dim,
-    S: RawStorage<T, D>,
+    N: Dim,
+    S: RawStorage<T, D, N>,
 {
     /// Returns a copy of the coefficient at the given index.
     ///
@@ -471,18 +475,19 @@ where
     /// * `y` - An array of corresponding output values of shape `[T; N]`.
     ///
     /// # Returns
-    /// A `Polynomial<T, D, S>` that approximates the relationship between `x` and `y`
-    /// using a least squares fit.
+    /// 
+    /// * `Polynomial<T, D, S>` - that approximates the relationship between `x` and `y`
     ///
     /// # Generic Arguments
-    /// - `N`: The number of data points in the X,y set
+    /// 
+    /// * `N` - The number of data points in the X,y set
     ///
     /// # Example
-    /// ```
-    /// let x = [1.0, 2.0, 3.0, 4.0];
-    /// let y = [2.1, 3.9, 6.2, 8.1];
-    /// let poly = fit(x, y);
-    /// println!("{:?}", poly);
+    /// ```rust
+    /// use control_rs::polynomial::SPolynomial;
+    /// let x = [-2.0, -1.0, 0.0, 1.0, 2.0];
+    /// let y = [4.0, 1.0, 0.0, 1.0, 4.0];
+    /// let poly: SPolynomial<f64, 3> = SPolynomial::fit("x", x, y);
     /// ```
     pub fn fit<const N: usize>(
         variable: &'static str,
@@ -504,7 +509,7 @@ where
         });
         let coeff_estimate = vandermonde
             .svd(true, true)
-            .solve(&h, T::RealField::from_f64(1e-10).unwrap())
+            .solve(&h, T::RealField::from_f64(1e-15).unwrap())
             .expect("Least squares solution failed");
         Polynomial::from_matrix(variable, coeff_estimate)
     }
@@ -518,10 +523,11 @@ where
 //  Index
 //
 
-impl<T, D, S> Index<usize> for Polynomial<T, D, S>
+impl<T, D, S, N> Index<usize> for Polynomial<T, D, S, N>
 where
     D: Dim,
-    S: RawStorage<T, D>,
+    N: Dim,
+    S: RawStorage<T, D, N>,
 {
     type Output = T;
 
@@ -532,10 +538,11 @@ where
     }
 }
 
-impl<T, D, S> IndexMut<usize> for Polynomial<T, D, S>
+impl<T, D, S, N> IndexMut<usize> for Polynomial<T, D, S, N>
 where
     D: Dim,
-    S: RawStorageMut<T, D>,
+    N: Dim,
+    S: RawStorageMut<T, D, N>,
 {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         assert!(index < self.num_coefficients(), "Index out of bounds");

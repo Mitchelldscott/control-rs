@@ -10,7 +10,7 @@
 //! Emami-Naeini (ch 7.1)
 //!
 use nalgebra::{SMatrix, Scalar};
-use num_traits::{real::Real, One, Zero};
+use num_traits::{One, Zero};
 
 #[cfg(feature = "std")]
 use std::{
@@ -79,21 +79,18 @@ use super::DynamicModel;
 ///     println!("{ss}");
 /// }
 /// ```
-pub struct StateSpace<T, const N: usize, const M: usize, const L: usize> {
+pub struct StateSpace<A, B, C, D> {
     /// system matrix `A` (N x N), representing the relationship between state derivatives and current states
-    pub a: SMatrix<T, N, N>,
+    pub a: A,
     /// input matrix `B` (N x M), representing how inputs affect state derivatives
-    pub b: SMatrix<T, N, M>,
+    pub b: B,
     /// output matrix `C` (L x N), representing how states contribute to outputs
-    pub c: SMatrix<T, L, N>,
+    pub c: C,
     /// direct transmission matrix `D` (L x M), representing direct input-to-output relationships
-    pub d: SMatrix<T, L, M>,
+    pub d: D,
 }
 
-impl<T, const N: usize, const M: usize, const L: usize> StateSpace<T, N, M, L>
-where
-    T: 'static + Real + PartialEq + fmt::Debug,
-{
+impl<A, B, C, D> StateSpace<A, B, C, D> {
     /// create a new state space model from lists of rows
     ///
     /// # Arguments
@@ -131,42 +128,43 @@ where
     ///     println!("{ss}");
     /// }
     /// ```
-    pub fn new(a: [[T; N]; N], b: [[T; M]; N], c: [[T; N]; L], d: [[T; M]; L]) -> Self {
-        StateSpace {
-            a: SMatrix::from_fn(|i, j| a[i][j]),
-            b: SMatrix::from_fn(|i, j| b[i][j]),
-            c: SMatrix::from_fn(|i, j| c[i][j]),
-            d: SMatrix::from_fn(|i, j| d[i][j]),
-        }
+    pub fn new(a: A, b: B, c: C, d: D) -> Self {
+        StateSpace { a, b, c, d }
+        //     a: SMatrix::from_fn(|i, j| a[i][j]),
+        //     b: SMatrix::from_fn(|i, j| b[i][j]),
+        //     c: SMatrix::from_fn(|i, j| c[i][j]),
+        //     d: SMatrix::from_fn(|i, j| d[i][j]),
+        // }
     }
 }
 
-impl<T, Input, State, Output, const N: usize, const M: usize, const L: usize>
-    DynamicModel<T, Input, State, Output> for StateSpace<T, N, M, L>
+impl<Input, State, Output, A, B, C, D>
+    DynamicModel<Input, State, Output> for StateSpace<A, B, C, D>
 where
-    T: 'static + Real + PartialEq + fmt::Debug,
-    Input: Copy,
-    State: Copy + Add<Output = State>,
-    Output: Copy + Add<Output = Output>,
-    SMatrix<T, N, N>: Mul<State, Output = State>,
-    SMatrix<T, N, M>: Mul<Input, Output = State>,
-    SMatrix<T, L, N>: Mul<State, Output = Output>,
-    SMatrix<T, L, M>: Mul<Input, Output = Output>,
+    Input: Clone,
+    State: Clone + Add<Output = State>,
+    Output: Clone + Add<Output = Output>,
+    A: Clone + Mul<State, Output = State>,
+    B: Clone + Mul<Input, Output = State>,
+    C: Clone + Mul<State, Output = Output>,
+    D: Clone + Mul<Input, Output = Output>,
 {
-    fn f(&self, x: State, u: Input) -> State {
-        self.a * x + self.b * u
+    fn dynamics(&self, x: State, u: Input) -> State {
+        self.a.clone() * x + self.b.clone() * u
     }
 
-    fn h(&self, x: State, u: Input) -> Output {
-        self.c * x + self.d * u
+    fn output(&self, x: State, u: Input) -> Output {
+        self.c.clone() * x + self.d.clone() * u
     }
 }
 
-impl<T, const N: usize, const M: usize, const L: usize> fmt::Display for StateSpace<T, N, M, L>
+impl<A, B, C, D> fmt::Display for StateSpace<A, B, C, D>
 where
-    T: 'static + Copy + PartialEq + fmt::Debug + fmt::Display,
+    A: fmt::Display,
+    B: fmt::Display,
+    C: fmt::Display,
+    D: fmt::Display,
 {
-    // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -229,7 +227,7 @@ where
 pub fn control_canonical<T, const N: usize, const M: usize, const L: usize>(
     b: [T; M],
     a: [T; L],
-) -> StateSpace<T, N, 1, 1>
+) -> StateSpace<SMatrix<T,N,N>, SMatrix<T,N,1>, SMatrix<T,1,N>, SMatrix<T,1,1>>
 where
     T: 'static + Copy + Scalar + Zero + One + Neg<Output = T>,
 {
@@ -306,29 +304,34 @@ where
 ///
 /// ## TODO:
 /// - [ ] compare with [nalgebra::Matrix::exp]
-pub fn zoh<T, const N: usize, const M: usize, const L: usize>(
-    ss: &StateSpace<T, N, M, L>,
+pub fn zoh<T, A, B, C, D>(
+    ss: &StateSpace<A, B, C, D>,
     ts: T,
-) -> StateSpace<T, N, M, L>
+) -> StateSpace<A, B, C, D>
 where
     T: Copy + Scalar + Zero + One + From<u8>,
-    SMatrix<T, N, N>: Add<Output = SMatrix<T, N, N>>
-        + Mul<T, Output = SMatrix<T, N, N>>
-        + Mul<SMatrix<T, N, N>, Output = SMatrix<T, N, N>>
-        + Mul<SMatrix<T, N, M>, Output = SMatrix<T, N, M>>
-        + Div<T, Output = SMatrix<T, N, N>>,
-    SMatrix<T, N, M>: Mul<T, Output = SMatrix<T, N, M>>,
+    A: Clone 
+        + Add<Output = A>
+        + Mul<T, Output = A>
+        + Div<T, Output = A>
+        + Mul<A, Output = A>
+        + Mul<B, Output = B>
+        + Default,
+    B: Clone
+        + Mul<T, Output = B>,
+    C: Clone,
+    D: Clone,
 {
     let k: u8 = 10;
-    let identity = SMatrix::<T, N, N>::identity();
-    let psi = (0..k - 1).fold(identity, |psi, i| {
-        identity + ss.a * ts * psi / T::from(k - i)
+    let identity = A::default(); // need an identity trait?
+    let psi = (0..k - 1).fold(identity.clone(), |psi, i| {
+        identity.clone() + ss.a.clone() * ts * psi.clone() / T::from(k - i)
     });
     StateSpace {
-        a: identity + ss.a * ts * psi,
-        b: psi * ss.b * ts,
-        c: ss.c,
-        d: ss.d,
+        a: identity + ss.a.clone() * ts * psi.clone(),
+        b: psi * ss.b.clone() * ts,
+        c: ss.c.clone(),
+        d: ss.d.clone(),
     }
 }
 
@@ -341,9 +344,9 @@ mod basic_ss_tests {
     #[test]
     fn initialize_velocity_statespace() {
         let ss = StateSpace::new(
-            [[0.0, 1.0], [0.0, -0.1]],
-            [[0.0], [1.0]],
-            [[1.0, 0.0]],
+            nalgebra::Matrix2::new(0.0, 1.0, 0.0, -0.1),
+            nalgebra::Matrix2x1::new(0.0, 1.0),
+            nalgebra::Matrix1x2::new(1.0, 0.0),
             [[0.0]],
         );
 
@@ -367,9 +370,9 @@ mod basic_ss_tests {
     #[test]
     fn velocity_model_zoh_and_stability() {
         let ss = StateSpace::new(
-            [[0.0, 1.0], [0.0, -0.1]],
-            [[0.0], [1.0]],
-            [[1.0, 0.0]],
+            nalgebra::Matrix2::new(0.0, 1.0, 0.0, -0.1),
+            nalgebra::Vector2::new(0.0, 1.0),
+            nalgebra::Matrix1x2::new(1.0, 0.0),
             [[0.0]],
         );
 

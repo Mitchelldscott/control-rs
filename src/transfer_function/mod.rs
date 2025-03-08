@@ -23,13 +23,18 @@ use core::{fmt, ops::Neg};
 use nalgebra::{ArrayStorage, Complex, Const, Dim, RawStorage, RealField, U1};
 use num_traits::{Float, Num};
 
-pub mod linear_tools;
-pub use linear_tools::*;
-
 use crate::{
     frequency_tools::{FrequencyResponse, FrequencyTools},
     polynomial::Polynomial,
 };
+
+// ===============================================================================================
+//      Polynomial Sub-Modules
+// ===============================================================================================
+
+
+pub mod linear_tools;
+pub use linear_tools::*;
 
 /// # Transfer Function
 ///

@@ -23,7 +23,7 @@
 //! DC Gain: 0.9090909090909091
 //! LHP: true
 //! ```
-use control_rs::{state_space::*, transfer_function::*, DynamicModel};
+use control_rs::{state_space::*, transfer_function::*, DynamicModel, integrators::runge_kutta4};
 use nalgebra::{Vector1, Vector2};
 
 // Define motor parameters
@@ -42,15 +42,15 @@ type MotorOutput = Vector1<f64>;
 const SIMSTEPS: usize = 100;
 type SimData = [(f64, f64, f64, f64); SIMSTEPS];
 
-fn sim<M: DynamicModel<f64, MotorInput, MotorState, MotorOutput>>(
+fn sim<M: DynamicModel<MotorInput, MotorState, MotorOutput>>(
     model: M,
     dt: f64,
     mut x: MotorState,
 ) -> SimData {
-    let mut sim = [(0.0, x[0], x[1], model.h(x, 1.0)[(0, 0)]); SIMSTEPS];
+    let mut sim = [(0.0, x[0], x[1], model.output(x, 1.0)[(0, 0)]); SIMSTEPS];
     for i in 1..SIMSTEPS {
-        x = model.rk4(0.01, 0.0, 0.1, x, 1.0);
-        sim[i] = (i as f64 * dt, x[0], x[1], model.h(x, 1.0)[(0, 0)]);
+        x = runge_kutta4(&model, x, 1.0, 0.0, 0.1, 0.01);
+        sim[i] = (i as f64 * dt, x[0], x[1], model.output(x, 1.0)[(0, 0)]);
     }
 
     sim
@@ -97,7 +97,7 @@ fn main() {
         monic_tf.numerator.coefficients,
         monic_tf.denominator.coefficients,
     );
-    let motor_ss: StateSpace<f64, 2, 1, 1> = control_canonical(num.0[0], den.0[0]);
+    let motor_ss = control_canonical(num.0[0], den.0[0]);
 
     println!("DC Motor {motor_ss}");
 
@@ -117,7 +117,7 @@ fn main() {
     );
 
     let monic_tf = as_monic(&compensated_motor_tf);
-    let compensated_motor_ss: StateSpace<f64, 2, 1, 1> = control_canonical(
+    let compensated_motor_ss = control_canonical(
         monic_tf.numerator.coefficients.0[0],
         monic_tf.denominator.coefficients.0[0],
     );

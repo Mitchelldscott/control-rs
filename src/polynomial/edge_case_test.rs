@@ -206,7 +206,7 @@ fn linear_i32() {
 
 #[test]
 fn linear_f32() {
-    let polynomial = Polynomial::new("x", [1.0, 0.0]);
+    let polynomial = SPolynomial::new("x", [1.0, 0.0]);
     validate_evaluate(
         "linear_f32",
         &polynomial,
