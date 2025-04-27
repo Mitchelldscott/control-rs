@@ -140,6 +140,7 @@ pub fn zoh<T, A, B, C, D>(
 where
     T: Copy + Scalar + Zero + One + From<u8>,
     A: Clone 
+        + One
         + Add<Output = A>
         + Mul<T, Output = A>
         + Div<T, Output = A>
@@ -152,7 +153,7 @@ where
     D: Clone,
 {
     let k: u8 = 10;
-    let identity = A::default(); // need an identity trait?
+    let identity = A::one();
     let psi = (0..k - 1).fold(identity.clone(), |psi, i| {
         identity.clone() + ss.a.clone() * ts * psi.clone() / T::from(k - i)
     });

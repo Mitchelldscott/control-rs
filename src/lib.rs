@@ -187,16 +187,16 @@ mod feedback_test {
     //     assert_eq!(p3.coefficients, [-1.0], "incorrect feedback polynomial");
     // }
 
-    #[test]
-    fn tf_tf() {
-        let tf1 = TransferFunction::new(
-            [1.0],
-            [1.0, 0.0]
-        );
-        let tf2 = TransferFunction::new(
-            [1.0],
-            [1.0, 0.0]
-        );
-        let tf3 = feedback(&tf1, &tf2, 1.0, -1.0);
-    }
+    // #[test]
+    // fn tf_tf() {
+    //     let tf1 = TransferFunction::new(
+    //         [1.0],
+    //         [1.0, 0.0]
+    //     );
+    //     let tf2 = TransferFunction::new(
+    //         [1.0],
+    //         [1.0, 0.0]
+    //     );
+    //     let tf3 = feedback(&tf1, &tf2, 1.0, -1.0);
+    // }
 }

@@ -225,7 +225,7 @@ mod basic_ss_tests {
             nalgebra::Matrix2::new(0.0, 1.0, 0.0, -0.1),
             nalgebra::Vector2::new(0.0, 1.0),
             nalgebra::Matrix1x2::new(1.0, 0.0),
-            [[0.0]],
+            nalgebra::Matrix1::new(0.0),
         );
 
         let ssd = zoh(&ss, 0.1 as f32);
@@ -233,7 +233,7 @@ mod basic_ss_tests {
         assert_eq!(
             ssd.a,
             nalgebra::Matrix2::new(1.0, 0.09950166, 0.0, 0.99004984),
-            "System matrix incorrect"
+            "Discrete System matrix incorrect"
         );
 
         // check if the eigen values are marginally stable
