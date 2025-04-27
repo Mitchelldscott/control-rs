@@ -2,7 +2,7 @@
 mod basic_model_tests {
 
     use control_rs::{
-        integrators::runge_kutta4, state_space::{control_canonical, zoh, StateSpace}, DynamicModel, NLModel
+        integrators::runge_kutta4, state_space::{StateSpace, utils::{control_canonical, zoh}}, DynamicModel, NLModel
     };
     use nalgebra::{Matrix2x1, Vector2};
 

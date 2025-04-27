@@ -69,8 +69,7 @@ pub trait NumericalFunction<T> {
 /// - [ ] move generics to type aliases, the <> are too full
 /// - [ ] add generic linearization so users don't need to define a custom one (derive?)
 /// - [ ] add LinearModel trait so custom models can be linearized to other forms (linear multivariate polynomial?)
-pub trait NLModel<Input, State, Output, A, B, C, D>:
-    DynamicModel<Input, State, Output> {
+pub trait NLModel<Input, State, Output, A, B, C, D>: DynamicModel<Input, State, Output> {
     /// Linearizes the system about a nominal state and input
     fn linearize(&self, x: State, u: Input) -> StateSpace<A, B, C, D>;
 }
@@ -95,4 +94,81 @@ pub trait DynamicModel<Input, State, Output> {
     fn dynamics(&self, x: State, u: Input) -> State;
     /// Evaluates the model's output for the given state and input
     fn output(&self, x: State, u: Input) -> Output;
+}
+
+#[cfg(test)]
+mod feedback_test {
+    use num_traits::{One, Zero};
+    use nalgebra::{Scalar, DimName, RawStorageMut, allocator::Allocator, DefaultAllocator};
+
+    #[cfg(feature = "std")]
+    use std::ops::{Add, Sub, Div, Mul};
+    
+    #[cfg(not(feature = "std"))]
+    use core::ops::{Add, Sub, Div, Mul};
+
+    use crate::Polynomial;
+    
+    trait NumericalModel: Clone {
+        fn zero() -> Self;
+        fn identity() -> Self;
+    }
+
+    impl<T, D, S, N> NumericalModel for Polynomial<T, D, S, N> 
+    where 
+        T: Scalar + Zero + One,
+        D: DimName,
+        S: Clone + RawStorageMut<T, D, N>,
+        N: DimName,
+        DefaultAllocator: Allocator<D, N, Buffer<T> = S>,
+    {
+        fn zero() -> Self {
+            Polynomial::from_element_generic(D::name(), N::name(), T::zero())
+        }
+
+        fn identity() -> Self {
+            let mut ident = Polynomial::from_element_generic(D::name(), N::name(), T::zero());
+            let num_coeff = ident.num_coefficients();
+            for _ in 0..ident.num_equations() {
+                ident[num_coeff - 1] = T::one();
+            }
+            ident
+        }
+    }
+
+    fn feedback<T, G, H, GH, D>(
+        sys1: &G,
+        sys2: &H,
+        sign_in: T,
+        sign_feedback: T,
+    ) -> D
+    where
+        T: Clone + Zero + One +  Mul<G, Output = G> + Mul<GH, Output = GH>,
+        G: NumericalModel + Mul<H, Output = GH> + Div<GH, Output = D>,
+        GH: NumericalModel + Sub<Output = GH>,
+        H: NumericalModel,
+    {
+        sign_in.clone() * sys1.clone() / (GH::identity() - sign_feedback.clone() * sys1.clone() * sys2.clone())
+    }
+
+    #[test]
+    fn polynomial_polynomial() {
+        let p1 = Polynomial::new([1.0]);
+        let p2 = Polynomial::new([2.0]);
+        let p3 = feedback(&p1, &p2, 1.0, -1.0);
+        assert_eq!(p3.coefficients, [-1.0], "incorrect feedback polynomial");
+    }
+
+    // #[test]
+    // fn tf_tf() {
+    //     let tf1 = TransferFunction::new(
+    //         [1.0],
+    //         [1.0, 0.0]
+    //     );
+    //     let tf2 = TransferFunction::new(
+    //         [1.0],
+    //         [1.0, 0.0]
+    //     );
+    //     let tf3 = feedback(&tf1, &tf2, 1.0, -1.0);
+    // }
 }

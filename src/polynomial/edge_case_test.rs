@@ -65,17 +65,13 @@ fn validate_derivative<T, D, S, S1>(
     S: RawStorage<T, D>,
     S1: RawStorageMut<T, DimDiff<D, U1>> + Default,
 {
-    let result: Polynomial<T, DimDiff<D, U1>, S1> = polynomial.derivative("x'");
+    let result: Polynomial<T, DimDiff<D, U1>, S1> = polynomial.derivative();
     for i in 0..result.num_coefficients() {
         assert_eq!(
             result[i], expected[i],
             "{name}.derivative() coefficients[{i}]",
         );
     }
-    assert_eq!(
-        result.variable, expected.variable,
-        "{name}.derivative() variable",
-    );
 }
 
 fn validate_companion<T, D, S, S1>(
@@ -141,14 +137,14 @@ fn validate<T, D, S, const N: usize, U, S1, S2>(
 
 #[test]
 fn constant_zero_f64() {
-    let polynomial = Polynomial::new("x", [0.0f64]);
+    let polynomial = Polynomial::new([0.0f64]);
     validate_evaluate(
         "constant_zero",
         &polynomial,
         &[-2.0, -2.0, 0.0, 1.0, 2.0],
         &[0.0, 0.0, 0.0, 0.0, 0.0],
     );
-    validate_derivative("constant_zero", &polynomial, Polynomial::new("x'", []));
+    validate_derivative("constant_zero", &polynomial, Polynomial::new([]));
     // cannot call companion on polynomial degree < 1
     // validate_companion(
     //     "constant_zero",
@@ -162,14 +158,14 @@ fn constant_zero_f64() {
 
 #[test]
 fn constant_one_i32() {
-    let polynomial = Polynomial::new("x", [1]);
+    let polynomial = Polynomial::new([1]);
     validate_evaluate(
         "constant_one",
         &polynomial,
         &[-2, -1, 0, 1, 2],
         &[1, 1, 1, 1, 1],
     );
-    validate_derivative("constant_one", &polynomial, Polynomial::new("x'", []));
+    validate_derivative("constant_one", &polynomial, Polynomial::new([]));
     // cannot call companion on polynomial where D: !DimSub<U1>
     // validate_companion(
     //     "constant_one",
@@ -187,9 +183,9 @@ fn constant_one_i32() {
 
 #[test]
 fn linear_i32() {
-    let polynomial = Polynomial::new("x", [1, 0]);
+    let polynomial = Polynomial::new([1, 0]);
     validate_evaluate("linear_i32", &polynomial, &[0, 1, 2], &[0, 1, 2]);
-    validate_derivative("linear_i32", &polynomial, Polynomial::new("x'", [1]));
+    validate_derivative("linear_i32", &polynomial, Polynomial::new([1]));
     validate_companion(
         "linear_i32",
         &polynomial,
@@ -206,14 +202,14 @@ fn linear_i32() {
 
 #[test]
 fn linear_f32() {
-    let polynomial = SPolynomial::new("x", [1.0, 0.0]);
+    let polynomial = SPolynomial::new([1.0, 0.0]);
     validate_evaluate(
         "linear_f32",
         &polynomial,
         &[0.0, 1.0, 2.0],
         &[0.0, 1.0, 2.0],
     );
-    validate_derivative("linear_f32", &polynomial, Polynomial::new("x'", [1.0]));
+    validate_derivative("linear_f32", &polynomial, Polynomial::new([1.0]));
     validate_companion(
         "linear_f32",
         &polynomial,
@@ -232,10 +228,10 @@ fn linear_f32() {
 fn unit_quadratic_f32() {
     validate(
         "unit_quadratic",
-        Polynomial::new("x", [1.0, 0.0, 0.0]),
+        Polynomial::new([1.0, 0.0, 0.0]),
         [-2.0, -1.0, 0.0, 1.0, 2.0],
         [4.0, 1.0, 0.0, 1.0, 4.0],
-        Polynomial::new("x'", [2.0, 0.0]),
+        Polynomial::new([2.0, 0.0]),
         SMatrix::<f32, 2, 2>::new(0.0, 0.0, 1.0, 0.0),
         OMatrix::<Complex<f32>, U2, U1>::new(Complex::zero(), Complex::zero()),
     );
@@ -245,10 +241,10 @@ fn unit_quadratic_f32() {
 fn offset_quadratic_f64() {
     validate(
         "offset_quadratic",
-        Polynomial::new("x", [1.0, 0.0, -2.0]),
+        Polynomial::new([1.0, 0.0, -2.0]),
         [-2.0, -1.0, 0.0, 1.0, 2.0],
         [2.0, -1.0, -2.0, -1.0, 2.0],
-        Polynomial::new("x'", [2.0, 0.0]),
+        Polynomial::new([2.0, 0.0]),
         SMatrix::<f64, 2, 2>::new(0.0, 2.0, 1.0, 0.0),
         OMatrix::<Complex<f64>, U2, U1>::new(
             Complex {
@@ -265,7 +261,7 @@ fn offset_quadratic_f64() {
 
 #[test]
 fn unit_cubic_f64() {
-    let polynomial = Polynomial::new("x", [1.0, 0.0, 0.0, 0.0]);
+    let polynomial = Polynomial::new([1.0, 0.0, 0.0, 0.0]);
     validate_evaluate(
         "unit_cubic_f64",
         &polynomial,
@@ -275,7 +271,7 @@ fn unit_cubic_f64() {
     validate_derivative(
         "unit_cubic_f64",
         &polynomial,
-        Polynomial::new("x'", [3.0, 0.0, 0.0]),
+        Polynomial::new([3.0, 0.0, 0.0]),
     );
     validate_companion(
         "unit_cubic_f64",

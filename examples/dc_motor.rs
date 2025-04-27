@@ -23,7 +23,7 @@
 //! DC Gain: 0.9090909090909091
 //! LHP: true
 //! ```
-use control_rs::{state_space::*, transfer_function::*, DynamicModel, integrators::runge_kutta4};
+use control_rs::{state_space::utils::control_canonical, transfer_function::*, DynamicModel, integrators::runge_kutta4};
 use nalgebra::{Vector1, Vector2};
 
 // Define motor parameters

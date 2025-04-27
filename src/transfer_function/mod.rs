@@ -88,8 +88,8 @@ impl<T, const M: usize, const N: usize>
     /// ```
     pub const fn new(numerator: [T; M], denominator: [T; N]) -> Self {
         TransferFunction {
-            numerator: Polynomial::new("s", numerator),
-            denominator: Polynomial::new("s", denominator),
+            numerator: Polynomial::new(numerator),
+            denominator: Polynomial::new(denominator),
         }
     }
 }
@@ -184,12 +184,12 @@ mod basic_tf_tests {
         let tf = TransferFunction::new([1.0], [1.0, 0.0]);
         assert_eq!(
             tf.numerator,
-            Polynomial::new("s", [1.0]),
+            Polynomial::new([1.0]),
             "TF numerator incorrect"
         );
         assert_eq!(
             tf.denominator,
-            Polynomial::new("s", [1.0, 0.0]),
+            Polynomial::new([1.0, 0.0]),
             "TF denominator incorrect"
         );
     }

@@ -26,6 +26,16 @@ use core::{
 
 use super::DynamicModel;
 
+// ===============================================================================================
+//      StateSpace Submodules
+// ===============================================================================================
+
+pub mod utils;
+
+// ===============================================================================================
+//      StateSpace Basic
+// ===============================================================================================
+
 /// Generic state-space model for a dynamic system
 ///
 /// The state-space model represents a linear system of equations in the form:
@@ -45,14 +55,14 @@ use super::DynamicModel;
 /// - `D`: direct transmission matrix (L x M)
 ///
 /// The model can describe single-input single-output (SISO), multiple-input multiple-output (MIMO),
-/// and variations with differing numbers of states, inputs, and outputs.
+/// single-input multiple-output (SIMO) and multiple-input single-output (MISO).
 ///
 /// # Generic Arguments
 ///
-/// * `T` - scalar type of the system (e.g., `f32`, `f64`)
-/// * `N` - number of state variables (dimension of `A`)
-/// * `M` - number of input variables (dimension of `B`)
-/// * `L` - number of output variables (dimension of `C`)
+/// * `A` - system matrix type
+/// * `B` - input matrix type
+/// * `C` - input matrix type
+/// * `D` - direct transmission matrix type
 ///
 /// # Example
 ///
@@ -91,7 +101,7 @@ pub struct StateSpace<A, B, C, D> {
 }
 
 impl<A, B, C, D> StateSpace<A, B, C, D> {
-    /// create a new state space model from lists of rows
+    /// Create a new state space model from lists of rows
     ///
     /// # Arguments
     ///
@@ -130,13 +140,12 @@ impl<A, B, C, D> StateSpace<A, B, C, D> {
     /// ```
     pub fn new(a: A, b: B, c: C, d: D) -> Self {
         StateSpace { a, b, c, d }
-        //     a: SMatrix::from_fn(|i, j| a[i][j]),
-        //     b: SMatrix::from_fn(|i, j| b[i][j]),
-        //     c: SMatrix::from_fn(|i, j| c[i][j]),
-        //     d: SMatrix::from_fn(|i, j| d[i][j]),
-        // }
     }
 }
+
+// ===============================================================================================
+//      StateSpace as DynamicModel
+// ===============================================================================================
 
 impl<Input, State, Output, A, B, C, D>
     DynamicModel<Input, State, Output> for StateSpace<A, B, C, D>
@@ -158,6 +167,10 @@ where
     }
 }
 
+// ===============================================================================================
+//      StateSpace Format
+// ===============================================================================================
+
 impl<A, B, C, D> fmt::Display for StateSpace<A, B, C, D>
 where
     A: fmt::Display,
@@ -174,172 +187,11 @@ where
     }
 }
 
-/// create a new SISO state-space model from the numerator and denomenator coefficients of
-/// a monic transfer function
-///
-/// The transfer function should be proper and its denominator must be monic. The function still
-/// runs if this criteria is not met but the results will likely be incorrect.
-///
-/// <pre>
-/// G(s) = b(s) / a(s)
-/// a(s) = (s^N + a_N s^(N-1) + ... + a_1)
-/// b(s) = (b_N s^(N-1) + b_(N-1) s^(N-2) + ... + b_1)
-///
-/// A = [  0    1    0  ...  0   ]
-///     [  0    0    1  ...  0   ]
-///     [  ...                   ]
-///     [ -a_1 -a_2 -a_3... -a_n ]
-///  
-/// - the final row of A is the denominator coefficients
-/// where j = 0 is the constant and j = N - 1 is the second highest order coefficient
-/// - the derivitive of each state variable i is the state variable i + 1
-///
-/// B = [ 0 ]
-///     [...]
-///     [ 1 ]
-///
-/// - the input is a term in the derivative of x_n
-///
-/// C = [ b_1 b_2 ... b_n]
-///
-/// D = [ 0 ]
-/// </pre>
-///
-/// # Arguments
-///
-/// * `b` - coefficients of a transfer functions numerator `[b_n ... b_1]`
-/// * `a` - coefficients of a transfer functions denominator `[1.0, a_n .. a_1]`
-///
-/// # Returns
-///
-/// * `StateSpace` - state-space model in control canonical form
-///
-/// # Example
-///
-/// ```
-/// use control_rs::state_space::{StateSpace, control_canonical};
-///
-/// fn main() {
-///     let ss: StateSpace::<_,2,1,1> = control_canonical([1.0], [0.1, 0.0]);
-///     println!("{ss}");
-/// }
-/// ```
-pub fn control_canonical<T, const N: usize, const M: usize, const L: usize>(
-    b: [T; M],
-    a: [T; L],
-) -> StateSpace<SMatrix<T,N,N>, SMatrix<T,N,1>, SMatrix<T,1,N>, SMatrix<T,1,1>>
-where
-    T: 'static + Copy + Scalar + Zero + One + Neg<Output = T>,
-{
-    StateSpace {
-        a: SMatrix::from_fn(|i, j| {
-            if i == N - 1 {
-                -a[L - j - 1]
-            } else {
-                if i + 1 == j {
-                    T::one()
-                } else {
-                    T::zero()
-                }
-            }
-        }),
-        b: SMatrix::from_fn(|i, _| if i == N - 1 { T::one() } else { T::zero() }),
-        c: SMatrix::from_fn(|_, j| if j < M { b[M - j - 1] } else { T::zero() }),
-        d: SMatrix::from_fn(|_, _| T::zero()),
-    }
-}
-
-/// Discretizes the given StateSpace model
-///
-/// This discretization applies a zero-order-hold (zoh) to the continuous state space matrices.
-/// zoh relies on the matrix exponent operation e^At which is approximated using a tenth order
-/// taylor-series expansion. The implementation is based on an example from "Digital Control of
-/// Dynamic Systems" by Gene F. Franklin, J. David Powell and Michael Workman (Ch 4.3, pg 107).
-///
-/// 1. Select sampling period T
-/// 2. **I** = Identity
-/// 3. **Psi** = Identity
-/// 4. k = 10
-/// 5. for i in 0..k-1
-///     - **Psi** = **I** + **A** * T * **Psi** / (k - i)
-/// 6. **G** = T * **Psi** * **B**
-/// 7. **F** = **I** + **F** * T * **Psi**
-///
-/// # Arguments
-///
-/// * `&self` - the dynamic system to linearize
-/// * `ts` - sampling time of the system
-/// * `x` - state vector
-/// * `u` - input vector
-///
-/// # Returns
-///
-/// * `StateSpace` - a discretized version of the state space model
-///
-/// # Example
-///
-/// ```
-/// use control_rs::state_space::{StateSpace, zoh};
-///
-/// fn main() {
-///     let ss = StateSpace::new(
-///         [
-///             [0.0, 1.0],
-///             [0.0, -0.1]
-///         ],
-///         [
-///             [0.0],
-///             [1.0]
-///         ],
-///         [
-///             [1.0, 0.0]
-///         ],
-///         [[0.0]]
-///     );
-///
-///     let ssd = zoh(&ss, 0.1 as f32);
-///     println!("{ssd}");
-/// }
-/// ```
-///
-/// ## TODO:
-/// - [ ] compare with [nalgebra::Matrix::exp]
-pub fn zoh<T, A, B, C, D>(
-    ss: &StateSpace<A, B, C, D>,
-    ts: T,
-) -> StateSpace<A, B, C, D>
-where
-    T: Copy + Scalar + Zero + One + From<u8>,
-    A: Clone 
-        + Add<Output = A>
-        + Mul<T, Output = A>
-        + Div<T, Output = A>
-        + Mul<A, Output = A>
-        + Mul<B, Output = B>
-        + Default,
-    B: Clone
-        + Mul<T, Output = B>,
-    C: Clone,
-    D: Clone,
-{
-    let k: u8 = 10;
-    let identity = A::default(); // need an identity trait?
-    let psi = (0..k - 1).fold(identity.clone(), |psi, i| {
-        identity.clone() + ss.a.clone() * ts * psi.clone() / T::from(k - i)
-    });
-    StateSpace {
-        a: identity + ss.a.clone() * ts * psi.clone(),
-        b: psi * ss.b.clone() * ts,
-        c: ss.c.clone(),
-        d: ss.d.clone(),
-    }
-}
-
 #[cfg(test)]
 mod basic_ss_tests {
     // not as productive as it could be...
     use super::*;
-    use crate::transfer_function::{as_monic, TransferFunction};
+    use crate::{state_space::utils::{zoh, control_canonical}, transfer_function::{as_monic, TransferFunction}};
 
     #[test]
     fn initialize_velocity_statespace() {
@@ -408,7 +260,7 @@ mod basic_ss_tests {
     fn control_cannonical_test() {
         let tf = TransferFunction::new([2.0, 4.0], [1.0, 1.0, 4.0, 0.0, 0.0]);
         let monic_tf = as_monic(&tf);
-        let (num, den) = (monic_tf.numerator, monic_tf.denominator.reduce_order("s"));
+        let (num, den) = (monic_tf.numerator, monic_tf.denominator.reduce_order());
 
         assert_eq!(
             den[0], 1.0,
