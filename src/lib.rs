@@ -99,15 +99,15 @@ pub trait DynamicModel<Input, State, Output> {
 #[cfg(test)]
 mod feedback_test {
     use num_traits::{One, Zero};
-    use nalgebra::{Scalar, DimName, RawStorageMut, allocator::Allocator, DefaultAllocator};
+    use nalgebra::{U1, Scalar, DimName, RawStorageMut, allocator::Allocator, DefaultAllocator};
 
     #[cfg(feature = "std")]
-    use std::ops::{Add, Sub, Div, Mul};
+    use std::ops::{Sub, Div, Mul};
     
     #[cfg(not(feature = "std"))]
-    use core::ops::{Add, Sub, Div, Mul};
+    use core::ops::{Sub, Div, Mul};
 
-    use crate::Polynomial;
+    use crate::{Polynomial, TransferFunction};
     
     trait NumericalModel: Clone {
         fn zero() -> Self;
@@ -136,6 +136,34 @@ mod feedback_test {
         }
     }
 
+    impl<T, M, N, S1, S2> NumericalModel for TransferFunction<T, M, N, S1, S2> 
+    where 
+        T: Scalar + Zero + One + Copy,
+        M: DimName,
+        N: DimName,
+        S1: Clone + RawStorageMut<T, M>,
+        S2: Clone + RawStorageMut<T, N>,
+        DefaultAllocator: Allocator<M, U1, Buffer<T> = S1>
+            + Allocator<N, U1, Buffer<T> = S2>,
+    {
+        fn zero() -> Self {
+            TransferFunction {
+                numerator: Polynomial::zeros_generic(M::name(), U1),
+                denominator: Polynomial::zeros_generic(N::name(), U1),
+            }
+        }
+
+        fn identity() -> Self {
+            let mut ident = TransferFunction::zero();
+            let m = ident.numerator.num_coefficients() - 1;
+            let n = ident.denominator.num_coefficients() - 1;
+            ident.numerator[m] = T::one();
+            ident.denominator[n] = T::one();
+
+            ident
+        }
+    }
+
     fn feedback<T, G, H, GH, D>(
         sys1: &G,
         sys2: &H,
@@ -151,24 +179,24 @@ mod feedback_test {
         sign_in.clone() * sys1.clone() / (GH::identity() - sign_feedback.clone() * sys1.clone() * sys2.clone())
     }
 
-    #[test]
-    fn polynomial_polynomial() {
-        let p1 = Polynomial::new([1.0]);
-        let p2 = Polynomial::new([2.0]);
-        let p3 = feedback(&p1, &p2, 1.0, -1.0);
-        assert_eq!(p3.coefficients, [-1.0], "incorrect feedback polynomial");
-    }
-
     // #[test]
-    // fn tf_tf() {
-    //     let tf1 = TransferFunction::new(
-    //         [1.0],
-    //         [1.0, 0.0]
-    //     );
-    //     let tf2 = TransferFunction::new(
-    //         [1.0],
-    //         [1.0, 0.0]
-    //     );
-    //     let tf3 = feedback(&tf1, &tf2, 1.0, -1.0);
+    // fn polynomial_polynomial() {
+    //     let p1 = Polynomial::new([1.0]);
+    //     let p2 = Polynomial::new([2.0]);
+    //     let p3 = feedback(&p1, &p2, 1.0, -1.0);
+    //     assert_eq!(p3.coefficients, [-1.0], "incorrect feedback polynomial");
     // }
+
+    #[test]
+    fn tf_tf() {
+        let tf1 = TransferFunction::new(
+            [1.0],
+            [1.0, 0.0]
+        );
+        let tf2 = TransferFunction::new(
+            [1.0],
+            [1.0, 0.0]
+        );
+        let tf3 = feedback(&tf1, &tf2, 1.0, -1.0);
+    }
 }

@@ -55,6 +55,7 @@ pub use linear_tools::*;
 /// ## References
 ///
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 3.1
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct TransferFunction<T, M, N, S1, S2> {
     /// coefficients of the numerator `[b0, b1, ... bm]`
     pub numerator: Polynomial<T, M, S1>,
