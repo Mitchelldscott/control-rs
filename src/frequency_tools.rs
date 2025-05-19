@@ -13,7 +13,7 @@
 //! system stability.
 //! - **Magnitude and Phase Response:** Evaluate systems at logarithmically spaced
 //! frequency points to compute magnitude and phase.
-//! - **Visualization Backend:** Generate html plots using plotlyrs.
+//! - **Visualization Backend:** Generate html plots using plotly-rs.
 //!
 //! ## Applications
 //!
@@ -35,7 +35,7 @@
 //!     - add to_polar() to FR (unrelated but useful, maybe make a PolarFrequencyResponse)
 //! - [ ] textbook example of trait productivity
 //! - [ ] move plotly to plotly helper file (or wait for a nice gui)
-//! - [ ] move FR constructors to FR factory? (configure set of FRs and target outputs without intializing anythning)
+//! - [ ] move FR constructors to FR factory? (configure set of FRs and target outputs without initializing anything)
 
 use nalgebra::{Complex, ComplexField, RealField};
 use num_traits::Float;
@@ -173,7 +173,7 @@ impl<T> FrequencyMargin<T> {
     /// a frequency response
     ///
     /// # Arguments
-    /// * `freqs` - The array of frequency values (in rad/s)
+    /// * `frequencies` - The array of frequency values (in rad/s)
     /// * `response` - The array of `Complex<T>` corresponding to the given frequencies
     ///
     /// # Returns
@@ -278,13 +278,13 @@ where
 
 /// Computes the first crossover of a signal
 ///
-/// Given two 1D arrays and a threshold this function will find the value of the first when the
+/// Given two 1D arrays and a threshold, this function will find the value of the first when the
 /// second crosses the given threshold:
 ///
 /// <pre>b[i] < thresh < b[i+1] || b[i] > thresh > b[i+1]</pre>
 ///
-/// Used to find the crossover frequencies of a transfer functions magnitude and phase.
-/// The magnitude crossover frequency is the frequency at which the magnitude of the transfer
+/// Used to find the crossover frequencies of a transfer function's gain and phase.
+/// The gain crossover frequency is the frequency at which the gain of the transfer
 /// function is 1 (0 dB). The phase crossover frequency is where the phase crosses -180°.
 ///
 /// If no crossover is found within the given frequency range, the function returns `None` for
@@ -342,7 +342,7 @@ pub fn generate_log_space<T: Float, const N: usize>(start: T, stop: T) -> [T; N]
 /// Renders a single magnitude and phase plot on subplots
 fn render_bode_subplot<T>(
     plot: &mut plotly::Plot,
-    freqs: &[T],
+    frequencies: &[T],
     mag: &[T],
     phase: &[T],
     row: usize,
@@ -361,7 +361,7 @@ fn render_bode_subplot<T>(
 
     // Add magnitude plot
     plot.add_trace(
-        plotly::Scatter::new(freqs.to_vec(), mag_db)
+        plotly::Scatter::new(frequencies.to_vec(), mag_db)
             .mode(common::Mode::Lines)
             .name(format!("Magnitude[{row}, {col}]"))
             // .x_axis(x_axis_mag.clone())
@@ -371,7 +371,7 @@ fn render_bode_subplot<T>(
 
     // Add phase plot
     plot.add_trace(
-        plotly::Scatter::new(freqs.to_vec(), phase_deg)
+        plotly::Scatter::new(frequencies.to_vec(), phase_deg)
             .mode(common::Mode::Lines)
             .name(format!("Phase[{row}, {col}]"))
             .x_axis("x2")
@@ -399,13 +399,13 @@ fn render_bode_subplot<T>(
     if let (Some(wc), Some(pm)) = (margins.gain_crossover, margins.phase_margin) {
         plot.add_trace(
             plotly::Scatter::new(vec![wc, wc], vec![<T as From<i16>>::from(-180), pm])
-                .mode(plotly::common::Mode::Lines)
+                .mode(common::Mode::Lines)
                 .name(format!("Phase Margin[{row}, {col}]"))
                 .x_axis("x2")
                 .y_axis("y2")
                 .line(
-                    plotly::common::Line::new()
-                        .dash(plotly::common::DashType::Dot)
+                    common::Line::new()
+                        .dash(common::DashType::Dot)
                         .color(plotly::color::Rgb::new(0, 0, 0)),
                 ),
         );
@@ -458,7 +458,7 @@ where
             ),
     );
 
-    // extract each outputs mag/phase (make a helper in response soon)
+    // extract each output mag/phase (make a helper in response soon)
     for (out_idx, fr) in response.responses.iter().enumerate() {
         let mut phases = [T::zero(); L];
         let mut magnitudes = [T::zero(); L];
@@ -490,26 +490,26 @@ mod test_first_crossover {
     #[test]
     fn test_crossover_detection() {
         // Test inputs
-        let freqs: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
+        let frequencies: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
         let magnitudes: [f64; 6] = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3];
         let threshold = 1.0;
 
         // Trigger edge case where b[i] == threshold
-        let result = first_crossover::<f64>(&freqs, &magnitudes, threshold, 6);
+        let result = first_crossover::<f64>(&frequencies, &magnitudes, threshold, 6);
 
         assert!(result.is_some());
-        assert_f64!(eq, result.unwrap(), 1.0); // `freqs[2]`
+        assert_f64!(eq, result.unwrap(), 1.0); // `frequencies[2]`
     }
 
     #[test]
     fn test_crossover_interpolation() {
         // Test inputs
-        let freqs: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
+        let frequencies: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
         let magnitudes: [f64; 6] = [0.8, 0.9, 0.95, 1.05, 1.2, 1.3];
         let threshold = 1.0;
 
         // Linear interpolation for crossover
-        let result = first_crossover::<f64>(&freqs, &magnitudes, threshold, 6);
+        let result = first_crossover::<f64>(&frequencies, &magnitudes, threshold, 6);
 
         assert!(result.is_some());
         assert_f64!(eq, result.unwrap(), 1.25, 1e-10); // Interpolated value
@@ -518,12 +518,12 @@ mod test_first_crossover {
     #[test]
     fn test_no_crossover() {
         // Test inputs with no crossover
-        let freqs: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
+        let frequencies: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
         let magnitudes: [f64; 6] = [0.8, 0.85, 0.9, 0.95, 0.98, 0.99];
         let threshold = 1.0;
 
         // No crossover detected
-        let result = first_crossover::<f64>(&freqs, &magnitudes, threshold, 6);
+        let result = first_crossover::<f64>(&frequencies, &magnitudes, threshold, 6);
 
         assert!(result.is_none());
     }
@@ -531,12 +531,12 @@ mod test_first_crossover {
     #[test]
     fn test_decreasing_crossover() {
         // Test inputs with decreasing crossover
-        let freqs: [f32; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
+        let frequencies: [f32; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
         let magnitudes: [f32; 6] = [1.2, 1.1, 1.05, 0.95, 0.8, 0.7];
         let threshold = 1.0;
 
         // Linear interpolation for decreasing crossover
-        let result = first_crossover::<f32>(&freqs, &magnitudes, threshold, 6);
+        let result = first_crossover::<f32>(&frequencies, &magnitudes, threshold, 6);
 
         assert!(result.is_some());
         assert_f32!(eq, result.unwrap(), 1.25, 1e-7); // Interpolated value

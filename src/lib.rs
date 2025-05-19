@@ -38,9 +38,9 @@ pub mod integrators;
 
 /// # Numerical Function trait
 ///
-/// This trait provides a universal interface for evalutating numerical models.
+/// This trait provides a universal interface for evaluating numerical models.
 ///
-/// model must be in the form:
+/// Model must be in the form:
 /// <pre>
 /// y = f(x)
 /// </pre>
@@ -78,7 +78,7 @@ pub trait NLModel<Input, State, Output, A, B, C, D>: DynamicModel<Input, State, 
 ///
 /// This trait provides a universal interface for evalutating numerical models.
 ///
-/// model must be in the form:
+/// Model must be in the form:
 /// <pre>
 /// ẋ = f(x, u)
 /// y = h(x, u)
@@ -181,10 +181,14 @@ mod feedback_test {
 
     // #[test]
     // fn polynomial_polynomial() {
+    //     // The input to p1 is the difference of the input to the system and
+    //     // the output of p2. The output of p1 is the output of the system and
+    //     // the input to p2.
+    //     // x = r - m, m = p2(p1(x))
     //     let p1 = Polynomial::new([1.0]);
     //     let p2 = Polynomial::new([2.0]);
     //     let p3 = feedback(&p1, &p2, 1.0, -1.0);
-    //     assert_eq!(p3.coefficients, [-1.0], "incorrect feedback polynomial");
+    //     assert_eq!(p3.coefficients.0, [[-1.0]], "incorrect feedback polynomial");
     // }
 
     // #[test]
