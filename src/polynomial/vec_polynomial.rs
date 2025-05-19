@@ -22,9 +22,8 @@ impl<T> DPolynomial<T> {
     /// # Returns
     ///
     /// * `Polynomial` - dynamic polynomial
-    pub fn from_vec(variable: &'static str, coefficients: Vec<T>) -> Self {
+    pub fn from_vec(coefficients: Vec<T>) -> Self {
         Self {
-            variable,
             coefficients: VecStorage::new(Dyn(coefficients.len()), U1, coefficients),
             _phantom: PhantomData,
         }

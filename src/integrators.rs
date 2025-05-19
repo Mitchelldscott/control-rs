@@ -1,5 +1,5 @@
 //! A variety of methods to integrate [DynamicSystem]s
-//! 
+//!
 use super::DynamicModel;
 
 #[cfg(feature = "std")]
@@ -25,8 +25,8 @@ use core::ops::{Add, Div, Mul};
 /// # Returns
 ///
 /// * `x` - state at end time
-pub fn runge_kutta4<T, X, U, Y, Sys>(model: &Sys, x0: X, u: U, t0: T, tf: T, dt: T) -> X 
-where 
+pub fn runge_kutta4<T, X, U, Y, Sys>(model: &Sys, x0: X, u: U, t0: T, tf: T, dt: T) -> X
+where
     Y: Copy,
     U: Copy,
     X: Copy + Add<Output = X> + Mul<T, Output = X>,

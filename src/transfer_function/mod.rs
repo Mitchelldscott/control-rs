@@ -32,7 +32,6 @@ use crate::{
 //      Polynomial Sub-Modules
 // ===============================================================================================
 
-
 pub mod linear_tools;
 pub use linear_tools::*;
 
@@ -55,6 +54,7 @@ pub use linear_tools::*;
 /// ## References
 ///
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 3.1
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct TransferFunction<T, M, N, S1, S2> {
     /// coefficients of the numerator `[b0, b1, ... bm]`
     pub numerator: Polynomial<T, M, S1>,
@@ -88,8 +88,8 @@ impl<T, const M: usize, const N: usize>
     /// ```
     pub const fn new(numerator: [T; M], denominator: [T; N]) -> Self {
         TransferFunction {
-            numerator: Polynomial::new("s", numerator),
-            denominator: Polynomial::new("s", denominator),
+            numerator: Polynomial::new(numerator),
+            denominator: Polynomial::new(denominator),
         }
     }
 }
@@ -184,12 +184,12 @@ mod basic_tf_tests {
         let tf = TransferFunction::new([1.0], [1.0, 0.0]);
         assert_eq!(
             tf.numerator,
-            Polynomial::new("s", [1.0]),
+            Polynomial::new([1.0]),
             "TF numerator incorrect"
         );
         assert_eq!(
             tf.denominator,
-            Polynomial::new("s", [1.0, 0.0]),
+            Polynomial::new([1.0, 0.0]),
             "TF denominator incorrect"
         );
     }

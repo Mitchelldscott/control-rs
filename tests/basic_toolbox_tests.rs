@@ -2,7 +2,12 @@
 mod basic_model_tests {
 
     use control_rs::{
-        integrators::runge_kutta4, state_space::{control_canonical, zoh, StateSpace}, DynamicModel, NLModel
+        integrators::runge_kutta4,
+        state_space::{
+            utils::{control_canonical, zoh},
+            StateSpace,
+        },
+        DynamicModel, NLModel,
     };
     use nalgebra::{Matrix2x1, Vector2};
 
@@ -28,12 +33,27 @@ mod basic_model_tests {
         }
     }
     use nalgebra::SMatrix;
-    impl NLModel<ParticleInput, ParticleState, ParticleOutput, SMatrix<ScalarType,2,2>, SMatrix<ScalarType,2,1>, SMatrix<ScalarType,1,2>, SMatrix<ScalarType,1,1>> for Particle1D {
+    impl
+        NLModel<
+            ParticleInput,
+            ParticleState,
+            ParticleOutput,
+            SMatrix<ScalarType, 2, 2>,
+            SMatrix<ScalarType, 2, 1>,
+            SMatrix<ScalarType, 1, 2>,
+            SMatrix<ScalarType, 1, 1>,
+        > for Particle1D
+    {
         fn linearize(
             &self,
             _state: ParticleState,
             _input: ParticleInput,
-        ) -> StateSpace<SMatrix<ScalarType,2,2>, SMatrix<ScalarType,2,1>, SMatrix<ScalarType,1,2>, SMatrix<ScalarType,1,1>> {
+        ) -> StateSpace<
+            SMatrix<ScalarType, 2, 2>,
+            SMatrix<ScalarType, 2, 1>,
+            SMatrix<ScalarType, 1, 2>,
+            SMatrix<ScalarType, 1, 1>,
+        > {
             control_canonical([1.0], [0.1, 0.0])
         }
     }
