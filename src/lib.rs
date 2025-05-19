@@ -10,7 +10,7 @@
 //! - **Analysis:** Tools for classical, modern and robust system analysis
 //! - **Synthesis:** Direct and data-driven methods to create models
 //! - **Simulation:** Easy model integration and data vizualization
-//! 
+//!
 //! ## Design Philosophy
 //! This crate is structured around core numerical model representations, each implementing common traits to have
 //! a consistent interface for simulation, analysis, and synthesis. This is all done to provide a clean interface
@@ -98,24 +98,24 @@ pub trait DynamicModel<Input, State, Output> {
 
 #[cfg(test)]
 mod feedback_test {
+    use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, RawStorageMut, Scalar, U1};
     use num_traits::{One, Zero};
-    use nalgebra::{U1, Scalar, DimName, RawStorageMut, allocator::Allocator, DefaultAllocator};
 
     #[cfg(feature = "std")]
-    use std::ops::{Sub, Div, Mul};
-    
+    use std::ops::{Div, Mul, Sub};
+
     #[cfg(not(feature = "std"))]
-    use core::ops::{Sub, Div, Mul};
+    use core::ops::{Div, Mul, Sub};
 
     use crate::{Polynomial, TransferFunction};
-    
+
     trait NumericalModel: Clone {
         fn zero() -> Self;
         fn identity() -> Self;
     }
 
-    impl<T, D, S, N> NumericalModel for Polynomial<T, D, S, N> 
-    where 
+    impl<T, D, S, N> NumericalModel for Polynomial<T, D, S, N>
+    where
         T: Scalar + Zero + One,
         D: DimName,
         S: Clone + RawStorageMut<T, D, N>,
@@ -136,15 +136,14 @@ mod feedback_test {
         }
     }
 
-    impl<T, M, N, S1, S2> NumericalModel for TransferFunction<T, M, N, S1, S2> 
-    where 
+    impl<T, M, N, S1, S2> NumericalModel for TransferFunction<T, M, N, S1, S2>
+    where
         T: Scalar + Zero + One + Copy,
         M: DimName,
         N: DimName,
         S1: Clone + RawStorageMut<T, M>,
         S2: Clone + RawStorageMut<T, N>,
-        DefaultAllocator: Allocator<M, U1, Buffer<T> = S1>
-            + Allocator<N, U1, Buffer<T> = S2>,
+        DefaultAllocator: Allocator<M, U1, Buffer<T> = S1> + Allocator<N, U1, Buffer<T> = S2>,
     {
         fn zero() -> Self {
             TransferFunction {
@@ -164,19 +163,15 @@ mod feedback_test {
         }
     }
 
-    fn feedback<T, G, H, GH, D>(
-        sys1: &G,
-        sys2: &H,
-        sign_in: T,
-        sign_feedback: T,
-    ) -> D
+    fn feedback<T, G, H, GH, D>(sys1: &G, sys2: &H, sign_in: T, sign_feedback: T) -> D
     where
-        T: Clone + Zero + One +  Mul<G, Output = G> + Mul<GH, Output = GH>,
+        T: Clone + Zero + One + Mul<G, Output = G> + Mul<GH, Output = GH>,
         G: NumericalModel + Mul<H, Output = GH> + Div<GH, Output = D>,
         GH: NumericalModel + Sub<Output = GH>,
         H: NumericalModel,
     {
-        sign_in.clone() * sys1.clone() / (GH::identity() - sign_feedback.clone() * sys1.clone() * sys2.clone())
+        sign_in.clone() * sys1.clone()
+            / (GH::identity() - sign_feedback.clone() * sys1.clone() * sys2.clone())
     }
 
     // #[test]

@@ -4,7 +4,8 @@ use super::*;
 
 /// A static polynomial with D coefficients. *Similar to [nalgebra::SMatrix], this is a type alias
 /// so not all of its methods are listed here. See [Polynomial] too*
-pub type SPolynomial<T, const D: usize, const N: usize = 1> = Polynomial<T, Const<D>, ArrayStorage<T, D, N>, Const<N>>;
+pub type SPolynomial<T, const D: usize, const N: usize = 1> =
+    Polynomial<T, Const<D>, ArrayStorage<T, D, N>, Const<N>>;
 
 impl<T, const D: usize> SPolynomial<T, D> {
     /// Create an [ArrayStorage] based [Polynomial]
@@ -52,11 +53,11 @@ where
     /// * `y` - An array of corresponding output values of shape `[T; N]`.
     ///
     /// # Returns
-    /// 
+    ///
     /// * `Polynomial<T, D, S>` - that approximates the relationship between `x` and `y`
     ///
     /// # Generic Arguments
-    /// 
+    ///
     /// * `N` - The number of data points in the X,y set
     ///
     /// # Example
@@ -90,7 +91,6 @@ where
         Polynomial::from_matrix(coeff_estimate)
     }
 }
-
 
 #[cfg(test)]
 mod spolynomial_tests {

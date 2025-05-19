@@ -32,7 +32,6 @@ use crate::{
 //      Polynomial Sub-Modules
 // ===============================================================================================
 
-
 pub mod linear_tools;
 pub use linear_tools::*;
 

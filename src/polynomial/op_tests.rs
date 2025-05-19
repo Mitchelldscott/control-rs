@@ -93,59 +93,29 @@ fn validate_scalar_post_div<T, U, D, S>(
 #[test]
 fn linear_f32() {
     let polynomial = Polynomial::new([1.0, 0.0]);
-    validate_scalar_post_add(
-        "linear_f32",
-        &polynomial,
-        1.0,
-        Polynomial::new([1.0, 1.0]),
-    );
-    validate_scalar_post_sub(
-        "linear_f32",
-        &polynomial,
-        1.0,
-        Polynomial::new([1.0, -1.0]),
-    );
+    validate_scalar_post_add("linear_f32", &polynomial, 1.0, Polynomial::new([1.0, 1.0]));
+    validate_scalar_post_sub("linear_f32", &polynomial, 1.0, Polynomial::new([1.0, -1.0]));
     validate_scalar_post_mul(
         "linear_f32",
         &polynomial,
         10.0,
         Polynomial::new([10.0, 0.0]),
     );
-    validate_scalar_post_div(
-        "linear_f32",
-        &polynomial,
-        10.0,
-        Polynomial::new([0.1, 0.0]),
-    );
+    validate_scalar_post_div("linear_f32", &polynomial, 10.0, Polynomial::new([0.1, 0.0]));
 }
 
 #[test]
 fn cubic_i32() {
     let polynomial = Polynomial::new([1, 0, 0, 0]);
-    validate_scalar_post_add(
-        "linear_f32",
-        &polynomial,
-        1,
-        Polynomial::new([1, 0, 0, 1]),
-    );
-    validate_scalar_post_sub(
-        "linear_f32",
-        &polynomial,
-        1,
-        Polynomial::new([1, 0, 0, -1]),
-    );
+    validate_scalar_post_add("linear_f32", &polynomial, 1, Polynomial::new([1, 0, 0, 1]));
+    validate_scalar_post_sub("linear_f32", &polynomial, 1, Polynomial::new([1, 0, 0, -1]));
     validate_scalar_post_mul(
         "linear_f32",
         &polynomial,
         10,
         Polynomial::new([10, 0, 0, 0]),
     );
-    validate_scalar_post_div(
-        "linear_f32",
-        &polynomial,
-        10,
-        Polynomial::new([0, 0, 0, 0]),
-    );
+    validate_scalar_post_div("linear_f32", &polynomial, 10, Polynomial::new([0, 0, 0, 0]));
 }
 
 #[test]

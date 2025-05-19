@@ -1,5 +1,5 @@
 //! Utilities for creating, converting and analyzing SS models
-//! 
+//!
 
 use super::*;
 
@@ -56,7 +56,7 @@ use super::*;
 pub fn control_canonical<T, const N: usize, const M: usize, const L: usize>(
     b: [T; M],
     a: [T; L],
-) -> StateSpace<SMatrix<T,N,N>, SMatrix<T,N,1>, SMatrix<T,1,N>, SMatrix<T,1,1>>
+) -> StateSpace<SMatrix<T, N, N>, SMatrix<T, N, 1>, SMatrix<T, 1, N>, SMatrix<T, 1, 1>>
 where
     T: 'static + Copy + Scalar + Zero + One + Neg<Output = T>,
 {
@@ -133,13 +133,10 @@ where
 ///
 /// ## TODO:
 /// - [ ] compare with [nalgebra::Matrix::exp]
-pub fn zoh<T, A, B, C, D>(
-    ss: &StateSpace<A, B, C, D>,
-    ts: T,
-) -> StateSpace<A, B, C, D>
+pub fn zoh<T, A, B, C, D>(ss: &StateSpace<A, B, C, D>, ts: T) -> StateSpace<A, B, C, D>
 where
     T: Copy + Scalar + Zero + One + From<u8>,
-    A: Clone 
+    A: Clone
         + One
         + Add<Output = A>
         + Mul<T, Output = A>
@@ -147,8 +144,7 @@ where
         + Mul<A, Output = A>
         + Mul<B, Output = B>
         + Default,
-    B: Clone
-        + Mul<T, Output = B>,
+    B: Clone + Mul<T, Output = B>,
     C: Clone,
     D: Clone,
 {

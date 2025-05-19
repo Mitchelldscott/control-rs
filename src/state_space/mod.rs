@@ -147,8 +147,7 @@ impl<A, B, C, D> StateSpace<A, B, C, D> {
 //      StateSpace as DynamicModel
 // ===============================================================================================
 
-impl<Input, State, Output, A, B, C, D>
-    DynamicModel<Input, State, Output> for StateSpace<A, B, C, D>
+impl<Input, State, Output, A, B, C, D> DynamicModel<Input, State, Output> for StateSpace<A, B, C, D>
 where
     Input: Clone,
     State: Clone + Add<Output = State>,
@@ -191,7 +190,10 @@ where
 mod basic_ss_tests {
     // not as productive as it could be...
     use super::*;
-    use crate::{state_space::utils::{zoh, control_canonical}, transfer_function::{as_monic, TransferFunction}};
+    use crate::{
+        state_space::utils::{control_canonical, zoh},
+        transfer_function::{as_monic, TransferFunction},
+    };
 
     #[test]
     fn initialize_velocity_statespace() {

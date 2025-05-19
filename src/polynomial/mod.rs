@@ -3,22 +3,21 @@
 //!
 //! Mostly a copy of [Matrix] implementation with the specifics of a polynomial.
 use nalgebra::{
-    allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, Dim, DimDiff, DimMin, DimMinimum, DimName, DimSub, Matrix, OMatrix, RawStorage, RawStorageMut, RealField, Scalar, U1
+    allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, Dim, DimDiff, DimMin,
+    DimMinimum, DimName, DimSub, Matrix, OMatrix, RawStorage, RawStorageMut, RealField, Scalar, U1,
 };
 use num_traits::{Float, Num, One, Zero};
 
 #[cfg(feature = "std")]
 use std::{
-    fmt,
-    iter,
+    fmt, iter,
     marker::PhantomData,
     ops::{Add, AddAssign, Div, Index, IndexMut, Mul, Neg, Sub, SubAssign},
 };
 
 #[cfg(not(feature = "std"))]
 use core::{
-    fmt,
-    iter,
+    fmt, iter,
     marker::PhantomData,
     ops::{Add, AddAssign, Div, Index, IndexMut, Mul, Neg, Sub, SubAssign},
 };
@@ -222,13 +221,17 @@ where
     /// # Returns
     ///
     /// * `num_eqn` - number of equations
-    pub fn equation<S1>(&self, index: usize) -> Polynomial<T, D, S1> 
-    where 
+    pub fn equation<S1>(&self, index: usize) -> Polynomial<T, D, S1>
+    where
         S1: RawStorage<T, D, U1>,
         DefaultAllocator: Allocator<D, U1, Buffer<T> = S1>,
     {
         assert!(index < self.num_equations());
-        Polynomial::from_iterator_generic(self.coefficients.shape().0, U1, (0..self.num_coefficients()).map(|i| self[(i,index)].clone()))
+        Polynomial::from_iterator_generic(
+            self.coefficients.shape().0,
+            U1,
+            (0..self.num_coefficients()).map(|i| self[(i, index)].clone()),
+        )
     }
 }
 
@@ -288,14 +291,16 @@ where
     ///
     /// The constant term of the polynomial is the last term in the storage. This is just
     /// a convienience function.
-    /// 
+    ///
     /// For mulivariate polynomials (N > 1) this is a sum of all N constants.
     ///
     /// # Returns
     ///
     /// * `coeff` - the constant coefficient
     pub fn constant(&self) -> T {
-        (0..self.num_equations()).fold(T::zero(), |acc, i| acc + self[(self.num_coefficients() - 1, i)].clone())
+        (0..self.num_equations()).fold(T::zero(), |acc, i| {
+            acc + self[(self.num_coefficients() - 1, i)].clone()
+        })
     }
 }
 
@@ -582,7 +587,10 @@ where
     fn index(&self, index: (usize, usize)) -> &Self::Output {
         // also need to check if storage is contiguous for sparse polynomial?
         assert!(index.0 < self.num_coefficients(), "Index row out of bounds");
-        assert!(index.1 < self.coefficients.shape().1.value(), "Index col out of bounds");
+        assert!(
+            index.1 < self.coefficients.shape().1.value(),
+            "Index col out of bounds"
+        );
         unsafe { self.coefficients.get_unchecked(index.0, index.1) }
     }
 }
@@ -595,7 +603,10 @@ where
 {
     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
         assert!(index.0 < self.num_coefficients(), "Index row out of bounds");
-        assert!(index.1 < self.coefficients.shape().1.value(), "Index col out of bounds");
+        assert!(
+            index.1 < self.coefficients.shape().1.value(),
+            "Index col out of bounds"
+        );
         unsafe { self.coefficients.get_unchecked_mut(index.0, index.1) }
     }
 }
