@@ -87,7 +87,7 @@ fn it_should_not_panic_if_values_are_approx_equal() {
 #[test]
 #[should_panic]
 fn it_should_panic_if_values_are_not_approx_equal() {
-    assert_f32!(eq, 3 as f32, 4 as f32);
+    assert_f32!(eq, 3f32, 4f32);
 }
 
 #[test]
