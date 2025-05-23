@@ -1,7 +1,57 @@
 //!
-//! # Polynomial struct and helpful tools
+//! # Base Polynomial type
 //!
 //! Mostly a copy of [Matrix] implementation with the specifics of a polynomial.
+//! 
+//! TODO:
+//!     * constructors
+//!         * from_fn<F>(cb: F): needs example and tests
+//!         * from_element(element: T): needs example
+//!         * new(coefficients; [T; N]): needs example
+//!         * from_constant(constant: T): needs example
+//!         * monomial(coefficient: T): needs example
+//!         * resize(): needs example and tests
+//!         * compose(f: Polynomial, g: Polynomial) -> Polynomial: Needs investigation
+//!         * to_monic(&self) -> Self
+//!         * zero(): needs tests and example
+//!         * one(): needs tests and example
+//!     * accessors
+//!         * degree(): needs tests and example
+//!         * is_monic(): needs tests and example
+//!         * is_zero(): needs tests and example
+//!         * is_one(): needs tests and example
+//!         * coefficient(): needs tests and example
+//!         * coefficient_mut(): needs tests and example
+//!         * constant(): needs tests and example
+//!         * constant_mut(): needs tests and example
+//!         * leading_coefficient(): needs tests and example
+//!         * leading_coefficient_mut(): needs tests and example
+//!         * as_array(): needs implementation, tests and example
+//!     * arithmatic
+//!         * Zero() -> Self: needs tests and example
+//!         * One() -> Self: needs tests and example
+//!         * Neg() -> Self: needs tests and example
+//!         * Add/AddAssign(&self, rhs: T): needs tests and example
+//!         * Sub/SubAssign(&self, rhs: T): needs tests and example
+//!         * Mul/MulAssign(&self, rhs: T): needs tests and example
+//!         * Div/DivAssign(&self, rhs: T) (Euclidean division): needs test and example
+//!         * Rem/RemAssign(&self, rhs: T) (remainder): needs test and example
+//!         * Add/AddAssign(&self, rhs: Polynomial<T, M>): needs tests and example
+//!         * Sub/SubAssign(&self, rhs: Polynomial<T, M>): needs tests and example
+//!         * Mul/MulAssign(&self, rhs: Polynomial<T, M>): Can't implement safely
+//!         * Div/DivAssign(&self, rhs: Polynomial<T, M>) (Euclidean division): Can't implement safely
+//!         * Rem/RemAssign(&self, rhs: Polynomial<T, M>) (remainder): Can't implement safely
+//!     * calculus
+//!         * evaluate<U>(x: U) -> U: needs test and example
+//!         * derivative(p_src: &Polynomial<T, M>) -> Self: cant implement safely
+//!         * integral(p_src: &Polynomial<T, M>) -> Self: cant implement safely
+//!         * foil_roots(&mut self, roots: &[T]) -> Result<(), Polynomial>
+//!         * foil_complex_roots(&mut self, roots: &[Complex<T>]) -> Result<(), Polynomial>
+//!         * real_roots(p: Polynomial, roots: &mut [T]) -> Result<(), PolynomialError>
+//!         * complex_roots(p: Polynomial, roots: &mut [Complex<T>]) -> Result<(), PolynomialError>
+//!     * formatting
+//!         * Display with precision option
+//!         * Latex / symbolic formatter (optional)
 use nalgebra::{
     allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, Dim, DimDiff, DimMin,
     DimMinimum, DimName, DimSub, Matrix, OMatrix, RawStorage, RawStorageMut, RealField, Scalar, U1,
