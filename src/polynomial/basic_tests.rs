@@ -3,9 +3,8 @@
 //! This file provides basic usage testing, initialization, accessors and setters, for
 //! specialized polynomial types. The specializations involve varying the underlying array data
 //! type `T` and the capacity of the array `N`. The tests are written in a way that they can be
-//! re-used for all specializations. The types should only cover numerical primitives (maybe custom
-//! numbers) and the sizes should not exceed 4096 bytes.
-//!
+//! re-used for all specializations. The types should cover numbers and the sizes should not exceed
+//! 4096 bytes.
 //!
 //! TODO:
 //!     * constructors
@@ -13,7 +12,7 @@
 //!         * from_element(element: T): needs example
 //!         * new(coefficients; [T; N]): needs example
 //!         * from_constant(constant: T): needs example
-//!         * monomial(): needs example
+//!         * monomial(coefficient: T): needs example
 //!         * resize(): needs example and tests
 //!         * compose(f: Polynomial, g: Polynomial) -> Polynomial: Needs investigation
 //!         * to_monic(&self) -> Self
@@ -51,15 +50,15 @@ where
     assert_eq!(polynomial.coefficients, expected_coefficients, "Polynomial::<{type_name}, {N}>::default()");
 }
 
-fn monomial_constructor_validator<T, const N: usize>()
+fn monomial_constructor_validator<T, const N: usize>(coefficient: T)
 where
     T: Clone + Num + PartialEq + fmt::Debug,
 {
     let type_name = type_name::<T>();
-    let polynomial = Polynomial::<T, N>::monomial();
-    assert_eq!(polynomial.coefficients[N-1], T::one(), "Polynomial::<{type_name}, {N}>::monomial() leading term");
+    let polynomial = Polynomial::<T, N>::monomial(coefficient.clone());
+    assert_eq!(polynomial.coefficients[N-1], coefficient, "Polynomial::<{type_name}, {N}>::monomial({coefficient:?}) leading term");
     for i in 0..N-1 {
-        assert_eq!(polynomial.coefficients[i], T::zero(), "Polynomial::<{type_name}, {N}>::monomial() term {i}");
+        assert_eq!(polynomial.coefficients[i], T::zero(), "Polynomial::<{type_name}, {N}>::monomial({coefficient:?}) term {i}");
     }
 }
 
@@ -76,7 +75,7 @@ where
 //     pub fn from_iterator<U: IntoIterator<Item=T>>(iterator: U) -> Result<Self, PolynomialInitError> {
 //         // SAFETY: An uninitialized `[MaybeUninit<_>; _]` is valid.
 //         let mut uninit_buffer: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
-//         let mut count =  0;
+//         let mut count = 0;
 //
 //         for (buffer, value) in uninit_buffer.iter_mut().zip(iterator.into_iter()) {
 //             *buffer = MaybeUninit::new(value);
@@ -125,20 +124,34 @@ where
     }
 }
 
+fn from_fn_constructor_validator<T, const N: usize>()
+where
+    T: Copy + Clone + Num + PartialEq + fmt::Debug,
+{
+    let mut counter = T::zero();
+    let type_name = std::any::type_name::<T>();
+    let polynomial = Polynomial::<T, N>::from_fn(|_| {counter = counter + T::one(); counter.clone()});
+    // the count starts at 1
+    counter = T::one();
+    for i in 0..N {
+        assert_eq!(polynomial.coefficients[i], counter, "Polynomial::<{type_name}, {N}>::from_fn() term {i}");
+        counter = counter + T::one();
+    }
+}
+
 #[test]
 fn i8_constructors() {
     default_constructor_validator::<i8, 1>([0i8]);
-    monomial_constructor_validator::<i8, 3>();
-    // from_iter_constructor_validator::<i8, 4, Range<i8>>(, (1..4));
+    monomial_constructor_validator::<i8, 3>(1i8);
     constant_constructor_validator::<i8, 10>(127i8);
     from_element_constructor_validator::<i8, 2>(1i8);
+    from_fn_constructor_validator::<i8, 10>()
 }
 
 #[test]
 fn u8_constructors() {
     default_constructor_validator::<u8, 10>([0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8]);
-    monomial_constructor_validator::<u8, 3>();
-    // from_iter_constructor_validator::<i8, 4, Range<i8>>(, (1..4));
+    monomial_constructor_validator::<u8, 3>(2u8);
     constant_constructor_validator::<u8, 10>(127u8);
     from_element_constructor_validator::<u8, 0>(1u8);
 }

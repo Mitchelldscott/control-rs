@@ -6,7 +6,7 @@
 //!         * from_element(element: T): needs example
 //!         * new(coefficients; [T; N]): needs example
 //!         * from_constant(constant: T): needs example
-//!         * monomial(): needs example
+//!         * monomial(coefficient: T): needs example
 //!         * resize(): needs example and tests
 //!         * compose(f: Polynomial, g: Polynomial) -> Polynomial: Needs investigation
 //!         * to_monic(&self) -> Self
@@ -23,6 +23,7 @@
 //!         * constant_mut(): needs tests and example
 //!         * leading_coefficient(): needs tests and example
 //!         * leading_coefficient_mut(): needs tests and example
+//!         * as_array(): needs implementation, tests and example
 //!     * arithmatic
 //!         * Zero() -> Self: needs tests and example
 //!         * One() -> Self: needs tests and example
@@ -67,31 +68,8 @@ mod basic_tests;
 #[cfg(test)]
 mod arithmatic_tests;
 
-// ===============================================================================================
-//      Polynomial Errors
-// ===============================================================================================
-
-
-/// Errors that can occur during polynomial initialization.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum PolynomialInitError {
-    /// Indicates that a slice provided to create a polynomial had an incorrect length.
-    LengthMismatch { expected: usize, actual: usize },
-}
-
-/// Errors that can occur during polynomial operations.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum PolynomialOpError {
-    /// Indicates that an attempt was made to access or set a coefficient for a power
-    /// greater than the polynomial's degree.
-    PowerOutOfBounds { requested_power: usize, max_degree: usize },
-    // Note: Arithmetic overflows (e.g., integer overflow) are dependent on the type `T`
-    // and its operator implementations. This struct itself does not add overflow checks
-    // beyond what T provides. For safety-critical applications, use `T` with
-    // defined overflow behavior (e.g., saturating or checked arithmetic).
-}
-
 /// Helper function to reverse arrays given to [Polynomial::new()]
+#[inline(always)]
 const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
     let mut output = input;
     let mut i = 0;
@@ -210,7 +188,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
 
     /// Creates a polynomial with all coefficients except the constant term set to zero
     ///
-    /// If N == 0 this will return an empty polynomial.
+    /// If N == 0, this will return an empty polynomial.
     ///
     /// # Arguments
     /// * `constant` - The value of the constant term
@@ -224,13 +202,17 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     }
 }
 impl<T: Zero + One, const N: usize> Polynomial<T, N> {
-    /// Creates a polynomial with all coefficients but the constant set to zero
+    /// Creates a monomial from a given constant.
+    ///
+    /// A monomial consists of a single non-zero leading coefficient. This is implemented by
+    /// creating a zero polynomial with the specified size and setting the final element to the
+    /// given constant.
     ///
     /// # Returns
     /// * `Polynomial` - a polynomial with only the trailing term
-    pub fn monomial() -> Self {
+    pub fn monomial(coefficient: T) -> Self {
         let mut polynomial = Self::from_fn(|_| T::zero());
-        if !polynomial.is_empty() { polynomial.coefficients[0] = T::one() }
+        if !polynomial.is_empty() { polynomial.coefficients[0] = coefficient }
         polynomial
     }
 }
