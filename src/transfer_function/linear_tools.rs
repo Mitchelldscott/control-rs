@@ -1,7 +1,7 @@
 //! Miscellaneous tools to help work with transfer functions
 //!
 use nalgebra::{
-    allocator::Allocator, Complex, DefaultAllocator, Dim, DimDiff, DimName, DimSub, OMatrix,
+    allocator::Allocator, Complex, Const, DefaultAllocator, Dim, DimDiff, DimName, DimSub, OMatrix,
     RawStorage, RawStorageMut, RealField, U1,
 };
 use num_traits::{Float, Zero};
@@ -13,23 +13,20 @@ use crate::TransferFunction;
 /// The DC gain is the value of the transfer function as the frequency approaches zero.
 ///
 /// <pre>
-/// DC Gain = b_0 / a_0
+/// DC Gain = b_m / a_n
 /// </pre>
 ///
-/// where \(b_0\) is the constant term of the numerator, and \(a_0\) is the constant term
+/// Where \(b_m\) is the constant term of the numerator, and \(a_n\) is the constant term
 /// of the denominator.
 ///
 /// # Arguments
-///
 /// * `tf` - the transfer function to analyze
 ///
 /// # Returns
-///
-/// * `Option<T>` - The DC gain if both numerator and denominator have a constant term;
+/// * `Option<T>` - The DC gain if both numerator and denominator have a non-zero constant term;
 ///                 `None` otherwise
 ///
 /// # Generic Arguments
-///
 /// * `T` - Scalar type for the coefficients (e.g., `f32`, `f64`)
 /// * `N` - number of coefficients in the denominator
 /// * `M` - number of coefficients in the numerator
@@ -37,22 +34,18 @@ use crate::TransferFunction;
 /// # Example
 ///
 /// ```rust
-/// use control_rs::transfer_function::{TransferFunction, dcgain};
+/// use control_rs::transfer_function::{TransferFunction, dc_gain};
 ///
 /// fn main() {
 ///     // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
 ///     let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
-///     let gain = dcgain(&tf);
+///     let gain = dc_gain(&tf);
 ///     println!("DC Gain: {gain:.2}");
 /// }
 /// ```
-pub fn dcgain<T, M, N, S1, S2>(tf: &TransferFunction<T, M, N, S1, S2>) -> T
+pub fn dc_gain<T, const M: usize, const N: usize>(tf: &TransferFunction<T, M, N>) -> T
 where
     T: Float,
-    M: Dim + DimSub<U1>,
-    N: Dim + DimSub<U1>,
-    S1: RawStorage<T, M>,
-    S2: RawStorage<T, N>,
 {
     let denominator_constant = tf.denominator.constant();
     if denominator_constant.is_zero() {
@@ -64,16 +57,12 @@ where
 
 /// Compute the roots of the characteristic equation
 ///
-/// Calculates the eigen values of the companion matrix of the transfer function's denominator.
-/// The eigen values of the companion matrix are the roots of the characteristic equation (tf
-/// denominator).
+/// Calculates the eigen values of a companion matrix constructed from the denominator.
 ///
 /// # Arguments
-///
 ///  * `tf` - the transfer function to check the poles of
 ///
 /// # Returns
-///
 ///  * `[complex<T>; N]` - poles of the tf
 ///
 /// # Example
@@ -89,37 +78,34 @@ where
 /// ```
 ///
 /// ## References
-///
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
-pub fn poles<T, M, N, S1, S2>(
-    tf: &TransferFunction<T, M, N, S1, S2>,
-) -> OMatrix<Complex<T>, DimDiff<N, U1>, U1>
+pub fn poles<T, const M: usize, const N: usize, S>(
+    tf: &TransferFunction<T, M, N>,
+) -> OMatrix<Complex<T>, DimDiff<Const<N>, U1>, U1>
 where
     T: Copy + Zero + Float + RealField,
-    N: DimSub<U1>,
-    DimDiff<N, U1>: DimName + DimSub<U1>,
-    S2: RawStorage<T, N>,
-    DefaultAllocator: Allocator<DimDiff<N, U1>, DimDiff<N, U1>>
-        + Allocator<DimDiff<N, U1>, DimDiff<DimDiff<N, U1>, U1>>
-        + Allocator<DimDiff<DimDiff<N, U1>, U1>>
-        + Allocator<DimDiff<N, U1>>,
+    Const<N>: DimSub<U1>,
+    DimDiff<Const<N>, U1>: DimName + DimSub<U1>,
+    S: RawStorage<T, Const<N>>,
+    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>
+        + Allocator<DimDiff<Const<N>, U1>, DimDiff<DimDiff<Const<N>, U1>, U1>>
+        + Allocator<DimDiff<DimDiff<Const<N>, U1>, U1>>
+        + Allocator<DimDiff<Const<N>, U1>>,
 {
     tf.denominator.roots()
 }
 
-/// Check if the system's poles lie in the left-half plane (LHP), a condition for stability
+/// Check if the system's poles lie on the left-half plane (LHP), a condition for stability
 ///
 /// Calculates the eigen values of the companion matrix of the transfer function's denominator.
 /// The eigen values of the companion matrix are the roots of the characteristic equation (tf
-/// denominator). If all roots of the characteristic equation lie in the left half plane (real
-/// part <= 0) then the transfer function is stable.
+/// denominator). If all roots of the characteristic equation lie on the left half-plane (real
+/// part <= 0), then the transfer function is stable.
 ///
 /// # Arguments
-///
 ///  * `tf` - the transfer function to check the poles of
 ///
 /// # Returns
-///
 ///  * `bool` - if the transfer functions poles are all <= 0
 ///
 /// # Example
@@ -140,18 +126,17 @@ where
 /// ```
 ///
 /// ## References
-///
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
-pub fn lhp<T, M, N, S1, S2>(tf: &TransferFunction<T, M, N, S1, S2>) -> bool
+pub fn lhp<T, const M: usize, const N: usize, S>(tf: &TransferFunction<T, M, N>) -> bool
 where
     T: Copy + Zero + Float + RealField,
-    N: DimSub<U1>,
-    DimDiff<N, U1>: DimName + DimSub<U1>,
-    S2: RawStorage<T, N>,
-    DefaultAllocator: Allocator<DimDiff<N, U1>, DimDiff<N, U1>>
-        + Allocator<DimDiff<N, U1>, DimDiff<DimDiff<N, U1>, U1>>
-        + Allocator<DimDiff<DimDiff<N, U1>, U1>>
-        + Allocator<DimDiff<N, U1>>,
+    Const<N>: DimSub<U1>,
+    DimDiff<Const<N>, U1>: DimName + DimSub<U1>,
+    S: RawStorage<T, Const<N>>,
+    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>
+        + Allocator<DimDiff<Const<N>, U1>, DimDiff<DimDiff<Const<N>, U1>, U1>>
+        + Allocator<DimDiff<DimDiff<Const<N>, U1>, U1>>
+        + Allocator<DimDiff<Const<N>, U1>>,
 {
     poles(&tf)
         .iter()
@@ -164,11 +149,9 @@ where
 /// denominator.
 ///
 /// # Arguments
-///
 /// * `tf` - the transfer function that will be converted to monic arrays
 ///
 /// # Returns
-///
 /// * `TransferFunction` - transferfunction scaled by `self.denominator[0]`
 ///
 /// # Example
@@ -182,18 +165,14 @@ where
 ///     let (num, den) = (monic_tf.numerator.coefficients, monic_tf.denominator.coefficients);
 /// }
 /// ```
-pub fn as_monic<T, M, N, S1, S2>(
-    tf: &TransferFunction<T, M, N, S1, S2>,
-) -> TransferFunction<T, M, N, S1, S2>
+pub fn as_monic<T, const M: usize, const N: usize>(
+    tf: &TransferFunction<T, M, N>,
+) -> TransferFunction<T, M, N>
 where
     T: Copy + Zero + Float,
-    N: Dim,
-    M: Dim,
-    S1: RawStorageMut<T, M> + Copy,
-    S2: RawStorageMut<T, N> + Copy,
 {
     TransferFunction {
-        numerator: tf.numerator / tf.denominator[0],
-        denominator: tf.denominator / tf.denominator[0],
+        numerator: tf.numerator / tf.denominator.coefficients[0],
+        denominator: tf.denominator / tf.denominator.coefficients[0],
     }
 }

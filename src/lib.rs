@@ -31,70 +31,19 @@ pub use transfer_function::TransferFunction;
 
 pub mod frequency_tools;
 
+pub mod vector;
+// pub use vector::Vector;
+
+pub mod matrix;
+// pub use matrix::Matrix;
+
 pub mod polynomial;
 pub use polynomial::Polynomial;
 
 pub mod integrators;
 
-/// # Numerical Function trait
-///
-/// This trait provides a universal interface for evaluating numerical models.
-///
-/// Model must be in the form:
-/// <pre>
-/// y = f(x)
-/// </pre>
-pub trait NumericalFunction<T> {
-    /// Evaluates the function for the given input
-    fn __evaluate(&self, x: T) -> T;
-}
-
-/// # Nonlinear Model
-///
-/// This allows users to implement a linearization of a nonlinear model. This also provides a
-/// trait bound for algorithms that use linearization.
-///
-/// # Generic Arguments
-///
-/// * `T` - type of the state, input and output values
-/// * `Input` - type of the input vector
-/// * `State` - type of the state vector
-/// * `Output` - type of the output vector
-///
-/// ## References
-///
-/// - *Nonlinear Systems*, Khalil, Ch. 2: Nonlinear Models.
-///
-/// ## TODO:
-/// - [ ] move generics to type aliases, the <> are too full
-/// - [ ] add generic linearization so users don't need to define a custom one (derive?)
-/// - [ ] add LinearModel trait so custom models can be linearized to other forms (linear multivariate polynomial?)
-pub trait NLModel<Input, State, Output, A, B, C, D>: DynamicModel<Input, State, Output> {
-    /// Linearizes the system about a nominal state and input
-    fn linearize(&self, x: State, u: Input) -> StateSpace<A, B, C, D>;
-}
-
-/// # Dynamic Model
-///
-/// This trait provides a universal interface for evalutating numerical models.
-///
-/// Model must be in the form:
-/// <pre>
-/// ẋ = f(x, u)
-/// y = h(x, u)
-/// </pre>
-///
-/// # Generic Arguments
-///
-/// * `Input` - type of the input variable(s)
-/// * `State` - type of the state variable(s)
-/// * `Output` - type of the output variable(s)
-pub trait DynamicModel<Input, State, Output> {
-    /// Evaluates the dynamics of the state for the given state and input
-    fn dynamics(&self, x: State, u: Input) -> State;
-    /// Evaluates the model's output for the given state and input
-    fn output(&self, x: State, u: Input) -> Output;
-}
+mod math;
+pub use math::{num_traits, system_traits};
 
 #[cfg(test)]
 mod feedback_test {
@@ -107,61 +56,50 @@ mod feedback_test {
     #[cfg(not(feature = "std"))]
     use core::ops::{Div, Mul, Sub};
 
-    use crate::{Polynomial, TransferFunction};
+    use crate::{math, Polynomial, TransferFunction};
 
     trait NumericalModel: Clone {
         fn zero() -> Self;
         fn identity() -> Self;
     }
 
-    impl<T, D, S, N> NumericalModel for Polynomial<T, D, S, N>
+    impl<T, const N: usize> NumericalModel for Polynomial<T, N>
     where
-        T: Scalar + Zero + One,
-        D: DimName,
-        S: Clone + RawStorageMut<T, D, N>,
-        N: DimName,
-        DefaultAllocator: Allocator<D, N, Buffer<T> = S>,
+        T: Copy + Clone + math::num_traits::Number,
     {
         fn zero() -> Self {
-            Polynomial::from_element_generic(D::name(), N::name(), T::zero())
+            Polynomial::from_element(T::zero())
         }
 
-        fn identity() -> Self {
-            let mut ident = Polynomial::from_element_generic(D::name(), N::name(), T::zero());
-            let num_coeff = ident.num_coefficients();
-            for _ in 0..ident.num_equations() {
-                ident[num_coeff - 1] = T::one();
-            }
-            ident
-        }
+        fn identity() -> Self { Polynomial::from_constant(T::one()) }
     }
 
-    impl<T, M, N, S1, S2> NumericalModel for TransferFunction<T, M, N, S1, S2>
-    where
-        T: Scalar + Zero + One + Copy,
-        M: DimName,
-        N: DimName,
-        S1: Clone + RawStorageMut<T, M>,
-        S2: Clone + RawStorageMut<T, N>,
-        DefaultAllocator: Allocator<M, U1, Buffer<T> = S1> + Allocator<N, U1, Buffer<T> = S2>,
-    {
-        fn zero() -> Self {
-            TransferFunction {
-                numerator: Polynomial::zeros_generic(M::name(), U1),
-                denominator: Polynomial::zeros_generic(N::name(), U1),
-            }
-        }
-
-        fn identity() -> Self {
-            let mut ident = TransferFunction::zero();
-            let m = ident.numerator.num_coefficients() - 1;
-            let n = ident.denominator.num_coefficients() - 1;
-            ident.numerator[m] = T::one();
-            ident.denominator[n] = T::one();
-
-            ident
-        }
-    }
+    // impl<T, M, N, S1, S2> NumericalModel for TransferFunction<T, M, N, S1, S2>
+    // where
+    //     T: Scalar + Zero + One + Copy,
+    //     M: DimName,
+    //     N: DimName,
+    //     S1: Clone + RawStorageMut<T, M>,
+    //     S2: Clone + RawStorageMut<T, N>,
+    //     DefaultAllocator: Allocator<M, U1, Buffer<T> = S1> + Allocator<N, U1, Buffer<T> = S2>,
+    // {
+    //     fn zero() -> Self {
+    //         TransferFunction {
+    //             numerator: Polynomial::zeros_generic(M::name(), U1),
+    //             denominator: Polynomial::zeros_generic(N::name(), U1),
+    //         }
+    //     }
+    //
+    //     fn identity() -> Self {
+    //         let mut ident = TransferFunction::zero();
+    //         let m = ident.numerator.num_coefficients() - 1;
+    //         let n = ident.denominator.num_coefficients() - 1;
+    //         ident.numerator[m] = T::one();
+    //         ident.denominator[n] = T::one();
+    //
+    //         ident
+    //     }
+    // }
 
     fn feedback<T, G, H, GH, D>(sys1: &G, sys2: &H, sign_in: T, sign_feedback: T) -> D
     where

@@ -24,7 +24,7 @@ use core::{
     ops::{Add, Div, Mul, Neg},
 };
 
-use super::DynamicModel;
+use super::{math::system_traits::DynamicModel};
 
 // ===============================================================================================
 //      StateSpace Submodules

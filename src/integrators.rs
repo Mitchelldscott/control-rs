@@ -1,6 +1,6 @@
 //! A variety of methods to integrate [DynamicSystem]s
 //!
-use super::DynamicModel;
+use super::{math::system_traits::DynamicModel};
 
 #[cfg(feature = "std")]
 use std::ops::{Add, Div, Mul};

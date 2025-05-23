@@ -15,13 +15,13 @@
 //!
 
 #[cfg(feature = "std")]
-use std::{fmt, ops::Neg};
+use std::fmt;
 
 #[cfg(not(feature = "std"))]
-use core::{fmt, ops::Neg};
+use core::fmt;
 
-use nalgebra::{ArrayStorage, Complex, Const, Dim, RawStorage, RealField, U1};
-use num_traits::{Float, Num};
+use nalgebra::{Complex, RealField};
+use num_traits::Float;
 
 use crate::{
     frequency_tools::{FrequencyResponse, FrequencyTools},
@@ -55,15 +55,15 @@ pub use linear_tools::*;
 ///
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 3.1
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct TransferFunction<T, M, N, S1, S2> {
-    /// coefficients of the numerator `[b0, b1, ... bm]`
-    pub numerator: Polynomial<T, M, S1>,
-    /// coefficients of the denominator `[a0, a1, ... an]`
-    pub denominator: Polynomial<T, N, S2>,
+pub struct TransferFunction<T, const M: usize, const N: usize> {
+    /// coefficients of the numerator `[b_0, b_1, ... b_m]`
+    pub numerator: Polynomial<T, M>,
+    /// coefficients of the denominator `[a_0, a_1, ... a_n]`
+    pub denominator: Polynomial<T, N>,
 }
 
 impl<T, const M: usize, const N: usize>
-    TransferFunction<T, Const<M>, Const<N>, ArrayStorage<T, M, 1>, ArrayStorage<T, N, 1>>
+    TransferFunction<T, M, N>
 {
     /// Create a new transfer function from arrays of coefficients
     ///
@@ -94,13 +94,9 @@ impl<T, const M: usize, const N: usize>
     }
 }
 
-impl<T, M, N, S1, S2> FrequencyTools<T, 1, 1> for TransferFunction<T, M, N, S1, S2>
+impl<T, const M: usize, const N: usize> FrequencyTools<T, 1, 1> for TransferFunction<T, M, N>
 where
     T: Float + RealField + From<i16>,
-    M: Dim,
-    N: Dim,
-    S1: RawStorage<T, M, U1>,
-    S2: RawStorage<T, N, U1>,
 {
     fn frequency_response<const L: usize>(&self, response: &mut FrequencyResponse<T, L, 1, 1>) {
         // Evaluate the transfer function at each frequency
@@ -132,47 +128,44 @@ fn formatted_length<T: fmt::Display>(value: &T) -> usize {
     counter.length
 }
 
-impl<T, M, N, S1, S2> fmt::Display for TransferFunction<T, M, N, S1, S2>
-where
-    T: Copy + Num + PartialOrd + Neg<Output = T> + fmt::Display,
-    M: Dim,
-    N: Dim,
-    S1: RawStorage<T, M>,
-    S2: RawStorage<T, N>,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let num_len = formatted_length(&self.numerator);
-        let den_len = formatted_length(&self.denominator);
-
-        let (n_align, d_align, bar_len) = if den_len > num_len {
-            ((den_len - num_len) / 2, 0, den_len)
-        } else {
-            (0, (num_len - den_len) / 2, num_len)
-        };
-
-        write!(f, "Transfer Function:\n")?;
-
-        // Write numerator with padding
-        for _ in 0..n_align {
-            write!(f, " ")?;
-        }
-        write!(f, "{}\n", self.numerator)?;
-
-        // Write division bar
-        for _ in 0..bar_len {
-            write!(f, "-")?;
-        }
-        write!(f, "\n")?;
-
-        // Write denominator with padding
-        for _ in 0..d_align {
-            write!(f, " ")?;
-        }
-        write!(f, "{}\n", self.denominator)?;
-
-        Ok(())
-    }
-}
+/// TODO: Fix formating
+// impl<T, const M: usize, const N: usize> fmt::Display for TransferFunction<T, M, N>
+// where
+//     T: Copy + Num + PartialOrd + Neg<Output = T> + fmt::Display,
+// {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         let num_len = formatted_length(&self.numerator);
+//         let den_len = formatted_length(&self.denominator);
+//
+//         let (n_align, d_align, bar_len) = if den_len > num_len {
+//             ((den_len - num_len) / 2, 0, den_len)
+//         } else {
+//             (0, (num_len - den_len) / 2, num_len)
+//         };
+//
+//         write!(f, "Transfer Function:\n")?;
+//
+//         // Write numerator with padding
+//         for _ in 0. .n_align {
+//             write!(f, " ")?;
+//         }
+//         write!(f, "{:?}\n", self.numerator)?;
+//
+//         // Write division bar
+//         for _ in 0. .bar_len {
+//             write!(f, "-")?;
+//         }
+//         write!(f, "\n")?;
+//
+//         // Write denominator with padding
+//         for _ in 0. .d_align {
+//             write!(f, " ")?;
+//         }
+//         write!(f, "{:?}\n", self.denominator)?;
+//
+//         Ok(())
+//     }
+// }
 
 #[cfg(test)]
 mod basic_tf_tests {

@@ -1,323 +1,247 @@
+//! A safe and statically sized univariate-polynomial
 //!
-//! # Polynomial struct and helpful tools
-//!
-//! Mostly a copy of [Matrix] implementation with the specifics of a polynomial.
-use nalgebra::{
-    allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, Dim, DimDiff, DimMin,
-    DimMinimum, DimName, DimSub, Matrix, OMatrix, RawStorage, RawStorageMut, RealField, Scalar, U1,
-};
-use num_traits::{Float, Num, One, Zero};
+//! TODO:
+//!     * constructors
+//!         * from_fn<F>(cb: F): needs example and tests
+//!         * from_element(element: T): needs example
+//!         * new(coefficients; [T; N]): needs example
+//!         * from_constant(constant: T): needs example
+//!         * monomial(): needs example
+//!         * resize(): needs example and tests
+//!         * compose(f: Polynomial, g: Polynomial) -> Polynomial: Needs investigation
+//!         * to_monic(&self) -> Self
+//!         * zero(): needs tests and example
+//!         * one(): needs tests and example
+//!     * accessors
+//!         * degree(): needs tests and example
+//!         * is_monic(): needs tests and example
+//!         * is_zero(): needs tests and example
+//!         * is_one(): needs tests and example
+//!         * coefficient(): needs tests and example
+//!         * coefficient_mut(): needs tests and example
+//!         * constant(): needs tests and example
+//!         * constant_mut(): needs tests and example
+//!         * leading_coefficient(): needs tests and example
+//!         * leading_coefficient_mut(): needs tests and example
+//!     * arithmatic
+//!         * Zero() -> Self: needs tests and example
+//!         * One() -> Self: needs tests and example
+//!         * Neg() -> Self: needs tests and example
+//!         * Add/AddAssign(&self, rhs: T): needs tests and example
+//!         * Sub/SubAssign(&self, rhs: T): needs tests and example
+//!         * Mul/MulAssign(&self, rhs: T): needs tests and example
+//!         * Div/DivAssign(&self, rhs: T) (Euclidean division): needs test and example
+//!         * Rem/RemAssign(&self, rhs: T) (remainder): needs test and example
+//!         * Add/AddAssign(&self, rhs: Polynomial<T, M>): needs tests and example
+//!         * Sub/SubAssign(&self, rhs: Polynomial<T, M>): needs tests and example
+//!         * Mul/MulAssign(&self, rhs: Polynomial<T, M>): Can't implement safely
+//!         * Div/DivAssign(&self, rhs: Polynomial<T, M>) (Euclidean division): Can't implement safely
+//!         * Rem/RemAssign(&self, rhs: Polynomial<T, M>) (remainder): Can't implement safely
+//!     * calculus
+//!         * evaluate<U>(x: U) -> U: needs test and example
+//!         * derivative(p_src: &Polynomial<T, M>) -> Self: cant implement safely
+//!         * integral(p_src: &Polynomial<T, M>) -> Self: cant implement safely
+//!         * foil_roots(&mut self, roots: &[T]) -> Result<(), Polynomial>
+//!         * foil_complex_roots(&mut self, roots: &[Complex<T>]) -> Result<(), Polynomial>
+//!         * real_roots(p: Polynomial, roots: &mut [T]) -> Result<(), PolynomialError>
+//!         * complex_roots(p: Polynomial, roots: &mut [Complex<T>]) -> Result<(), PolynomialError>
+//!     * formatting
+//!         * Display with precision option
+//!         * Latex / symbolic formatter (optional)
 
 #[cfg(feature = "std")]
-use std::{
-    fmt, iter,
-    marker::PhantomData,
-    ops::{Add, AddAssign, Div, Index, IndexMut, Mul, Neg, Sub, SubAssign},
-};
+use std::{ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, Neg, Rem, RemAssign}, array};
 
 #[cfg(not(feature = "std"))]
-use core::{
-    fmt, iter,
-    marker::PhantomData,
-    ops::{Add, AddAssign, Div, Index, IndexMut, Mul, Neg, Sub, SubAssign},
-};
+use core::{ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, Neg, Rem, RemAssign}, array};
 
-// ===============================================================================================
-//      Polynomial Sub-Modules
-// ===============================================================================================
-
-pub mod array_polynomial;
-pub use array_polynomial::SPolynomial;
-
-#[cfg(feature = "std")]
-pub mod vec_polynomial;
-#[cfg(feature = "std")]
-pub use vec_polynomial::DPolynomial;
-
-// pub mod sparse_polynomial;
+use num_traits::{Zero, One};
 
 // ===============================================================================================
 //      Polynomial Tests
 // ===============================================================================================
 
 #[cfg(test)]
-mod edge_case_test;
+mod basic_tests;
 
 #[cfg(test)]
-mod op_tests;
-
-#[cfg(test)]
-#[cfg(feature = "std")]
-mod fmt_tests;
+mod arithmatic_tests;
 
 // ===============================================================================================
-//      Polynomial Base Implementation
-//
-//  These functions apply to all variations of the polynomial type
+//      Polynomial Errors
 // ===============================================================================================
 
-/// Stores coefficients and implements tools for a polynomial degree `D - 1`.
+
+/// Errors that can occur during polynomial initialization.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum PolynomialInitError {
+    /// Indicates that a slice provided to create a polynomial had an incorrect length.
+    LengthMismatch { expected: usize, actual: usize },
+}
+
+/// Errors that can occur during polynomial operations.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum PolynomialOpError {
+    /// Indicates that an attempt was made to access or set a coefficient for a power
+    /// greater than the polynomial's degree.
+    PowerOutOfBounds { requested_power: usize, max_degree: usize },
+    // Note: Arithmetic overflows (e.g., integer overflow) are dependent on the type `T`
+    // and its operator implementations. This struct itself does not add overflow checks
+    // beyond what T provides. For safety-critical applications, use `T` with
+    // defined overflow behavior (e.g., saturating or checked arithmetic).
+}
+
+/// Helper function to reverse arrays given to [Polynomial::new()]
+const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
+    let mut output = input;
+    let mut i = 0;
+    while i < N / 2 {
+        let tmp = output[i];
+        output[i] = output[N - 1 - i];
+        output[N - 1 - i] = tmp;
+        i += 1;
+    }
+    output
+}
+
+/// Statically sized univariate polynomial
 ///
-/// This struct stores the coefficients of a polynomial a(s):
+/// This struct stores the coefficients of a polynomial a(x):
 /// <pre>
-/// a(s) = a_0 * s^(D-1) + a_1 * s^(D-2) + ... + a_(D-2) * s + a_(D-1)
+/// a(s) = a_n * x^n + a_(n-1) * x^(n-1) + ... + a_1 * x + a_0
 /// </pre>
+/// where `n` is the degree of the polynomial.
 ///
-/// The coefficients are stored in descending degree order.
+/// The coefficients are stored in ascending degree order (i.e., index 0 is the lowest degree
+/// or constant term, index N-1 is the highest degree term).
 ///
 /// # Generic Arguments
-///
-/// * `T` - Type of the coefficients
-/// * `D` - Length of the coefficient array, ***NOT the degree!***
-/// * `S` - The type of the storage
-/// * `N` - number of equations (input variables)
+/// * `T` - Type of the coefficients in the polynomial
+/// * `N` - Capacity of the underlying array
 ///
 /// # Example
 /// ```rust
-/// use control_rs::Polynomial;
-/// let quadratic = Polynomial::new([1, 0, 0]);
+/// let quadratic = control_rs::Polynomial::new([1, 0, 0]);
 /// ```
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub struct Polynomial<T, D, S, N = U1> {
-    /// coefficients of the polynomial `[a0, a1, ... an]`, stored [highest -> lowest degree]
-    pub coefficients: S,
-    _phantom: PhantomData<(T, D, N)>,
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct Polynomial<T, const N: usize> {
+    /// coefficients of the polynomial `[a_0, a_1 ... a_n]`, lowest to highest degree order
+    coefficients: [T; N],
 }
 
-impl<T, D, S, N> Polynomial<T, D, S, N>
-where
-    D: Dim,
-    N: Dim,
-    S: RawStorage<T, D, N>,
-{
-    /// Returns the number of coefficients in the polynomial (degree + 1).
+impl<T, const N: usize> Polynomial<T, N> {
+    /// Creates a new polynomial from a function closure.
     ///
-    /// This function relies on the [RawStorage] trait to access the the number of rows.
-    ///
-    /// # Returns
-    ///
-    /// * `num_coeff` - number of coefficients (including zeros)
-    pub fn num_coefficients(&self) -> usize {
-        self.coefficients.shape().0.value()
-    }
-
-    /// Returns the number of equations in the polynomial.
-    ///
-    /// This function relies on the [RawStorage] trait to access the the number of cols.
-    ///
-    /// # Returns
-    ///
-    /// * `num_eqn` - number of equations
-    pub fn num_equations(&self) -> usize {
-        self.coefficients.shape().1.value()
-    }
-
-    /// Construct a polynomial from data.
+    /// This is a wrapper for [array::from_fn].
     ///
     /// # Arguments
-    ///
-    /// * `data` - RawStorage implementor
+    /// * `cb` - The generator function, which takes the degree (`usize`) as input and returns the
+    /// coefficient (`T`) for that degree
     ///
     /// # Returns
-    ///
-    /// * `polynomial` - polynomial built from the given data
-    pub fn from_data(data: S) -> Self {
-        Polynomial {
-            coefficients: data,
-            _phantom: PhantomData,
-        }
+    /// * `polynomial` - A new instance with the generated coefficients
+    #[inline]
+    pub fn from_fn<F>(cb: F) -> Self
+    where
+        F: FnMut(usize) -> T
+    {
+        Self { coefficients: array::from_fn(cb) }
     }
 
-    /// Construct a polynomial from a [Matrix].
+    /// Checks if the capacity is zero
+    #[inline]
+    pub fn is_empty(&self) -> bool { N == 0 }
+}
+
+impl<T: Copy, const N: usize> Polynomial<T, N> {
+    /// Creates a new polynomial from an array
     ///
-    /// should this be from_data(data: S) instead?
+    /// Expects an array of coefficients sorted highest to lowest degree.
     ///
     /// # Arguments
-    ///
-    /// * `matrix` - column matrix containing the coefficients
+    /// * `coefficients` - The coefficient array in descending degree order (highest -> lowest)
     ///
     /// # Returns
+    /// * `polynomial` - polynomial with the given coefficients
+    #[inline]
+    pub const fn new(coefficients: [T; N]) -> Self {
+        Self { coefficients:  reverse_array(coefficients) }
+    }
+
+    /// Creates a new polynomial with all coefficients set to the same element
     ///
-    /// * `polynomial` - polynomial built from the matrix's data
-    pub fn from_matrix(matrix: Matrix<T, D, N, S>) -> Self {
-        Polynomial::from_data(matrix.data)
+    /// # Arguments
+    /// * `element` - The value to be copied into the coefficient array
+    ///
+    /// # Returns
+    /// * `polynomial` - polynomial with all coefficients set to `element`
+    #[inline]
+    pub const fn from_element(element: T) -> Self {
+        Self::new([element; N])
     }
 }
 
-impl<T, D, S, N> Default for Polynomial<T, D, S, N>
-where
-    T: Clone,
-    S: Default,
-{
-    /// Create a new polynomial with the default coefficients.
-    ///
-    /// # Arguments
-    ///
-    /// * `coefficients` - An array of coefficients of the polynomial in descending degree order.
-    ///
-    /// # Returns
-    ///
-    /// * `Polynomial<T, D>` - A new polynomial with the given coefficients.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use control_rs::polynomial::Polynomial;
-    /// use nalgebra::{U2, ArrayStorage};
-    /// let p: Polynomial<i32, U2, ArrayStorage<i32, 2, 1>> = Polynomial::default();
-    /// ```
+impl<T: Default, const N: usize> Default for Polynomial<T, N> {
+    #[inline]
     fn default() -> Self {
-        Polynomial {
-            coefficients: S::default(),
-            _phantom: PhantomData,
-        }
+        Self::from_fn(|_| T::default())
     }
 }
 
-// ===============================================================================================
-//      Polynomial Generic Constructors
-//
-//  These constructors are copied from nalgebra, they provide a generic way to initialize different
-// variations of the polynomial type.
-// ===============================================================================================
-
-impl<T, D, S, N> Polynomial<T, D, S, N>
-where
-    T: Scalar,
-    D: Dim,
-    N: Dim,
-    S: RawStorage<T, D, N>,
-    DefaultAllocator: Allocator<D, N, Buffer<T> = S>,
-{
-    /// Creates a polynomial with all its elements set to `elem`.
-    #[inline]
-    pub fn from_element_generic(nrows: D, ncols: N, elem: T) -> Self {
-        let len = nrows.value() * ncols.value();
-        Self::from_iterator_generic(nrows, ncols, iter::repeat(elem).take(len))
-    }
-
-    /// Creates a polynomial with all its elements set to 0.
-    #[inline]
-    pub fn zeros_generic(nrows: D, ncols: N) -> Self
-    where
-        T: Zero,
-    {
-        Self::from_element_generic(nrows, ncols, T::zero())
-    }
-
-    /// Creates a polynomial with all its elements filled by an iterator.
-    #[inline]
-    pub fn from_iterator_generic<I>(nrows: D, ncols: N, iter: I) -> Self
-    where
-        I: IntoIterator<Item = T>,
-    {
-        Self::from_data(DefaultAllocator::allocate_from_iterator(nrows, ncols, iter))
-    }
-
-    /// Returns the number of equations in the polynomial.
+impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
+    /// Create a polynomial from another polynomial with a different capacity.
     ///
-    /// This function relies on the [RawStorage] trait to access the the number of cols.
-    ///
-    /// # Returns
-    ///
-    /// * `num_eqn` - number of equations
-    pub fn equation<S1>(&self, index: usize) -> Polynomial<T, D, S1>
-    where
-        S1: RawStorage<T, D, U1>,
-        DefaultAllocator: Allocator<D, U1, Buffer<T> = S1>,
-    {
-        assert!(index < self.num_equations());
-        Polynomial::from_iterator_generic(
-            self.coefficients.shape().0,
-            U1,
-            (0..self.num_coefficients()).map(|i| self[(i, index)].clone()),
-        )
-    }
-}
-
-// ===============================================================================================
-//      Univariate-Polynomial
-//
-//  Functions for polynomials of a single variable.
-// ===============================================================================================
-
-impl<T, D, S> Polynomial<T, D, S>
-where
-    T: Clone,
-    D: Dim,
-    S: RawStorage<T, D, U1>,
-{
-    /// Returns a copy of the coefficient at the given index.
-    ///
-    /// This is a wrapper for the index trait impl, the Copy trait bound allows this
-    /// function to copy the value at index rather than returning a refernce to the value.
-    ///
-    /// Coefficients are sorted high degree -> low degree, should add a function to look up terms
-    /// by degree.
-    ///
-    /// This will panic if the index is invalid.
+    /// * Shrinking the capacity will drop higher order terms.
+    /// * Extending the capacity will pad the array with T::zero().
     ///
     /// # Arguments
-    ///
-    /// * `index` - the index of the coefficient
-    ///
-    /// # Returns
-    ///
-    /// * `coeff` - the coefficient at the index
-    ///
-    /// # Example
-    /// ```rust
-    /// use control_rs::Polynomial;
-    /// let p = Polynomial::new("x", [1, 0, 0]);
-    /// // forces T to be Copy, won't compile otherwise
-    /// assert_eq!(p.coefficient(0), 1, "reference had the wrong value");
-    /// ```
-    pub fn coefficient(&self, index: usize) -> T {
-        self[index].clone()
-    }
-}
-
-impl<T, D, S, N> Polynomial<T, D, S, N>
-where
-    T: Clone + Zero + Add,
-    D: Dim + DimSub<U1>,
-    N: Dim + DimSub<U1>,
-    S: RawStorage<T, D, N>,
-{
-    /// Returns a copy of the constant coefficient.
-    ///
-    /// This is a wrapper for the index function, the Copy trait bound allows this
-    /// function to copy the value at index rather than returning a refernce to the value.
-    ///
-    /// The constant term of the polynomial is the last term in the storage. This is just
-    /// a convienience function.
-    ///
-    /// For mulivariate polynomials (N > 1) this is a sum of all N constants.
+    /// * `other` - the polynomial to resize
     ///
     /// # Returns
-    ///
-    /// * `coeff` - the constant coefficient
-    pub fn constant(&self) -> T {
-        (0..self.num_equations()).fold(T::zero(), |acc, i| {
-            acc + self[(self.num_coefficients() - 1, i)].clone()
+    /// * `resized_polynomial` - a polynomial with a new capacity
+    #[inline]
+    pub fn resize<const M: usize>(self, other: Polynomial<T, M>) -> Polynomial<T, N> {
+        Self::from_fn(|i| {
+            if i < M { other.coefficients[i].clone() }
+            else { T::zero() }
         })
     }
+
+    /// Creates a polynomial with all coefficients except the constant term set to zero
+    ///
+    /// If N == 0 this will return an empty polynomial.
+    ///
+    /// # Arguments
+    /// * `constant` - The value of the constant term
+    ///
+    /// # Returns
+    /// * `Polynomial` - a polynomial with only the trailing term
+    pub fn from_constant(constant: T) -> Self {
+        let mut polynomial = Self::from_fn(|_| T::zero());
+        if !polynomial.is_empty() { polynomial.coefficients[0] = constant }
+        polynomial
+    }
+}
+impl<T: Zero + One, const N: usize> Polynomial<T, N> {
+    /// Creates a polynomial with all coefficients but the constant set to zero
+    ///
+    /// # Returns
+    /// * `Polynomial` - a polynomial with only the trailing term
+    pub fn monomial() -> Self {
+        let mut polynomial = Self::from_fn(|_| T::zero());
+        if !polynomial.is_empty() { polynomial.coefficients[0] = T::one() }
+        polynomial
+    }
 }
 
-impl<T, D, S> Polynomial<T, D, S>
-where
-    T: Clone,
-    D: Dim,
-    S: RawStorage<T, D>,
-{
+impl<T: Clone, const N: usize> Polynomial<T, N> {
     /// Evaluate the polynomial at the given value.
     ///
     /// # Arguments
-    ///
     /// * `value` - The value at which to evaluate the polynomial.
     ///
     /// # Returns
-    ///
     /// * `T` - The value of the polynomial at the given value.
     ///
     /// # Example
@@ -325,631 +249,534 @@ where
     /// ```rust
     /// use control_rs::polynomial::Polynomial;
     ///
-    /// let p = Polynomial::new([1.0, 2.0, 3.0]);
-    /// let value = p.evaluate(2.0);
+    /// let p = Polynomial::new([1, 2, 3]);
+    /// let result = p.evaluate(2);
     /// ```
     pub fn evaluate<U>(&self, value: U) -> U
     where
-        U: Copy + Zero + One + Add<T, Output = U> + Mul<U, Output = U>,
+        U: Clone + Zero + Add<T, Output = U> + Mul<U, Output = U>,
     {
-        (0..self.num_coefficients()).fold(U::zero(), |acc, irow| {
-            // safe becuase nrows is from shape() and irow is in 0..nrows
-            acc * value + self[irow].clone()
+        (0..N).rev().fold(U::zero(), |acc, i| {
+            acc * value.clone() + self.coefficients[i].clone()
         })
     }
 }
 
-impl<T, D, S1> Polynomial<T, D, S1>
-where
-    T: Clone + Num + Default,
-    D: DimSub<U1>,
-    DimDiff<D, U1>: DimName,
-    S1: RawStorage<T, D>,
-{
-    /// Compute the derivative of the polynomial.
+impl<T: Zero, const N: usize> Polynomial<T, N> {
+    /// Returns the degree of the polynomial
+    ///
+    /// The degree is found by iterating through the array of coefficients, from 0 to N, and
+    /// returning the power of the first non-zero term. This is slow for polynomials with
+    /// lots of leading zeros.
     ///
     /// # Returns
-    ///
-    /// * `Polynomial<T, D - 1>` - The derivative of the polynomial.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use control_rs::polynomial::Polynomial;
-    /// use nalgebra::ArrayStorage;
-    ///
-    /// let p = Polynomial::new([1.0, 2.0, 3.0]);
-    /// let derivative = p.derivative::<ArrayStorage<f32, 2, 1>>();
-    /// ```
-    pub fn derivative<S2>(&self) -> Polynomial<T, DimDiff<D, U1>, S2>
-    where
-        S2: RawStorageMut<T, DimDiff<D, U1>> + Default,
-    {
-        let new_dim = self.num_coefficients() - 1;
-        let mut derivative = Polynomial {
-            coefficients: S2::default(),
-            _phantom: PhantomData,
-        };
-        for i in 0..new_dim {
-            derivative[i] = (i..new_dim).fold(T::zero(), |acc, _| acc + self[i].clone());
+    /// * `Option<usize>`
+    ///     * `Some(degree)` - power of the highest order non-zero coefficient
+    ///     * `None` - if the length is zero or all coefficients are zero
+    pub fn degree(&self) -> Option<usize> {
+        for i in (0..N).rev() {
+            if !self.coefficients[i].is_zero() {
+                return Some(i);
+            }
         }
-
-        derivative
-    }
-
-    /// Compute the derivative of the polynomial.
-    ///
-    /// # Returns
-    ///
-    /// * `Polynomial<T, D - 1>` - The derivative of the polynomial.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use control_rs::polynomial::Polynomial;
-    /// use nalgebra::{U2, ArrayStorage};
-    ///
-    /// let p = Polynomial::new([1.0, 2.0, 3.0]);
-    /// let reduced_p: Polynomial<f32, U2, ArrayStorage<f32, 2, 1>> = p.reduce_order();
-    /// ```
-    pub fn reduce_order<S2>(&self) -> Polynomial<T, DimDiff<D, U1>, S2>
-    where
-        S2: RawStorageMut<T, DimDiff<D, U1>> + Default,
-    {
-        let mut reduced = Polynomial {
-            coefficients: S2::default(),
-            _phantom: PhantomData,
-        };
-        for i in 0..reduced.num_coefficients() {
-            reduced[i] = self[i + 1].clone();
-        }
-
-        reduced
+        None
     }
 }
-
-impl<T, D, S> Polynomial<T, D, S>
-where
-    T: 'static + Clone + Num + Neg<Output = T> + fmt::Debug,
-    D: DimSub<U1>,
-    DimDiff<D, U1>: DimName,
-    S: RawStorage<T, D>,
-    DefaultAllocator: Allocator<DimDiff<D, U1>, DimDiff<D, U1>>,
-{
-    /// Constructs the companion matrix of the polynomial.
-    ///
-    /// The companion matrix is a square matrix whose eigenvalues are the roots of the polynomial.
-    /// It is constructed from an identity matrix, a zero column and a row of the polynomial's
-    /// coefficients scaled by the highest term.
-    ///
-    /// <pre>
-    /// |  a[1..D] / a[0]  |
-    /// |     I      0     |
-    /// </pre>
-    /// <pre>
-    /// |  -a_1/a_0  -a_2/a_0  -a_3/a_0  ...  -a_(D-2)/a_0  -a_(D-1)/a_0  |
-    /// |     1         0         0      ...       0            0         |
-    /// |     0         1         0      ...       0            0         |
-    /// |     0         0         1      ...       0            0         |
-    /// |    ...       ...       ...     ...      ...          ...        |
-    /// |     0         0         0      ...       1            0         |
-    /// </pre>
+impl<T: PartialEq + One, const N: usize> Polynomial<T, N> {
+    /// Checks if a polynomial is monic
     ///
     /// # Returns
-    ///
-    /// * `OMatrix<T, DimDiff<D, U1>, DimDiff<D, U1>>` - The companion matrix representation of the polynomial.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use control_rs::polynomial::Polynomial;
-    ///
-    /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]);
-    /// let companion_matrix = p.companion();
-    /// ```
-    pub fn companion(&self) -> OMatrix<T, DimDiff<D, U1>, DimDiff<D, U1>> {
-        // return companion;
-        OMatrix::<T, DimDiff<D, U1>, DimDiff<D, U1>>::from_fn(|i, j| {
-            if i == 0 {
-                -self[j + 1].clone() / self[0].clone()
-            } else {
-                if i == j + 1 {
-                    T::one()
-                } else {
-                    T::zero()
-                }
-            }
-        })
-    }
-}
-
-impl<T, D, S> Polynomial<T, D, S>
-where
-    T: 'static + Clone + Num + Neg<Output = T> + fmt::Debug + RealField + Float,
-    D: DimSub<U1>,
-    DimDiff<D, U1>: DimName + DimSub<U1>,
-    S: RawStorage<T, D>,
-    DefaultAllocator: Allocator<DimDiff<D, U1>, DimDiff<D, U1>>
-        + Allocator<DimDiff<D, U1>, DimDiff<DimDiff<D, U1>, U1>>
-        + Allocator<DimDiff<DimDiff<D, U1>, U1>>
-        + Allocator<DimDiff<D, U1>>,
-{
-    /// Computes the roots of the polynomial.
-    ///
-    /// Edge cases:
-    /// - if the leadng coeff is zero this should reduce the order and recurse, having issues with trait bounds (currently returning NaN)
-    /// - all coefficients are zero: all roots are infinite
-    /// - if there are two coefficients and the lead is non-zero: the root is `-coeff[1]/coeff[0]`
-    /// - if all but the first coeff are zero: all roots are zero
-    ///
-    ///
-    /// For very high order polynomials this may be inefficient, especially for degenerate cases.
-    /// User should consider cases where all/many coeff = 0 and avoid calling this. Would be nice if
-    /// nalgebra handled large/sparse matrix eigenvalues.
-    ///
-    /// # Returns
-    ///
-    /// * `OMatrix<Complex<T>, Const<D>, U1>` - A column vector containing the computed roots.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use control_rs::polynomial::Polynomial;
-    ///
-    /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]);
-    /// let roots = p.roots();
-    /// ```
-    pub fn roots(&self) -> OMatrix<Complex<T>, DimDiff<D, U1>, U1> {
-        if !self[0].is_zero() {
-            let num_coeff = self.num_coefficients();
-            if num_coeff == 2 {
-                OMatrix::<Complex<T>, DimDiff<D, U1>, U1>::from_element(Complex::new(
-                    -self[1].clone() / self[0].clone(),
-                    T::zero(),
-                ))
-            } else {
-                let num_zeros = (0..num_coeff).fold(0, |acc, i| match self[i] == T::zero() {
-                    true => acc + 1,
-                    false => acc,
-                });
-
-                if num_zeros == num_coeff {
-                    // zero/degenerate polynomial, all infinite roots
-                    OMatrix::<Complex<T>, DimDiff<D, U1>, U1>::from_element(Complex::new(
-                        T::infinity(),
-                        T::infinity(),
-                    ))
-                } else if num_zeros == num_coeff - 1 {
-                    // unit case, all zero roots
-                    OMatrix::<Complex<T>, DimDiff<D, U1>, U1>::from_element(Complex::new(
-                        T::zero(),
-                        T::zero(),
-                    ))
-                } else {
-                    // need to know more specifics about what matrices work with complex_eigenvalues,
-                    // the current cases fixed an infinite loops in the test, but certianly not a garuanteed solution
-                    self.companion().complex_eigenvalues()
-                }
-            }
-        } else {
-            // should be able to reduce order and keep trying, but having issues with recursive trait bounds
-            OMatrix::<Complex<T>, DimDiff<D, U1>, U1>::from_element(Complex::new(
-                T::nan(),
-                T::nan(),
-            ))
-        }
+    /// * `bool` - true if the leading coefficient is one, false otherwise
+    pub fn is_monic(&self) -> bool {
+        if self.is_empty() { false }
+        else if self.coefficients[0].is_one() { true }
+        else { false }
     }
 }
 
 // ===============================================================================================
-//      Polynomial Operator Implementations
+//      Polynomial Coefficient Accessors
 // ===============================================================================================
 
-//
-//  Index
-//
+impl<T, const N: usize> Polynomial<T, N> {
+    /// Returns a coefficient of the polynomial
+    ///
+    /// # Arguments
+    /// * `degree` - the degree of the coefficient to return
+    ///
+    /// # Returns
+    /// * `Option<&T>`
+    ///     * `Some(constant)` - when N > degree: coefficient at the specified degree
+    ///     * `None` - when N <= degree
+    pub fn coefficient(&self, degree: usize) -> Option<&T> {
+        if N > degree { Some(&self.coefficients[degree]) }
+        else { None }
+    }
 
-impl<T, D, S, N> Index<usize> for Polynomial<T, D, S, N>
-where
-    D: Dim,
-    N: Dim,
-    S: RawStorage<T, D, N>,
-{
-    type Output = T;
+    /// Returns a coefficient of the polynomial
+    ///
+    /// # Arguments
+    /// * `degree` - the degree of the coefficient to return
+    ///
+    /// # Returns
+    /// * `Option<&mut T>`
+    ///     * `Some(coefficient)` - when N > degree: coefficient at the specified degree
+    ///     * `None` - when N <= degree
+    pub fn coefficient_mut(&mut self, degree: usize) -> Option<&T> {
+        if N > degree { Some(&mut self.coefficients[N - degree - 1]) }
+        else { None }
+    }
 
-    fn index(&self, index: usize) -> &Self::Output {
-        // also need to check if storage is contiguous for sparse polynomial?
-        assert!(index < self.num_coefficients(), "Index out of bounds");
-        unsafe { self.coefficients.get_unchecked(index, 0) }
+    /// Returns the constant term of the polynomial
+    ///
+    /// # Returns
+    /// * `Option<&T>`
+    ///     * `Some(constant)` - when N > 0: coefficient at the start of the array
+    ///     * `None` - when N == 0
+    pub fn constant(&self) -> Option<&T> {
+        if self.is_empty() { None }
+        else { Some(&self.coefficients[0]) }
+    }
+
+    /// Returns the constant term of the polynomial
+    ///
+    /// # Returns
+    /// * `Option<&mut T>`
+    ///     * `Some(constant)` - when N > 0: coefficient at the start of the array
+    ///     * `None` - when N == 0
+    pub fn constant_mut(&mut self) -> Option<&mut T> {
+        if self.is_empty() { None }
+        else { Some(&mut self.coefficients[0]) }
+    }
+
+    /// Returns the highest order term of the polynomial
+    ///
+    /// # Returns
+    /// * `Option<&T>`
+    ///     * `Some(constant)` - when N > 0: coefficient at the end of the array
+    ///     * `None` - when N == 0
+    pub fn leading_coefficient(&self) -> Option<&T> {
+        if self.is_empty() { None }
+        else { Some(&self.coefficients[N-1]) }
+    }
+
+    /// Returns the highest order term of the polynomial
+    ///
+    /// # Returns
+    /// * `Option<&mut T>`
+    ///     * `Some(leading_coefficient)` - when N > 0: coefficient at the end of the array
+    ///     * `None` - when N == 0
+    pub fn leading_coefficient_mut(&mut self) -> Option<&mut T> {
+        if self.is_empty() { None }
+        else { Some(&mut self.coefficients[N-1]) }
     }
 }
 
-impl<T, D, S, N> IndexMut<usize> for Polynomial<T, D, S, N>
-where
-    D: Dim,
-    N: Dim,
-    S: RawStorageMut<T, D, N>,
-{
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        assert!(index < self.num_coefficients(), "Index out of bounds");
-        unsafe { self.coefficients.get_unchecked_mut(index, 0) }
+impl<T: Zero, const N: usize> Zero for Polynomial<T, N> {
+    fn zero() -> Self {
+        Self::from_fn(|_| T::zero())
     }
-}
 
-impl<T, D, S, N> Index<(usize, usize)> for Polynomial<T, D, S, N>
-where
-    D: Dim,
-    N: Dim,
-    S: RawStorage<T, D, N>,
-{
-    type Output = T;
-
-    fn index(&self, index: (usize, usize)) -> &Self::Output {
-        // also need to check if storage is contiguous for sparse polynomial?
-        assert!(index.0 < self.num_coefficients(), "Index row out of bounds");
-        assert!(
-            index.1 < self.coefficients.shape().1.value(),
-            "Index col out of bounds"
-        );
-        unsafe { self.coefficients.get_unchecked(index.0, index.1) }
-    }
-}
-
-impl<T, D, S, N> IndexMut<(usize, usize)> for Polynomial<T, D, S, N>
-where
-    D: Dim,
-    N: Dim,
-    S: RawStorageMut<T, D, N>,
-{
-    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
-        assert!(index.0 < self.num_coefficients(), "Index row out of bounds");
-        assert!(
-            index.1 < self.coefficients.shape().1.value(),
-            "Index col out of bounds"
-        );
-        unsafe { self.coefficients.get_unchecked_mut(index.0, index.1) }
-    }
-}
-
-//
-//  Scalar Math
-//
-// provides function implementions for op(Polynomial, U), where U implements Num
-//
-
-impl<T, U, D, S, N> Add<U> for Polynomial<T, D, S, N>
-where
-    T: Clone + Add<U, Output = T>,
-    U: Clone + Num,
-    D: Dim + DimSub<U1>,
-    N: Dim + DimSub<U1>,
-    S: RawStorageMut<T, D, N> + Clone,
-{
-    type Output = Self;
-
-    fn add(self, rhs: U) -> Self::Output {
-        let mut new_poly = self.clone();
-        let num_coeff = self.coefficients.shape().0.value();
-        if num_coeff > 0 {
-            for i in 0..self.coefficients.shape().1.value() {
-                new_poly[(num_coeff - 1, i)] = self[num_coeff - 1].clone() + rhs.clone();
+    /// Checks if coefficients of a polynomial are zero
+    ///
+    /// # Returns
+    /// * `bool` - false if any coefficients are non-zero or the array is empty, otherwise true
+    fn is_zero(&self) -> bool {
+        if N > 0 {
+            for c in &self.coefficients {
+                if !c.is_zero() { return false }
             }
         }
-        new_poly
+        true
     }
 }
 
-impl<T, U, D, S, N> Sub<U> for Polynomial<T, D, S, N>
-where
-    T: Clone + Sub<U, Output = T>,
-    U: Clone + Num,
-    D: Dim + DimSub<U1>,
-    N: Dim + DimSub<U1>,
-    S: RawStorageMut<T, D, N> + Clone,
-{
-    type Output = Self;
+impl<T: Zero + PartialEq + One, const N: usize> One for Polynomial<T, N> {
+    fn one() -> Self {
+        Self::from_fn(|_| T::one())
+    }
 
-    fn sub(self, rhs: U) -> Self::Output {
-        let mut new_poly = self.clone();
-        let num_coeff = self.coefficients.shape().0.value();
-        if num_coeff > 0 {
-            for i in 0..self.coefficients.shape().1.value() {
-                new_poly[(num_coeff - 1, i)] = self[num_coeff - 1].clone() - rhs.clone();
-            }
+    /// Checks if coefficients of a polynomial are zero and the constant is one
+    ///
+    /// # Returns
+    /// * `bool` - true if all coefficients are zero and the constant is one, false otherwise
+    fn is_one(&self) -> bool {
+        if self.is_empty() { return false }
+        else if !self.coefficients[N-1].is_one() { return false }
+        for c in &self.coefficients {
+            if !c.is_zero() { return false }
         }
-        new_poly
+        true
     }
 }
 
-impl<T, U, D, S> Mul<U> for Polynomial<T, D, S>
-where
-    T: Clone + Mul<U, Output = T>,
-    U: Clone + Num,
-    D: Dim,
-    S: RawStorageMut<T, D> + Clone,
-{
-    type Output = Polynomial<T, D, S>;
+// ===============================================================================================
+//      Polynomial-Scalar Arithmatic
+// ===============================================================================================
 
-    fn mul(self, rhs: U) -> Self::Output {
-        let mut new_poly = self.clone();
-        for i in 0..self.num_coefficients() {
-            new_poly[i] = self[i].clone() * rhs.clone();
-        }
-        new_poly
-    }
-}
-
-impl<T, U, D, S> Div<U> for Polynomial<T, D, S>
-where
-    T: Clone + Div<U, Output = T>,
-    U: Clone + Num,
-    D: Dim,
-    S: RawStorageMut<T, D> + Clone,
-{
-    type Output = Self;
-
-    fn div(self, rhs: U) -> Self::Output {
-        let mut new_poly = self.clone();
-        for i in 0..self.num_coefficients() {
-            new_poly[i] = self[i].clone() / rhs.clone();
-        }
-        new_poly
-    }
-}
-
-impl<T, D, S> Neg for Polynomial<T, D, S>
-where
-    T: Clone + Zero + Sub<Output = T>,
-    D: Dim,
-    S: RawStorageMut<T, D> + Clone,
-{
+impl<T: Clone + Neg<Output = T>, const N: usize> Neg for Polynomial<T, N> {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        let mut new_poly = self.clone();
-        for i in 0..self.num_coefficients() {
-            new_poly[i] = T::zero() - self[i].clone();
-        }
-        new_poly
+        Self::from_fn(|i| -self.coefficients[i].clone())
     }
 }
 
-macro_rules! impl_left_scalar_arithmetic {
-    ($($scalar:ty),*) => {
-        $(
-            impl<D, S> Add<Polynomial<$scalar, D, S>> for $scalar
-            where
-                $scalar: Clone + Add<Output = $scalar> + Num,
-                D: Dim + DimSub<U1>,
-                S: RawStorageMut<$scalar, D> + Clone,
-            {
-                type Output = Polynomial<$scalar, D, S>;
-
-                fn add(self, rhs: Polynomial<$scalar, D, S>) -> Self::Output {
-                    let mut new_poly = rhs.clone();
-                    let num_coeff = rhs.num_coefficients();
-                    if num_coeff > 0 {
-                        new_poly[num_coeff - 1] = self + rhs.constant();
-                    }
-                    new_poly
-                }
-            }
-
-            impl<D, S> Sub<Polynomial<$scalar, D, S>> for $scalar
-            where
-                $scalar: Scalar + Sub<Output = $scalar> + Num,
-                D: Dim + DimSub<U1>,
-                S: RawStorageMut<$scalar, D> + Clone,
-            {
-                type Output = Polynomial<$scalar, D, S>;
-
-                fn sub(self, rhs: Polynomial<$scalar, D, S>) -> Self::Output {
-                    let mut new_poly = -rhs.clone();
-                    let num_coeff = rhs.num_coefficients();
-                    if num_coeff > 0 {
-                        new_poly[num_coeff - 1] = self - new_poly.constant();
-                    }
-                    new_poly
-                }
-            }
-
-            impl<D, S> Mul<Polynomial<$scalar, D, S>> for $scalar
-            where
-                $scalar: Clone + Mul<$scalar, Output = $scalar> + Num,
-                D: Dim + DimSub<U1>,
-                S: RawStorageMut<$scalar, D> + Clone,
-            {
-                type Output = Polynomial<$scalar, D, S>;
-
-                fn mul(self, rhs: Polynomial<$scalar, D, S>) -> Self::Output {
-                    let mut new_poly = rhs.clone();
-                    let num_coeff = rhs.num_coefficients();
-                    for i in 0..num_coeff {
-                        new_poly[i] = self * rhs[i];
-                    }
-                    new_poly
-                }
-            }
-
-            impl<D, S> Div<Polynomial<$scalar, D, S>> for $scalar
-            where
-                $scalar: Clone + Div<$scalar, Output = $scalar> + Num,
-                D: Dim + DimSub<U1>,
-                S: RawStorageMut<$scalar, D> + Clone,
-            {
-                type Output = Polynomial<$scalar, D, S>;
-
-                fn div(self, rhs: Polynomial<$scalar, D, S>) -> Self::Output {
-                    let mut new_poly = rhs.clone();
-                    let num_coeff = rhs.num_coefficients();
-                    for i in 0..num_coeff {
-                        new_poly[i] = self / rhs[i];
-                    }
-                    new_poly
-                }
-            }
-        )*
-    };
-}
-
-impl_left_scalar_arithmetic!(i16, u16, u32, i32, f32, f64);
-
-//
-//  Polynomial Math
-//
-// - NO Variable Checking, this only works for polynomials with the same variable
-// and does not error
-// - No Multivariate support
-// - should do <Op>Assign for Add, sub, Mul, Div
-// - steal nalgebra impl_arithmatic() macro?
-
-impl<T, D, S, N> Add<Polynomial<T, D, S, N>> for Polynomial<T, D, S, N>
-where
-    T: Clone + AddAssign,
-    D: Dim + DimSub<U1>,
-    S: Clone + RawStorageMut<T, D, N>,
-    N: Dim,
-{
+impl<T: Clone + Add<Output = T>, const N: usize> Add<T> for Polynomial<T, N> {
     type Output = Self;
 
-    fn add(self, rhs: Polynomial<T, D, S, N>) -> Self::Output {
-        let mut sum = self.clone();
-        for i in 0..self.num_coefficients() {
-            for j in 0..self.coefficients.shape().1.value() {
-                sum[(i, j)] += rhs[(i, j)].clone();
-            }
+    fn add(self, rhs: T) -> Self::Output {
+        let mut result = self.clone();
+        if N > 0 {
+            // Add `rhs` to the constant term (x^0)
+            result.coefficients[0] = result.coefficients[0].clone() + rhs;
         }
-        sum
+        result
     }
 }
 
-impl<T, D, S, N> Sub<Polynomial<T, D, S, N>> for Polynomial<T, D, S, N>
-where
-    T: Clone + SubAssign,
-    D: Dim + DimSub<U1>,
-    S: Clone + RawStorageMut<T, D, N>,
-    N: Dim,
-{
+impl<T: AddAssign, const N: usize> AddAssign<T> for Polynomial<T, N> {
+    fn add_assign(&mut self, rhs: T) {
+        if N > 0 {
+            // Add `rhs` to the constant term (x^0)
+            self.coefficients[0] += rhs;
+        }
+    }
+}
+
+impl<T: Clone + Sub<Output = T>, const N: usize> Sub<T> for Polynomial<T, N> {
     type Output = Self;
 
-    fn sub(self, rhs: Polynomial<T, D, S, N>) -> Self::Output {
-        let mut dif = self.clone();
-        for i in 0..self.num_coefficients() {
-            for j in 0..self.coefficients.shape().1.value() {
-                dif[(i, j)] -= rhs[(i, j)].clone();
-            }
+    fn sub(self, rhs: T) -> Self::Output {
+        let mut result = self.clone();
+        if N > 0 {
+            // Subtract `rhs` from the constant term (x^0)
+            result.coefficients[0] = result.coefficients[0].clone() - rhs;
         }
-        dif
+        result
     }
 }
 
-// impl<T, D, S, N> Div<Polynomial<T, D, S, N>> for Polynomial<T, D, S, N>
-// where
-//     T: Clone + SubAssign<Output = T> + Div<Output = T> + Mul<Output = T> + Zero,
-//     D: Dim + DimSub<U1>,
-//     S: Clone + RawStorageMut<T, D, N>,
-//     N: Dim,
-// {
-//     type Output = Self;
+impl<T: SubAssign, const N: usize> SubAssign<T> for Polynomial<T, N> {
+    fn sub_assign(&mut self, rhs: T) {
+        if N > 0 {
+            // Subtract `rhs` from the constant term (x^0)
+            self.coefficients[0] -= rhs;
+        }
+    }
+}
 
-//     fn div(self, rhs: Polynomial<T, D, S, N>) -> Self::Output {
-//         let mut quotient = self.clone() * T::zero();
-//         let mut remainder = self.clone();
-//         let divisor_degree = rhs.num_coefficients() - 1;
-//         let divisor_lead_coeff = rhs[0].clone();
+impl<T: Clone + Mul<Output = T>, const N: usize> Mul<T> for Polynomial<T, N> {
+    type Output = Self;
 
-//         while remainder.num_coefficients() - 1 >= divisor_degree {
-//             let degree_diff = remainder.num_coefficients() - 1 - divisor_degree;
-//             let coeff = remainder[0].clone() / divisor_lead_coeff.clone();
+    fn mul(self, rhs: T) -> Self::Output {
+        let mut result = self.clone();
+        for i in 0..N {
+            result.coefficients[i] = result.coefficients[i].clone() * rhs.clone();
+        }
+        result
+    }
+}
 
-//             let mut term = Polynomial::zeros_generic(, U1);
-//             term[degree_diff] = coeff.clone();
-//             quotient += term.clone();
-//             remainder -= term * rhs.clone();
-//         }
+impl<T: Clone + MulAssign, const N: usize> MulAssign<T> for Polynomial<T, N> {
+    fn mul_assign(&mut self, rhs: T) {
+        for i in 0..N {
+            self.coefficients[i] *= rhs.clone();
+        }
+    }
+}
 
-//         quotient
-//     }
-// }
+impl<T: Clone + Div<Output = T>, const N: usize> Div<T> for Polynomial<T, N> {
+    type Output = Self;
+
+    fn div(self, rhs: T) -> Self::Output {
+        let mut result = self.clone();
+        for i in 0..N {
+            result.coefficients[i] = result.coefficients[i].clone() / rhs.clone();
+        }
+        self
+    }
+}
+
+impl<T, const N: usize> DivAssign<T> for Polynomial<T, N>
+where
+    T: DivAssign + Copy,
+{
+    fn div_assign(&mut self, rhs: T) {
+        for i in 0..N {
+            self.coefficients[i] /= rhs;
+        }
+    }
+}
+
+impl<T: Clone + Rem<Output = T>, const N: usize> Rem<T> for Polynomial<T, N> {
+    type Output = Self;
+
+    fn rem(self, rhs: T) -> Self::Output {
+        let mut result = self.clone();
+        for i in 0..N {
+            result.coefficients[i] = result.coefficients[i].clone() % rhs.clone();
+        }
+        self
+    }
+}
+
+impl<T: Clone + RemAssign, const N: usize> RemAssign<T> for Polynomial<T, N> {
+    fn rem_assign(&mut self, rhs: T) {
+        for i in 0..N {
+            self.coefficients[i] %= rhs.clone();
+        }
+    }
+}
 
 // ===============================================================================================
-//      Polynomial Num Traits Implementation
+//      Polynomial-Polynomial Arithmatic
+//
+// These functions are intentionally only available for polynomials with the same capacity. This
+// is meant to force user implementations to provide size checking and guaranteed operations.
 // ===============================================================================================
 
-// impl<T, D, S, N> Zero for Polynomial<T, D, S, N>
-// where
-//     T: Clone + Zero + AddAssign,
-//     D: Dim + DimSub<U1>,
-//     S: Clone + RawStorageMut<T, D, N>,
-//     N: Dim,
-// {
-//     fn zero() -> Self {
-//         Self {
-//             variable: "x",
-//             coefficients: S::zero(),
-//             _phantom: PhantomData,
-//         }
-//     }
+impl<T: Clone + Add<Output = T>, const N: usize> Add for Polynomial<T, N> {
+    type Output = Self;
 
-//     fn is_zero(&self) -> bool {
-//         // Assuming `coefficients` implements `iter()` or similar trait
-//         self.coefficients.iter().all(|&c| c == T::zero())
-//     }
-// }
+    fn add(self, rhs: Self) -> Self::Output {
+        Self::from_fn(|degree| self.coefficients[degree].clone() + rhs.coefficients[degree].clone())
+    }
+}
 
-// impl<T, D, S, N> One for Polynomial<T, D, S, N>
-// where
-//     T: One,
-//     S: Default + FromIterator<T>,
-// {
-//     fn one() -> Self {
-//         Self {
-//             variable: "x",
-//             coefficients: core::iter::once(T::one()).collect(),
-//             _phantom: PhantomData,
-//         }
-//     }
-// }
+impl<T: Clone + AddAssign, const N: usize> AddAssign for Polynomial<T, N> {
+    fn add_assign(&mut self, rhs: Self) {
+        for i in 0..N {
+            self.coefficients[i] += rhs.coefficients[i].clone();
+        }
+    }
+}
+
+impl<T: Clone + Sub<Output = T>, const N: usize> Sub for Polynomial<T, N> {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Polynomial::from_fn(|i| self.coefficients[i].clone() - rhs.coefficients[i].clone())
+    }
+}
+
+impl<T: Clone + SubAssign, const N: usize> SubAssign for Polynomial<T, N> {
+    fn sub_assign(&mut self, rhs: Self) {
+        for i in 0..N {
+            self.coefficients[i] -= rhs.coefficients[i].clone();
+        }
+    }
+}
+
+// Mul<Polynomial<T, M>>
+// Polynomial multiplication: the degree of the product is deg(P) + deg(Q).
+// So, the size of the resulting array is N + M - 1.
+// We need `T` to have `Add` and `Mul` traits.
+impl<T, const N: usize> Mul for Polynomial<T, N>
+where
+    T: Add<Output = T> + Mul<Output = T> + Zero + Copy, // Need Zero for initialization
+{
+    type Output = Polynomial<T, N * N>; // Size of result: (N-1) + (M-1) + 1 = N+M-1
+
+    fn mul(self, rhs: Polynomial<T, M>) -> Self::Output {
+        // Handle edge cases where N or M is 0 (empty polynomials)
+        if N == 0 || M == 0 {
+            return Polynomial { coefficients: [T::zero(); {N + M - 1}] }; // Result is zero polynomial
+        }
+
+        const RESULT_SIZE: usize = N + M - 1;
+        let mut result_coeffs = [T::zero(); RESULT_SIZE];
+
+        // Standard polynomial multiplication algorithm (Cauchy product)
+        for i in 0..N { // Iterate through terms of self
+            for j in 0..M { // Iterate through terms of rhs
+                // Coefficient of x^(i+j) in the product is (self.coeffs[i] * rhs.coeffs[j])
+                result_coeffs[i + j] = result_coeffs[i + j] + self.coefficients[i] * rhs.coefficients[j];
+            }
+        }
+        Polynomial { coefficients: result_coeffs }
+    }
+}
+
+// MulAssign<Polynomial<T, M>>
+// Note: MulAssign for polynomials is complex because the result often has a different degree.
+// This means the array size changes. It's generally not recommended for `[T; N]` based polynomials
+// unless you are willing to truncate or resize, which is outside the scope of fixed-size arrays.
+// For a `Vec<T>` based polynomial, this would be easier.
+// For fixed-size arrays, it implies `N` must be large enough to hold `N + M - 1` terms.
+// We'll implement it by assigning the product, which means `N` must be the product's size.
+impl<T, const N: usize, const M: usize> MulAssign<Polynomial<T, M>> for Polynomial<T, N>
+where
+    T: Add<Output = T> + Mul<Output = T> + Zero + Copy + PartialEq, // Add PartialEq for degree()
+    Polynomial<T, N>: Mul<Polynomial<T, M>, Output = Polynomial<T, N>>, // Ensure the output size matches N
+{
+    fn mul_assign(&mut self, rhs: Polynomial<T, M>) {
+        // This only works if `N` is exactly `self.degree() + rhs.degree() + 1` after multiplication.
+        // If `N` is not `N_self + M - 1`, this will either truncate or zero-pad,
+        // which might not be the desired behavior for `MulAssign`.
+        //
+        // A common pattern for `MulAssign` with fixed-size arrays is to
+        // panic if the result won't fit, or require N >= N + M - 1,
+        // which means N must be very large or M must be 1.
+        //
+        // For simplicity and adherence to trait, we'll assume the result fits.
+        // It's likely more practical for a `Polynomial` using `Vec<T>`.
+
+        // Calculate the product into a temporary polynomial
+        let product = self.clone() * rhs; // Requires `Clone` if `self` is consumed by `Mul`
+
+        // Check if the product fits into `self` (N should be `product.len()`)
+        // If N != product.len(), we have a problem for `MulAssign` semantics.
+        // For this skeleton, we assume N is appropriate or truncate.
+        // If N < product.len(), we truncate higher terms.
+        // If N > product.len(), we zero-pad.
+
+        let mut new_coeffs = [T::zero(); N];
+        let common_len = N.min(product.len());
+        for i in 0..common_len {
+            new_coeffs[i] = product.coefficients[i];
+        }
+        self.coefficients = new_coeffs;
+    }
+}
+
+
+// Div<Polynomial<T, M>> (Euclidean division)
+// This is significantly more complex and requires specific properties for T (e.g., field, or Euclidean domain).
+// The algorithm typically involves long division.
+// It also needs to return a new polynomial.
+impl<T, const N: usize, const M: usize> Div<Polynomial<T, M>> for Polynomial<T, N>
+where
+    T: Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Div<Output = T> + Zero + One + Copy + PartialEq, // Extensive bounds for division
+// T also needs to support inverses if it's a field (e.g. f64) or be an integer type with proper division behavior.
+// The divisor (rhs) must not be the zero polynomial.
+{
+    type Output = Polynomial<T, { N.saturating_sub(M) + 1 }>; // Degree of quotient is deg(N) - deg(M). Size: deg(quotient) + 1
+
+    fn div(self, rhs: Polynomial<T, M>) -> Self::Output {
+        // Handle division by zero polynomial
+        if rhs.is_zero() {
+            panic!("Division by zero polynomial");
+        }
+
+        // Implementation of polynomial long division (Euclidean division)
+        // This is a complex algorithm.
+        // For integer coefficients, you might need a way to handle non-divisible terms (e.g., using fractions).
+        // For floating-point coefficients, this is more direct.
+        //
+        // Algorithm sketch:
+        // 1. Determine degrees of self and rhs.
+        // 2. If deg(self) < deg(rhs), quotient is 0.
+        // 3. Loop:
+        //    a. Divide leading term of current dividend by leading term of rhs.
+        //    b. This gives a term for the quotient.
+        //    c. Multiply that term by rhs and subtract from dividend.
+        //    d. Update dividend.
+        // 4. Collect quotient terms.
+        todo!("Implement polynomial Euclidean division (long division algorithm)");
+    }
+}
+
+// DivAssign<Polynomial<T, M>>
+impl<T, const N: usize, const M: usize> DivAssign<Polynomial<T, M>> for Polynomial<T, N>
+where
+    T: Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Div<Output = T> + Zero + One + Copy + PartialEq,
+    Polynomial<T, N>: Div<Polynomial<T, M>, Output = Polynomial<T, N>>, // Ensure output size matches N
+{
+    fn div_assign(&mut self, rhs: Polynomial<T, M>) {
+        // This is problematic for fixed-size arrays if the quotient's degree
+        // doesn't match N.
+        // Similar to MulAssign, this typically implies N must be exact for the quotient,
+        // or truncation/padding occurs.
+        let quotient = self.clone() / rhs; // Requires `Clone`
+
+        let mut new_coeffs = [T::zero(); N];
+        let common_len = N.min(quotient.len());
+        for i in 0..common_len {
+            new_coeffs[i] = quotient.coefficients[i];
+        }
+        self.coefficients = new_coeffs;
+    }
+}
+
+// Rem<Polynomial<T, M>> (Remainder of Euclidean division)
+impl<T, const N: usize, const M: usize> Rem<Polynomial<T, M>> for Polynomial<T, N>
+where
+    T: Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Div<Output = T> + Zero + One + Copy + PartialEq,
+{
+    // The degree of the remainder is always less than the degree of the divisor.
+    // So, the size of the remainder polynomial will be M.
+    type Output = Polynomial<T, M>;
+
+    fn rem(self, rhs: Polynomial<T, M>) -> Self::Output {
+        if rhs.is_zero() {
+            panic!("Remainder by zero polynomial");
+        }
+
+        // Implementation of polynomial long division to get the remainder.
+        // You'll essentially run the division algorithm and return the final dividend.
+        todo!("Implement polynomial remainder (long division algorithm remainder part)");
+    }
+}
+
+// RemAssign<Polynomial<T, M>>
+impl<T, const N: usize, const M: usize> RemAssign<Polynomial<T, M>> for Polynomial<T, N>
+where
+    T: Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Div<Output = T> + Zero + One + Copy + PartialEq,
+    Polynomial<T, N>: Rem<Polynomial<T, M>, Output = Polynomial<T, N>>, // Ensure output size matches N
+{
+    fn rem_assign(&mut self, rhs: Polynomial<T, M>) {
+        // Similar issues to MulAssign and DivAssign regarding fixed size.
+        // The remainder's degree is always less than the divisor's (M).
+        // If N < M, this is fine. If N > M, we're zeroing out higher terms.
+        let remainder = self.clone() % rhs; // Requires `Clone`
+
+        let mut new_coeffs = [T::zero(); N];
+        let common_len = N.min(remainder.len()); // remainder.len() is M here
+        for i in 0..common_len {
+            new_coeffs[i] = remainder.coefficients[i];
+        }
+        self.coefficients = new_coeffs;
+    }
+}
 
 // ===============================================================================================
 //      Polynomial Display Implementation
 // ===============================================================================================
 
-impl<T, D, S> fmt::Display for Polynomial<T, D, S>
-where
-    T: Copy + Num + PartialOrd + Neg<Output = T> + fmt::Display,
-    D: Dim,
-    S: RawStorage<T, D>,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let num_coeff = self.num_coefficients();
-        for i in 0..num_coeff {
-            let coeff = self[i];
-            if coeff == T::zero() {
-                continue;
-            }
-
-            if i > 0 {
-                write!(f, " {} ", if coeff >= T::zero() { "+" } else { "-" })?;
-            } else if coeff < T::zero() {
-                write!(f, "-")?;
-            }
-
-            let abs_coeff = if coeff < T::zero() { -coeff } else { coeff };
-            let exp = num_coeff - 1 - i;
-
-            if abs_coeff != T::one() || exp == 0 {
-                write!(f, "{}", abs_coeff)?;
-            }
-
-            if exp > 0 {
-                write!(f, "x")?;
-                if exp > 1 {
-                    write!(f, "^{}", exp)?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
+// impl<T, const N: usize> fmt::Display for Polynomial<T, N>
+// where
+//     T: Copy + Number + PartialOrd + Neg<Output = T> + fmt::Display,
+// {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         let num_coefficients = self.degree() + 1;
+//         for i in 0..num_coefficients {
+//             let coefficient = self.coefficient(i);
+//             if coefficient == T::zero() {
+//                 continue;
+//             }
+//
+//             if i > 0 {
+//                 write!(f, " {} ", if coefficient >= T::zero() { "+" } else { "-" })?;
+//             } else if coefficient < T::zero() {
+//                 write!(f, "-")?;
+//             }
+//
+//             let abs_coefficient = if coefficient < T::zero() { -coefficient } else { coefficient };
+//             let exp = num_coefficients - 1 - i;
+//
+//             if abs_coefficient != T::one() || exp == 0 {
+//                 write!(f, "{}", abs_coefficient)?;
+//             }
+//
+//             if exp > 0 {
+//                 write!(f, "x")?;
+//                 if exp > 1 {
+//                     write!(f, "^{}", exp)?;
+//                 }
+//             }
+//         }
+//
+//         Ok(())
+//     }
+// }
