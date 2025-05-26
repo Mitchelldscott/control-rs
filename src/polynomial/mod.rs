@@ -55,7 +55,7 @@ use std::{ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, 
 
 #[cfg(not(feature = "std"))]
 use core::{ops::{Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, Neg, Rem, RemAssign}, array};
-
+use std::ops::Index;
 use num_traits::{Zero, One};
 
 // ===============================================================================================
@@ -79,6 +79,7 @@ const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
         output[N - 1 - i] = tmp;
         i += 1;
     }
+
     output
 }
 
@@ -125,6 +126,24 @@ impl<T, const N: usize> Polynomial<T, N> {
         F: FnMut(usize) -> T
     {
         Self { coefficients: array::from_fn(cb) }
+    }
+
+    /// Creates a new polynomial from a function closure.
+    ///
+    /// This is a wrapper for [array::from_fn].
+    ///
+    /// # Arguments
+    /// * `cb` - The generator function, which takes the degree (`usize`) as input and returns the
+    /// coefficient (`T`) for that degree
+    ///
+    /// # Returns
+    /// * `polynomial` - A new instance with the generated coefficients
+    #[inline]
+    pub fn from_iterator<I>(iter: I) -> Self
+    where
+        I: IntoIterator,
+    {
+        let mut coefficients = [];
     }
 
     /// Checks if the capacity is zero
@@ -195,6 +214,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     ///
     /// # Returns
     /// * `Polynomial` - a polynomial with only the trailing term
+    #[inline]
     pub fn from_constant(constant: T) -> Self {
         let mut polynomial = Self::from_fn(|_| T::zero());
         if !polynomial.is_empty() { polynomial.coefficients[0] = constant }
@@ -210,6 +230,7 @@ impl<T: Zero + One, const N: usize> Polynomial<T, N> {
     ///
     /// # Returns
     /// * `Polynomial` - a polynomial with only the trailing term
+    #[inline]
     pub fn monomial(coefficient: T) -> Self {
         let mut polynomial = Self::from_fn(|_| T::zero());
         if !polynomial.is_empty() { polynomial.coefficients[0] = coefficient }
@@ -234,6 +255,7 @@ impl<T: Clone, const N: usize> Polynomial<T, N> {
     /// let p = Polynomial::new([1, 2, 3]);
     /// let result = p.evaluate(2);
     /// ```
+    #[inline]
     pub fn evaluate<U>(&self, value: U) -> U
     where
         U: Clone + Zero + Add<T, Output = U> + Mul<U, Output = U>,
@@ -255,6 +277,7 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     /// * `Option<usize>`
     ///     * `Some(degree)` - power of the highest order non-zero coefficient
     ///     * `None` - if the length is zero or all coefficients are zero
+    #[inline]
     pub fn degree(&self) -> Option<usize> {
         for i in (0..N).rev() {
             if !self.coefficients[i].is_zero() {
@@ -269,9 +292,9 @@ impl<T: PartialEq + One, const N: usize> Polynomial<T, N> {
     ///
     /// # Returns
     /// * `bool` - true if the leading coefficient is one, false otherwise
+    #[inline]
     pub fn is_monic(&self) -> bool {
-        if self.is_empty() { false }
-        else if self.coefficients[0].is_one() { true }
+        if !self.is_empty() && self.coefficients[0].is_one() { true }
         else { false }
     }
 }
@@ -284,6 +307,44 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// Returns a coefficient of the polynomial
     ///
     /// # Arguments
+    /// * `index` - the degree of the coefficient to return
+    ///
+    /// # Returns
+    /// * `&T` - the coefficient at the specified degree
+    ///
+    /// # Safety
+    /// 1.  `index` must be valid. That is, `0 <= index < N`. Failing to meet this condition will
+    /// result in dereferencing an out-of-bounds or otherwise invalid memory address, leading to
+    /// undefined behavior.
+    /// 2.  The memory backing `self.coefficients` must remain valid and unchanged for the lifetime
+    /// of the returned reference.
+    unsafe fn get_unchecked(&self, index: usize) -> &T {
+        &*self.coefficients.as_ptr().wrapping_add(index)
+    }
+
+    /// Returns a coefficient of the polynomial
+    ///
+    /// # Arguments
+    /// * `index` - the degree of the coefficient to return
+    ///
+    /// # Returns
+    /// * `&mut T` - the coefficient at the specified degree
+    ///
+    /// # Safety
+    /// 1.  `index` must be valid. That is, `0 <= index < N`. Failing to meet this condition will
+    /// result in dereferencing an out-of-bounds or otherwise invalid memory address, leading to
+    /// undefined behavior.
+    /// 2.  The memory backing `self.coefficients` must remain valid and unchanged for the lifetime
+    /// of the returned reference.
+    unsafe fn get_unchecked_mut(&mut self, index: usize) -> &mut T {
+        &mut *self.coefficients.as_mut_ptr().wrapping_add(index)
+    }
+}
+
+impl<T, const N: usize> Polynomial<T, N> {
+    /// Returns a coefficient of the polynomial
+    ///
+    /// # Arguments
     /// * `degree` - the degree of the coefficient to return
     ///
     /// # Returns
@@ -291,8 +352,31 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///     * `Some(constant)` - when N > degree: coefficient at the specified degree
     ///     * `None` - when N <= degree
     pub fn coefficient(&self, degree: usize) -> Option<&T> {
-        if N > degree { Some(&self.coefficients[degree]) }
-        else { None }
+        if N > degree {
+            // SAFETY: the index is usize (>= 0) and less than N, the reference will also have the
+            // same lifetime as self.
+            unsafe { Some(self.get_unchecked(degree)) }
+        } else { None }
+    }
+
+    /// Returns the constant term of the polynomial
+    ///
+    /// # Returns
+    /// * `Option<&T>`
+    ///     * `Some(constant)` - when N > 0: coefficient at the start of the array
+    ///     * `None` - when N == 0
+    pub fn constant(&self) -> Option<&T> {
+        self.coefficient(0)
+    }
+
+    /// Returns the highest order term of the polynomial
+    ///
+    /// # Returns
+    /// * `Option<&T>`
+    ///     * `Some(constant)` - when N > 0: coefficient at the end of the array
+    ///     * `None` - when N == 0
+    pub fn leading_coefficient(&self) -> Option<&T> {
+        self.coefficient(N-1)
     }
 
     /// Returns a coefficient of the polynomial
@@ -304,20 +388,13 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// * `Option<&mut T>`
     ///     * `Some(coefficient)` - when N > degree: coefficient at the specified degree
     ///     * `None` - when N <= degree
-    pub fn coefficient_mut(&mut self, degree: usize) -> Option<&T> {
-        if N > degree { Some(&mut self.coefficients[N - degree - 1]) }
+    pub fn coefficient_mut(&mut self, degree: usize) -> Option<&mut T> {
+        if N > degree {
+            // SAFETY: the index is usize (>= 0) and less than N, the reference will also have the
+            // same lifetime as self.
+            unsafe { Some(self.get_unchecked_mut(degree)) }
+        }
         else { None }
-    }
-
-    /// Returns the constant term of the polynomial
-    ///
-    /// # Returns
-    /// * `Option<&T>`
-    ///     * `Some(constant)` - when N > 0: coefficient at the start of the array
-    ///     * `None` - when N == 0
-    pub fn constant(&self) -> Option<&T> {
-        if self.is_empty() { None }
-        else { Some(&self.coefficients[0]) }
     }
 
     /// Returns the constant term of the polynomial
@@ -327,19 +404,7 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///     * `Some(constant)` - when N > 0: coefficient at the start of the array
     ///     * `None` - when N == 0
     pub fn constant_mut(&mut self) -> Option<&mut T> {
-        if self.is_empty() { None }
-        else { Some(&mut self.coefficients[0]) }
-    }
-
-    /// Returns the highest order term of the polynomial
-    ///
-    /// # Returns
-    /// * `Option<&T>`
-    ///     * `Some(constant)` - when N > 0: coefficient at the end of the array
-    ///     * `None` - when N == 0
-    pub fn leading_coefficient(&self) -> Option<&T> {
-        if self.is_empty() { None }
-        else { Some(&self.coefficients[N-1]) }
+        self.coefficient_mut(0)
     }
 
     /// Returns the highest order term of the polynomial
@@ -349,8 +414,7 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///     * `Some(leading_coefficient)` - when N > 0: coefficient at the end of the array
     ///     * `None` - when N == 0
     pub fn leading_coefficient_mut(&mut self) -> Option<&mut T> {
-        if self.is_empty() { None }
-        else { Some(&mut self.coefficients[N-1]) }
+        self.coefficient_mut(N-1)
     }
 }
 
@@ -518,11 +582,21 @@ impl<T: Clone + RemAssign, const N: usize> RemAssign<T> for Polynomial<T, N> {
 // is meant to force user implementations to provide size checking and guaranteed operations.
 // ===============================================================================================
 
-impl<T: Clone + Add<Output = T>, const N: usize> Add for Polynomial<T, N> {
-    type Output = Self;
+impl<T: Clone + Add<Output = T> + Zero, const N: usize, const M: usize, const L: usize> Add<Polynomial<T, M>> for Polynomial<T, N>
+where
+    nalgebra::Const<N>: nalgebra::DimMax<nalgebra::Const<M>, Output = nalgebra::Const<L>>,
+{
+    type Output = Polynomial<T, L>;
 
-    fn add(self, rhs: Self) -> Self::Output {
-        Self::from_fn(|degree| self.coefficients[degree].clone() + rhs.coefficients[degree].clone())
+    fn add(self, rhs: Polynomial<T, M>) -> Self::Output {
+        Self::Output::from_fn(|degree|
+            match (degree < N, degree < M) {
+                (true, true) => self[degree].clone() + rhs[degree].clone(),
+                (true, false) => self[degree].clone(),
+                (false, true) => rhs[degree].clone(),
+                (false, false) => T::zero(),
+            }
+        )
     }
 }
 
@@ -550,30 +624,26 @@ impl<T: Clone + SubAssign, const N: usize> SubAssign for Polynomial<T, N> {
     }
 }
 
-// Mul<Polynomial<T, M>>
-// Polynomial multiplication: the degree of the product is deg(P) + deg(Q).
-// So, the size of the resulting array is N + M - 1.
-// We need `T` to have `Add` and `Mul` traits.
-impl<T, const N: usize> Mul for Polynomial<T, N>
+impl<T, const N: usize, const M: usize> Mul<Polynomial<T, M>> for Polynomial<T, N>
 where
     T: Add<Output = T> + Mul<Output = T> + Zero + Copy, // Need Zero for initialization
 {
-    type Output = Polynomial<T, N * N>; // Size of result: (N-1) + (M-1) + 1 = N+M-1
+    type Output = Polynomial<[T; M], N>; // Size of result: (N-1) + (M-1) + 1 = N+M-1
 
     fn mul(self, rhs: Polynomial<T, M>) -> Self::Output {
-        // Handle edge cases where N or M is 0 (empty polynomials)
-        if N == 0 || M == 0 {
-            return Polynomial { coefficients: [T::zero(); {N + M - 1}] }; // Result is zero polynomial
-        }
-
-        const RESULT_SIZE: usize = N + M - 1;
-        let mut result_coeffs = [T::zero(); RESULT_SIZE];
+        let mut result = array::from_fn(|i| array::from_fn(|j| {
+            let mut result = T::zero();
+            if i < N && j < M {
+                unsafe { *self.get_unchecked(i) * rhs.get_unchecked(j) }
+            }
+            else { }
+        }));
 
         // Standard polynomial multiplication algorithm (Cauchy product)
         for i in 0..N { // Iterate through terms of self
-            for j in 0..M { // Iterate through terms of rhs
+            for j in 0..N { // Iterate through terms of rhs
                 // Coefficient of x^(i+j) in the product is (self.coeffs[i] * rhs.coeffs[j])
-                result_coeffs[i + j] = result_coeffs[i + j] + self.coefficients[i] * rhs.coefficients[j];
+                result.get_unchecked_mut(i + j) += self.coefficient(i) * rhs.coefficient(j);
             }
         }
         Polynomial { coefficients: result_coeffs }
