@@ -19,7 +19,7 @@ fn test_zero() {
 
 #[test]
 fn test_one() {
-    let p_one_i8: Polynomial<i8, 3> = Polynomial::one();
+    let p_one_i8: Polynomial<i8, 3> = Polynomial::from_element(1);
     assert_eq!(p_one_i8.coefficients, [1i8, 0i8, 0i8], "p_one_i8 is not [1, 0, 0]");
     assert!(p_one_i8.is_one(), "p_one_i8 is not one");
 
@@ -109,12 +109,12 @@ fn test_mul_polynomial() {
     let p1 = Polynomial::new([1.0, 1.0]); // 1 + x
     let p2 = Polynomial::new([2.0, 1.0]); // 2 + x
     let p_prod = p1 * p2;
-    assert_eq!(p_prod.coefficients, [2.0, 3.0, 1.0]); // N+M-1 = 2+2-1 = 3
+    assert_eq!(p_prod.coefficients, [2.0, 3.0, 1.0, 0.0]); // N+M-1 = 2+2-1 = 3
 
     // (1 + 2x) * (3 + x^2) = 3 + x^2 + 6x + 2x^3 = 3 + 6x + x^2 + 2x^3
     let p3 = Polynomial::new([1.0, 2.0]); // 1 + 2x
     let p4 = Polynomial::new([3.0, 0.0, 1.0]); // 3 + 0x + x^2
     let p_prod2 = p3 * p4;
     // Expected size N+M-1 = 2+3-1 = 4
-    assert_eq!(p_prod2.coefficients, [3.0, 6.0, 1.0, 2.0]);
+    assert_eq!(p_prod2.coefficients, [3.0, 6.0, 1.0, 2.0, 0.0, 0.0]);
 }

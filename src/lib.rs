@@ -2,14 +2,14 @@
 //!
 //! Control-rs is a numerical modeling and analysis library designed for embedded applications.
 //! Inspired by MATLAB's control systems toolbox, this crate provides a structured approach to
-//! system modeling, analysis, and numerical design while maintaining a lightweight footprint suitable
+//! system modeling, analysis and numerical design while maintaining a lightweight footprint suitable
 //! for real-time and resource-constrained environments.
 //!
 //! ## Features
-//! - **Modeling:** Support for Polynomial, Transfer Function, State-Space, and custom representations
-//! - **Analysis:** Tools for classical, modern and robust system analysis
-//! - **Synthesis:** Direct and data-driven methods to create models
-//! - **Simulation:** Easy model integration and data vizualization
+//! - **Modeling**: Support for Polynomial, Transfer Function, State-Space, and custom representations
+//! - **Analysis**: Tools for classical, modern and robust system analysis
+//! - **Synthesis**: Direct and data-driven methods to create models
+//! - **Simulation**: Easy model integration and data visualization
 //!
 //! ## Design Philosophy
 //! This crate is structured around core numerical model representations, each implementing common traits to have
@@ -19,7 +19,7 @@
 //! ***A lot of docs were written by throwing bullet points into ChatGPT, some hallucinations may have snuck in.
 //! Please report any you find.***
 #![cfg_attr(not(feature = "std"), no_std)]
-#![warn(missing_docs)]
+#![warn(missing_docs, unused)]
 
 pub mod assertf;
 
@@ -65,7 +65,7 @@ mod feedback_test {
 
     impl<T, const N: usize> NumericalModel for Polynomial<T, N>
     where
-        T: Copy + Clone + math::num_traits::Number,
+        T: Copy + Clone + num_traits::Num,
     {
         fn zero() -> Self {
             Polynomial::from_element(T::zero())

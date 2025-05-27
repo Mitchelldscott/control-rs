@@ -43,15 +43,21 @@ use crate::TransferFunction;
 ///     println!("DC Gain: {gain:.2}");
 /// }
 /// ```
-pub fn dc_gain<T, const M: usize, const N: usize>(tf: &TransferFunction<T, M, N>) -> T
-where
-    T: Float,
-{
-    let denominator_constant = tf.denominator.constant();
-    if denominator_constant.is_zero() {
-        T::infinity()
-    } else {
-        tf.numerator.constant() / denominator_constant
+pub fn dc_gain<T: Float, const M: usize, const N: usize>(tf: &TransferFunction<T, M, N>) -> T {
+    if let Some(&denominator_constant) = tf.denominator.constant() {
+        if denominator_constant.is_zero() {
+            T::infinity()
+        } else {
+            if let Some(&numerator_constant) = tf.numerator.constant()  {
+                numerator_constant / denominator_constant
+            }
+            else {
+                T::nan()
+            }
+        }
+    }
+    else {
+        T::nan()
     }
 }
 
@@ -79,20 +85,20 @@ where
 ///
 /// ## References
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
-pub fn poles<T, const M: usize, const N: usize, S>(
+pub fn poles<T, const M: usize, const N: usize>(
     tf: &TransferFunction<T, M, N>,
 ) -> OMatrix<Complex<T>, DimDiff<Const<N>, U1>, U1>
 where
     T: Copy + Zero + Float + RealField,
     Const<N>: DimSub<U1>,
     DimDiff<Const<N>, U1>: DimName + DimSub<U1>,
-    S: RawStorage<T, Const<N>>,
     DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>
         + Allocator<DimDiff<Const<N>, U1>, DimDiff<DimDiff<Const<N>, U1>, U1>>
         + Allocator<DimDiff<DimDiff<Const<N>, U1>, U1>>
         + Allocator<DimDiff<Const<N>, U1>>,
 {
-    tf.denominator.roots()
+    // tf.denominator.roots()
+    todo!("unimplemented")
 }
 
 /// Check if the system's poles lie on the left-half plane (LHP), a condition for stability
@@ -127,12 +133,11 @@ where
 ///
 /// ## References
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
-pub fn lhp<T, const M: usize, const N: usize, S>(tf: &TransferFunction<T, M, N>) -> bool
+pub fn lhp<T, const M: usize, const N: usize>(tf: &TransferFunction<T, M, N>) -> bool
 where
     T: Copy + Zero + Float + RealField,
     Const<N>: DimSub<U1>,
     DimDiff<Const<N>, U1>: DimName + DimSub<U1>,
-    S: RawStorage<T, Const<N>>,
     DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>
         + Allocator<DimDiff<Const<N>, U1>, DimDiff<DimDiff<Const<N>, U1>, U1>>
         + Allocator<DimDiff<DimDiff<Const<N>, U1>, U1>>
@@ -162,7 +167,7 @@ where
 /// fn main() {
 ///     let tf = TransferFunction::new([1.0, 1.0], [1.0, 1.0, 1.0]);
 ///     let monic_tf = as_monic(&tf);
-///     let (num, den) = (monic_tf.numerator.coefficients, monic_tf.denominator.coefficients);
+///     let (num, den) = (monic_tf.numerator, monic_tf.denominator);
 /// }
 /// ```
 pub fn as_monic<T, const M: usize, const N: usize>(
@@ -171,8 +176,9 @@ pub fn as_monic<T, const M: usize, const N: usize>(
 where
     T: Copy + Zero + Float,
 {
+    let scale = if let Some(&denominator_leading_coefficient) = tf.denominator.leading_coefficient() {denominator_leading_coefficient} else {T::one()};
     TransferFunction {
-        numerator: tf.numerator / tf.denominator.coefficients[0],
-        denominator: tf.denominator / tf.denominator.coefficients[0],
+        numerator: tf.numerator / scale,
+        denominator: tf.denominator / scale,
     }
 }

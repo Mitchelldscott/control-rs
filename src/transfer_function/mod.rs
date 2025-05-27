@@ -46,14 +46,13 @@ pub use linear_tools::*;
 /// Stores two polynomials, one for the numerator and one for the denominator.
 ///
 /// # Generic Arguments
-///
 /// * `T` - type of the coefficients
 /// * `M` - number of coefficients in the numerator
 /// * `N` - number of coefficients in the denominator
 ///
 /// ## References
-///
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 3.1
+/// TODO: Example + Integration Test
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct TransferFunction<T, const M: usize, const N: usize> {
     /// coefficients of the numerator `[b_0, b_1, ... b_m]`
@@ -62,18 +61,16 @@ pub struct TransferFunction<T, const M: usize, const N: usize> {
     pub denominator: Polynomial<T, N>,
 }
 
-impl<T, const M: usize, const N: usize>
+impl<T: Copy, const M: usize, const N: usize>
     TransferFunction<T, M, N>
 {
     /// Create a new transfer function from arrays of coefficients
     ///
     /// # Arguments
-    ///
-    /// * `numerator` - coefficients of the numerator `[b0, b1, ... bm]`
-    /// * `denominator` - coefficients of the denominator `[a0, a1, ... an]`
+    /// * `numerator` - coefficients of the numerator `[b_m, ... b_1, b_0]`
+    /// * `denominator` - coefficients of the denominator `[a_n, ... a_1, a_0]`
     ///
     /// # Returns
-    ///
     /// * `TransferFunction` - static TransferFunction
     ///
     /// # Example
@@ -86,6 +83,7 @@ impl<T, const M: usize, const N: usize>
     ///     println!("{tf}");
     /// }
     /// ```
+    /// TODO: Unit Test
     pub const fn new(numerator: [T; M], denominator: [T; N]) -> Self {
         TransferFunction {
             numerator: Polynomial::new(numerator),
@@ -94,10 +92,12 @@ impl<T, const M: usize, const N: usize>
     }
 }
 
+
 impl<T, const M: usize, const N: usize> FrequencyTools<T, 1, 1> for TransferFunction<T, M, N>
 where
     T: Float + RealField + From<i16>,
 {
+    /// TODO: Doc + Unit Test + Example
     fn frequency_response<const L: usize>(&self, response: &mut FrequencyResponse<T, L, 1, 1>) {
         // Evaluate the transfer function at each frequency
         response.frequencies[0]
@@ -192,13 +192,18 @@ mod basic_tf_tests {
         let tf = TransferFunction::new([2.0], [2.0, 0.0]);
         let monic_tf = as_monic(&tf);
         assert_eq!(
-            monic_tf.numerator.coefficients(),
-            [1.0],
+            monic_tf.numerator.coefficient(0),
+            Some(&1.0),
             "TF numerator incorrect"
         );
         assert_eq!(
-            monic_tf.denominator.coefficients(),
-            [1.0, 0.0],
+            monic_tf.denominator.coefficient(0),
+            Some(&0.0),
+            "TF denominator incorrect"
+        );
+        assert_eq!(
+            monic_tf.denominator.coefficient(1),
+            Some(&1.0),
             "TF denominator incorrect"
         );
     }
@@ -208,13 +213,23 @@ mod basic_tf_tests {
         let tf = TransferFunction::new([1.0, 1.0], [1.0, 0.0]);
         let monic_tf = as_monic(&tf);
         assert_eq!(
-            monic_tf.numerator.coefficients(),
-            [1.0, 1.0],
+            monic_tf.numerator.coefficient(0),
+            Some(&1.0),
             "TF numerator incorrect"
         );
         assert_eq!(
-            monic_tf.denominator.coefficients(),
-            [1.0, 0.0],
+            monic_tf.numerator.coefficient(1),
+            Some(&1.0),
+            "TF numerator incorrect"
+        );
+        assert_eq!(
+            monic_tf.denominator.coefficient(0),
+            Some(&0.0),
+            "TF denominator incorrect"
+        );
+        assert_eq!(
+            monic_tf.denominator.coefficient(1),
+            Some(&1.0),
             "TF denominator incorrect"
         );
     }
