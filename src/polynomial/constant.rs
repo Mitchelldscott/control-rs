@@ -25,12 +25,12 @@ impl<T: Clone + Add<Output = T>> Add<T> for Constant<T> {
     type Output = Constant<T>;
 
     fn add(self, rhs: T) -> Self::Output {
-        // SAFETY: `N` is 1, so the index is always valid
-        unsafe {
-            Self::from_data([
+        Self::from_data([
+            // SAFETY: `N` is 1, so the index is always valid
+            unsafe {
                 self.get_unchecked(0).clone() + rhs
-            ])
-        }
+            }
+        ])
     }
 }
 
@@ -63,12 +63,12 @@ impl<T: Clone + Sub<Output = T>> Sub<T> for Constant<T> {
     type Output = Self;
 
     fn sub(self, rhs: T) -> Self::Output {
-        // SAFETY: `N` is 1, so the index is always valid
-        unsafe {
-            Self::from_data([
+        Self::from_data([
+            // SAFETY: `N` is 1, so the index is always valid
+            unsafe {
                 self.get_unchecked(0).clone() - rhs
-            ])
-        }
+            }
+        ])
     }
 }
 
@@ -108,13 +108,13 @@ impl<T: Clone + Add<Output = T>> Add for Constant<T> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        // SAFETY: `N` is 1, so the index is always valid
-        unsafe {
-            Self::from_data([
+        Self::from_data([
+            // SAFETY: `N` is 1, so the index is always valid
+            unsafe {
                 self.get_unchecked(0).clone()
                     + rhs.get_unchecked(0).clone()
-            ])
-        }
+            }
+        ])
     }
 }
 
@@ -151,13 +151,13 @@ impl<T: Clone + Sub<Output = T>> Sub for Constant<T> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        // SAFETY: `N` is 1, so the index is always valid
-        unsafe {
-            Self::from_data([
+        Self::from_data([
+            // SAFETY: `N` is 1, so the index is always valid
+            unsafe {
                 self.get_unchecked(0).clone()
                     - rhs.get_unchecked(0).clone()
-            ])
-        }
+            }
+        ])
     }
 }
 
@@ -194,12 +194,12 @@ impl<T: Clone + Mul<Output = T>> Mul for Constant<T> {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        // SAFETY: `N` is 1, so the index is always valid
-        unsafe {
-            Self::from_data([
+        Self::from_data([
+            // SAFETY: `N` is 1, so the index is always valid
+            unsafe {
                 self.get_unchecked(0).clone() * rhs.get_unchecked(0).clone()
-            ])
-        }
+            }
+        ])
     }
 }
 
@@ -217,7 +217,7 @@ impl<T: Clone + MulAssign> MulAssign for Constant<T> {
     fn mul_assign(&mut self, rhs: Self) {
         // SAFETY: `N` is 1, so the index is always valid
         unsafe {
-            *self.coefficients.get_unchecked_mut(0) *= rhs.coefficients.get_unchecked(0).clone();
+            *self.get_unchecked_mut(0) *= rhs.get_unchecked(0).clone();
         }
     }
 }
@@ -236,12 +236,12 @@ impl<T: Clone + Div<Output = T>> Div for Constant<T> {
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self::Output {
-        // SAFETY: `N` is 1, so the index is always valid
-        unsafe {
-            Self::from_data([
+        Self::from_data([
+            // SAFETY: `N` is 1, so the index is always valid
+            unsafe {
                 self.get_unchecked(0).clone() / rhs.get_unchecked(0).clone()
-            ])
-        }
+            }
+        ])
     }
 }
 
@@ -278,12 +278,12 @@ impl<T: Clone + Rem<Output = T>> Rem for Constant<T> {
     type Output = Self;
 
     fn rem(self, rhs: Self) -> Self::Output {
-        // SAFETY: `N` is 1, so the index is always valid
-        unsafe {
-            Self::from_data([
+        Self::from_data([
+            // SAFETY: `N` is 1, so the index is always valid
+            unsafe {
                 self.get_unchecked(0).clone() % rhs.get_unchecked(0).clone()
-            ])
-        }
+            }
+        ])
     }
 }
 

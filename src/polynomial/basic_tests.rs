@@ -124,7 +124,6 @@ where
     // TODO: Line + Quadratic + Cubic + ...
 }
 
-
 #[test]
 fn i8_constructors() {
     from_data_validator::<i8>();

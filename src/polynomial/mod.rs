@@ -357,11 +357,8 @@ impl<T: PartialEq + One, const N: usize> Polynomial<T, N> {
     pub fn is_monic(&self) -> bool {
         if self.is_empty() { false }
         else {
-            // SAFETY: N > 0 so N-1 is valid, and the reference drops before the function returns
-            unsafe {
-                if self.get_unchecked(N-1).is_one() {true}
-                else { false }
-            }
+            // SAFETY: N > 0 so N-1 is valid
+            unsafe { self.get_unchecked(N-1).is_one() }
         }
     }
 }
@@ -380,10 +377,10 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// * `&T` - the coefficient at the specified degree
     ///
     /// # Safety
-    /// 1.  `index` must be valid. That is, `0 <= index < N`. Failing to meet this condition will
+    /// * `index` must be valid. That is, `0 <= index < N`. Failing to meet this condition will
     /// result in dereferencing an out-of-bounds or otherwise invalid memory address, leading to
     /// undefined behavior.
-    /// 2.  The memory backing `self.coefficients` must remain valid and unchanged for the lifetime
+    /// * The memory backing `self.coefficients` must remain valid and unchanged for the lifetime
     /// of the returned reference.
     #[inline(always)]
     #[must_use]
@@ -402,10 +399,10 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// * `&mut T` - the coefficient at the specified degree
     ///
     /// # Safety
-    /// 1.  `index` must be valid. That is, `0 <= index < N`. Failing to meet this condition will
+    /// * `index` must be valid. That is, `0 <= index < N`. Failing to meet this condition will
     /// result in dereferencing an out-of-bounds or otherwise invalid memory address, leading to
     /// undefined behavior.
-    /// 2.  The memory backing `self.coefficients` must remain valid and unchanged for the lifetime
+    /// * The memory backing `self.coefficients` must remain valid and unchanged for the lifetime
     /// of the returned reference.
     #[inline(always)]
     #[must_use]
