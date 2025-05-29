@@ -7,7 +7,7 @@ mod basic_model_tests {
             utils::{control_canonical, zoh},
             StateSpace,
         },
-        DynamicModel, NLModel,
+        systems::{DynamicalSystem, NLModel},
     };
     use nalgebra::{Matrix2x1, Vector2};
 
@@ -23,7 +23,7 @@ mod basic_model_tests {
         control: ParticleInput,
     }
 
-    impl DynamicModel<ParticleInput, ParticleState, ParticleOutput> for Particle1D {
+    impl DynamicalSystem<ParticleInput, ParticleState, ParticleOutput> for Particle1D {
         fn dynamics(&self, state: ParticleState, input: ParticleInput) -> ParticleState {
             ParticleState::new(state[1], input - 0.1 * state[1])
         }
@@ -67,7 +67,7 @@ mod basic_model_tests {
         // Create a new particle model
         let model = Particle1D {
             state: Vector2::zeros(),
-            control: control,
+            control,
         };
 
         // linearize the model
@@ -119,10 +119,10 @@ mod tf_frequency_tool_tests {
     fn test_margins() {
         let tf = TransferFunction::new([10.0], [1.0, -5.0]);
         // Frequencies to evaluate (in rad/s)
-        let freqs = [0.0, 0.1, 1.0, 10.0];
+        let frequencies = [0.0, 0.1, 1.0, 10.0];
 
         // Call the bode function
-        let mut response = FrequencyResponse::default([freqs]);
+        let mut response = FrequencyResponse::default([frequencies]);
         tf.frequency_response(&mut response);
 
         let margins = Margin::new(&response);
@@ -136,7 +136,7 @@ mod tf_frequency_tool_tests {
         {
             assert_f64!(eq, phase_crossover, 0.0, 0.1);
             assert_f64!(eq, gain_crossover, 8.66, 0.1);
-            assert_f64!(eq, phase_margin, 60.0, 2.5); // wide error range because crossover is imprecise with such few points.
+            assert_f64!(eq, phase_margin, 60.0, 2.5); // wide error range because crossover is imprecise with so few points.
             assert_f64!(eq, gain_margin, -6.02, 0.01);
         } else {
             panic!(
@@ -170,11 +170,11 @@ mod bode_and_nyquist_plot_tests {
     #[test]
     fn nyquist_plot() {
         // Define a test transfer function
-        let title = "Demo Nyquist Plot";
-        let tf = TransferFunction::new([1.0], [1.0, 1.0, 1.0]);
+        let _title = "Demo Nyquist Plot";
+        let _tf = TransferFunction::new([1.0], [1.0, 1.0, 1.0]);
 
-        let response = FrequencyResponse::<f64, 100, 1, 1>::new([0.1], [10.0]);
+        let _response = FrequencyResponse::<f64, 100, 1, 1>::new([0.1], [10.0]);
 
-        println!("{title}\n{tf}\n{:?}", response.responses);
+        // println!("{title}\n{tf}\n{:?}", response.responses);
     }
 }

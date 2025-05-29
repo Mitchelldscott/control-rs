@@ -1,11 +1,7 @@
-//! A variety of methods to integrate [DynamicSystem]s
+//! A variety of methods to integrate [DynamicModel]s
 //!
-use super::DynamicModel;
+use crate::math::systems::DynamicalSystem;
 
-#[cfg(feature = "std")]
-use std::ops::{Add, Div, Mul};
-
-#[cfg(not(feature = "std"))]
 use core::ops::{Add, Div, Mul};
 
 /// Integrate the system for a given time interval
@@ -31,7 +27,7 @@ where
     U: Copy,
     X: Copy + Add<Output = X> + Mul<T, Output = X>,
     T: Copy + PartialOrd + Add<Output = T> + Div<Output = T> + From<u8>,
-    Sys: DynamicModel<U, X, Y>,
+    Sys: DynamicalSystem<U, X, Y>,
 {
     let dt_2 = dt / T::from(2);
     let dt_3 = dt / T::from(3);
