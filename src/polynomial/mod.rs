@@ -37,8 +37,8 @@ use core::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign},
     slice,
 };
-use num_traits::{One, Zero};
-
+use num_traits::{One, Zero, Num, Float};
+use nalgebra::{allocator::Allocator, Const, Complex, DefaultAllocator, DimDiff, DimName, DimSub, OMatrix, RealField, U1};
 // ===============================================================================================
 //      Polynomial Specializations
 // ===============================================================================================
@@ -47,7 +47,7 @@ pub mod constant;
 pub use constant::Constant;
 
 mod line;
-// pub use line::Line;
+pub use line::Line;
 
 // ===============================================================================================
 //      Polynomial Tests
@@ -590,6 +590,139 @@ impl<T, const N: usize> Polynomial<T, N> {
         } else {
             // SAFETY: N > 0 so N-1 is valid
             unsafe { Some(self.get_unchecked_mut(N - 1)) }
+        }
+    }
+}
+// ===============================================================================================
+//      Calculus
+// ===============================================================================================
+
+impl<T, const N: usize> Polynomial<T, N>
+where
+    T: 'static + Clone + Num + Neg<Output = T> + fmt::Debug,
+    Const<N>: DimSub<U1>,
+    DimDiff<Const<N>, U1>: DimName,
+    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>,
+{
+    /// Constructs the companion matrix of the polynomial.
+    ///
+    /// The companion matrix is a square matrix whose eigenvalues are the roots of the polynomial.
+    /// It is constructed from an identity matrix, a zero column and a row of the polynomial's
+    /// coefficients scaled by the highest term.
+    ///
+    /// <pre>
+    /// |  a[0...n-1] / a_n  |
+    /// |     I      0     |
+    /// </pre>
+    /// <pre>
+    /// |  -a_(n-1)/a_n  -a_(n-2)/a_n  -a_(n-3)/a_n  ...  -a_1/a_0  -a_0/a_n  |
+    /// |     1         0         0      ...       0            0         |
+    /// |     0         1         0      ...       0            0         |
+    /// |     0         0         1      ...       0            0         |
+    /// |    ...       ...       ...     ...      ...          ...        |
+    /// |     0         0         0      ...       1            0         |
+    /// </pre>
+    ///
+    /// # Returns
+    /// * `OMatrix<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>` - The companion matrix
+    /// representation of the polynomial.
+    ///
+    /// # Example
+    /// ```rust
+    /// use control_rs::polynomial::Polynomial;
+    ///
+    /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]);
+    /// let companion_matrix = p.companion();
+    /// ```
+    pub fn companion(&self) -> OMatrix<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>> {
+        // return companion;
+        if let Some(leading_coefficient) = self.leading_coefficient() {
+            OMatrix::<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>::from_fn(|i, j| {
+                if i == 0 {
+                    // SAFETY: the index j is less than N
+                    unsafe { -self.get_unchecked(N - j - 1).clone() / leading_coefficient.clone() }
+                } else {
+                    if i == j + 1 {
+                        T::one()
+                    } else {
+                        T::zero()
+                    }
+                }
+            })
+        } else {
+            OMatrix::<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>::zeros()
+        }
+    }
+}
+impl<T, const N: usize> Polynomial<T, N>
+where
+    T: 'static + Clone + Num + Neg<Output = T> + fmt::Debug + RealField + Float,
+    Const<N>: DimSub<U1>,
+    DimDiff<Const<N>, U1>: DimName + DimSub<U1>,
+    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>
+        + Allocator<DimDiff<Const<N>, U1>, DimDiff<DimDiff<Const<N>, U1>, U1>>
+        + Allocator<DimDiff<DimDiff<Const<N>, U1>, U1>>
+        + Allocator<DimDiff<Const<N>, U1>>,
+{
+    /// Computes the roots of the polynomial.
+    ///
+    /// Edge cases:
+    /// - if the leading coefficient is zero this should reduce the order and recurse, having
+    /// issues with trait bounds (currently returning NaN)
+    /// - all coefficients are zero: all roots are infinite
+    /// - if there are two coefficients and the lead is non-zero: the root is
+    /// `-coefficient[1]/coefficient[0]`
+    /// - if all but the first coefficient are zero: all roots are zero
+    ///
+    /// For very high-order polynomials this may be inefficient, especially for degenerate cases.
+    ///
+    /// # Returns
+    /// * `OMatrix<Complex<T>, Const<D>, U1>` - A column vector containing the computed roots.
+    ///
+    /// # Example
+    /// ```rust
+    /// use control_rs::polynomial::Polynomial;
+    ///
+    /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]);
+    /// let roots = p.roots();
+    /// ```
+    pub fn roots(&self) -> OMatrix<Complex<T>, DimDiff<Const<N>, U1>, U1> {
+        if !self.coefficients[0].is_zero() {
+            if N == 2 {
+                OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
+                    -self.coefficients[1].clone() / self.coefficients[0].clone(),
+                    T::zero(),
+                ))
+            } else {
+                let num_zeros = (0..N).fold(0, |acc, i| match self.coefficients[i] == T::zero() {
+                    true => acc + 1,
+                    false => acc,
+                });
+
+                if num_zeros == N {
+                    // zero/degenerate polynomial, all infinite roots
+                    OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
+                        T::infinity(),
+                        T::infinity(),
+                    ))
+                } else if num_zeros == N - 1 {
+                    // unit case, all zero roots
+                    OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
+                        T::zero(),
+                        T::zero(),
+                    ))
+                } else {
+                    // need to know more specifics about what matrices work with complex_eigenvalues,
+                    // the current cases fixed an infinite loop in the test, but certainly not a guaranteed solution
+                    self.companion().complex_eigenvalues()
+                }
+            }
+        } else {
+            // should be able to reduce order and keep trying, but having issues with recursive trait bounds
+            OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
+                T::nan(),
+                T::nan(),
+            ))
         }
     }
 }
