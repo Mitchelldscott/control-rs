@@ -188,8 +188,11 @@ mod basic_ss_tests {
     // not as productive as it could be...
     use super::*;
     use crate::{
-        state_space::utils::{control_canonical, zoh},
-        transfer_function::{as_monic, TransferFunction},
+        state_space::utils::{
+            // control_canonical,
+            zoh
+        },
+        // transfer_function::{as_monic, TransferFunction},
     };
 
     #[test]

@@ -1,8 +1,8 @@
 //! Miscellaneous tools to help work with transfer functions
 //!
 use nalgebra::{
-    allocator::Allocator, Complex, Const, DefaultAllocator, Dim, DimDiff, DimName, DimSub, OMatrix,
-    RawStorage, RawStorageMut, RealField, U1,
+    allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimName, DimSub, OMatrix,
+    RealField, U1,
 };
 use num_traits::{Float, Zero};
 
@@ -86,7 +86,7 @@ pub fn dc_gain<T: Float, const M: usize, const N: usize>(tf: &TransferFunction<T
 /// ## References
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
 pub fn poles<T, const M: usize, const N: usize>(
-    tf: &TransferFunction<T, M, N>,
+    _tf: &TransferFunction<T, M, N>,
 ) -> OMatrix<Complex<T>, DimDiff<Const<N>, U1>, U1>
 where
     T: Copy + Zero + Float + RealField,

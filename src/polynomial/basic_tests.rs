@@ -8,27 +8,18 @@
 //!
 //! TODO:
 //!     * constructors
-//!         * from_fn<F>(cb: F): needs example and tests
-//!         * from_element(element: T): needs example
-//!         * new(coefficients; [T; N]): needs example
-//!         * from_constant(constant: T): needs example
-//!         * monomial(coefficient: T): needs example
-//!         * resize(): needs example and tests
-//!         * compose(f: Polynomial, g: Polynomial) -> Polynomial: Needs investigation
+//!         * new(coefficients; [T; N])
+//!         * resize()
+//!         * compose(f: Polynomial, g: Polynomial) -> Polynomial
 //!         * to_monic(&self) -> Self
-//!         * zero(): needs tests and example
-//!         * one(): needs tests and example
 //!     * accessors
-//!         * degree(): needs tests and example
-//!         * is_monic(): needs tests and example
-//!         * is_zero(): needs tests and example
-//!         * is_one(): needs tests and example
-//!         * coefficient(): needs tests and example
-//!         * coefficient_mut(): needs tests and example
-//!         * constant(): needs tests and example
-//!         * constant_mut(): needs tests and example
-//!         * leading_coefficient(): needs tests and example
-//!         * leading_coefficient_mut(): needs tests and example
+//!         * coefficient()
+//!         * coefficient_mut()
+//!         * constant()
+//!         * constant_mut()
+//!         * leading_coefficient()
+//!         * leading_coefficient_mut()
+//!         * resize(polynomial: Polynomial)
 
 
 #[cfg(feature = "std")]
@@ -39,119 +30,117 @@ use core::{fmt, any::type_name};
 
 use crate::polynomial::Polynomial;
 
-use num_traits::Num;
+use num_traits::{Zero, One};
 
-fn default_constructor_validator<T, const N: usize>(expected_coefficients: [T; N])
-where
-    T: Default + Copy + Clone + PartialEq + fmt::Debug,
-{
-    let type_name = type_name::<T>();
-    let polynomial = Polynomial::<T, N>::default();
-    assert_eq!(polynomial.coefficients, expected_coefficients, "Polynomial::<{type_name}, {N}>::default()");
+fn is_empty_degree_constant_monic_validator<T: Clone + Zero + One + PartialEq + fmt::Debug, const N: usize>(
+    _test_name: &str,
+    polynomial: Polynomial<T, N>,
+    is_empty: bool,
+    expected_degree: Option<usize>,
+    expected_constant: Option<&T>,
+    expected_monic: bool
+) {
+    let _type_name = type_name::<T>();
+    assert_eq!(polynomial.is_empty(), is_empty, "Polynomial::<{_type_name}, {N}>::{_test_name}().is_empty()");
+    assert_eq!(polynomial.degree(), expected_degree, "Polynomial::<{_type_name}, {N}>::{_test_name}().degree()");
+    assert_eq!(polynomial.constant(), expected_constant, "Polynomial::<{_type_name}, {N}>::{_test_name}().constant()");
+    assert_eq!(polynomial.is_monic(), expected_monic, "Polynomial::<{_type_name}, {N}>::{_test_name}().is_monic()");
 }
 
-fn monomial_constructor_validator<T, const N: usize>(coefficient: T)
+fn from_data_validator<T>()
 where
-    T: Clone + Num + PartialEq + fmt::Debug,
+    T: Clone + Zero + One + PartialEq + fmt::Debug,
 {
-    let type_name = type_name::<T>();
-    let polynomial = Polynomial::<T, N>::monomial(coefficient.clone());
-    assert_eq!(polynomial.coefficients[N-1], coefficient, "Polynomial::<{type_name}, {N}>::monomial({coefficient:?}) leading term");
-    for i in 0..N-1 {
-        assert_eq!(polynomial.coefficients[i], T::zero(), "Polynomial::<{type_name}, {N}>::monomial({coefficient:?}) term {i}");
-    }
+    let empty_polynomial: Polynomial<T, 0> = Polynomial::from_data([]);
+    is_empty_degree_constant_monic_validator("from_data", empty_polynomial, true, None, None, false);
+
+    let constant = Polynomial::from_data([T::one()]);
+    is_empty_degree_constant_monic_validator("from_data", constant, false, Some(0), Some(&T::one()), true);
+    // TODO: Line + Quadratic + Cubic + ...
 }
 
-// impl<T, const N: usize> Polynomial<T, N> {
-//     /// Creates a new polynomial from an iterator
-//     ///
-//     /// This is using unsafe code and should be ditched. Or find a way to make it safe
-//     ///
-//     /// # Arguments
-//     /// * `iterator` - The iterator to be copied into the coefficient array
-//     ///
-//     /// # Returns
-//     /// * `polynomial` - polynomial with all coefficients set to `iterator`
-//     pub fn from_iterator<U: IntoIterator<Item=T>>(iterator: U) -> Result<Self, PolynomialInitError> {
-//         // SAFETY: An uninitialized `[MaybeUninit<_>; _]` is valid.
-//         let mut uninit_buffer: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
-//         let mut count = 0;
-//
-//         for (buffer, value) in uninit_buffer.iter_mut().zip(iterator.into_iter()) {
-//             *buffer = MaybeUninit::new(value);
-//             count += 1;
-//         }
-//
-//         if count == N {
-//             return Ok(
-//                 unsafe {
-//                     Self::new((&uninit_buffer as *const _ as *const [_; N]).read())
-//                 }
-//             );
-//         }
-//
-//         Err(PolynomialInitError::LengthMismatch{ expected: N, actual: count })
-//     }
-// }
-
-// fancy constructors introduce unsafe code and depend on [core::mem::MaybeUninit]
-// for now restrict constructors to types implementing Copy
-// fn from_iter_constructor_validator<T: Default, const N: usize, U: IntoIterator<Item=T> + Clone>(type_name: &str, coefficients_iter: U) {
-//     let from_iter_poly = Polynomial::<T, N>::from_iterator(coefficients_iter.clone()).expect("Polynomial::<{type_name}, {N}>::from_iterator()");
-//     assert_eq!(from_iter_poly.coefficients, coefficients_iter.into_iter().collect().try_into(), "Polynomial::<{type_name}, {N}>::from_iterator()");
-// }
-
-fn constant_constructor_validator<T, const N: usize>(constant: T)
+fn from_fn_validator<T>()
 where
-    T: Clone + Num + PartialEq + fmt::Debug,
+    T: Default + Clone + Zero + One + PartialEq + fmt::Debug,
 {
-    let type_name = std::any::type_name::<T>();
-    let polynomial = Polynomial::<T, N>::from_constant(constant.clone());
-    assert_eq!(polynomial.coefficients[0], constant, "Polynomial::<{type_name}, {N}>::from_constant({constant:?}) constant");
-    for i in 1..N {
-        assert_eq!(polynomial.coefficients[i], T::zero(), "Polynomial::<{type_name}, {N}>::from_constant({constant:?}) term {i}");
-    }
-}
+    let empty_polynomial: Polynomial<T, 0> = Polynomial::from_fn(|_| T::one());
+    is_empty_degree_constant_monic_validator("from_fn", empty_polynomial, true, None, None, false);
 
-fn from_element_constructor_validator<T, const N: usize>(element: T)
-where
-    T: Copy + Clone + Num + PartialEq + fmt::Debug,
-{
-    let type_name = std::any::type_name::<T>();
-    let polynomial = Polynomial::<T, N>::from_element(element);
-    for i in 0..N {
-        assert_eq!(polynomial.coefficients[i], element, "Polynomial::<{type_name}, {N}>::from_element({element:?}) term {i}");
-    }
-}
-
-fn from_fn_constructor_validator<T, const N: usize>()
-where
-    T: Copy + Clone + Num + PartialEq + fmt::Debug,
-{
     let mut counter = T::zero();
-    let type_name = std::any::type_name::<T>();
-    let polynomial = Polynomial::<T, N>::from_fn(|_| {counter = counter + T::one(); counter.clone()});
-    // the count starts at 1
-    counter = T::one();
-    for i in 0..N {
-        assert_eq!(polynomial.coefficients[i], counter, "Polynomial::<{type_name}, {N}>::from_fn() term {i}");
-        counter = counter + T::one();
-    }
+    let constant: Polynomial<T, 1> = Polynomial::from_fn(|_| {counter = counter.clone() + T::one(); counter.clone() });
+    is_empty_degree_constant_monic_validator("from_fn", constant, false, Some(0), Some(&T::one()), true);
+    // TODO: Line + Quadratic + Cubic + ...
 }
+
+fn from_iterator_validator<T>()
+where
+    T: Clone + Copy + Zero + One + PartialEq + fmt::Debug,
+{
+    let empty_polynomial: Polynomial<T, 0> = Polynomial::from_iterator([]);
+    is_empty_degree_constant_monic_validator("from_iterator", empty_polynomial, true, None, None, false);
+
+    let constant: Polynomial<T, 1> = Polynomial::from_iterator([T::zero()]);
+    is_empty_degree_constant_monic_validator("from_iterator", constant, false, None, Some(&T::zero()), false);
+    // TODO: Line + Quadratic + Cubic + ...
+}
+
+fn default_validator<T>()
+where
+    T: Default + Clone + Zero + One + PartialEq + fmt::Debug,
+{
+    let empty_polynomial: Polynomial<T, 0> = Polynomial::default();
+    is_empty_degree_constant_monic_validator("default", empty_polynomial, true, None, None, false);
+
+    let constant: Polynomial<T, 1> = Polynomial::default();
+    let degree = match T::default() == T::zero() {
+        true => None,
+        _ => Some(0),
+    };
+    is_empty_degree_constant_monic_validator("default", constant, false, degree, Some(&T::default()), T::default() == T::one());
+    // TODO: Line + Quadratic + Cubic + ...
+}
+
+fn monomial_validator<T>()
+where
+    T: Clone + Zero + One + PartialEq + fmt::Debug,
+{
+    let empty_polynomial: Polynomial<T, 0> = Polynomial::monomial(T::zero());
+    is_empty_degree_constant_monic_validator("monomial", empty_polynomial, true, None, None, false);
+
+    let constant: Polynomial<T, 1> = Polynomial::monomial(T::one());
+    is_empty_degree_constant_monic_validator("monomial", constant, false, Some(0), Some(&T::one()), true);
+    // TODO: Line + Quadratic + Cubic + ...
+}
+
+fn from_element_validator<T>()
+where
+    T: Clone + Copy + Zero + One + PartialEq + fmt::Debug,
+{
+    let empty_polynomial: Polynomial<T, 0> = Polynomial::from_element(T::zero());
+    is_empty_degree_constant_monic_validator("from_element", empty_polynomial, true, None, None, false);
+
+    let constant: Polynomial<T, 1> = Polynomial::from_element(T::one());
+    is_empty_degree_constant_monic_validator("from_element", constant, false, Some(0), Some(&T::one()), true);
+    // TODO: Line + Quadratic + Cubic + ...
+}
+
 
 #[test]
 fn i8_constructors() {
-    default_constructor_validator::<i8, 1>([0i8]);
-    monomial_constructor_validator::<i8, 3>(1i8);
-    constant_constructor_validator::<i8, 10>(127i8);
-    from_element_constructor_validator::<i8, 2>(1i8);
-    from_fn_constructor_validator::<i8, 10>()
+    from_data_validator::<i8>();
+    from_fn_validator::<i8>();
+    from_iterator_validator::<i8>();
+    default_validator::<i8>();
+    monomial_validator::<i8>();
+    from_element_validator::<i8>();
 }
 
 #[test]
 fn u8_constructors() {
-    default_constructor_validator::<u8, 10>([0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8]);
-    monomial_constructor_validator::<u8, 3>(2u8);
-    constant_constructor_validator::<u8, 10>(127u8);
-    from_element_constructor_validator::<u8, 0>(1u8);
+    from_data_validator::<u8>();
+    from_fn_validator::<u8>();
+    from_iterator_validator::<u8>();
+    default_validator::<u8>();
+    monomial_validator::<u8>();
+    from_element_validator::<u8>();
 }

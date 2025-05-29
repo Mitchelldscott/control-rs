@@ -14,11 +14,11 @@
 //! > [MathWorks](https://www.mathworks.com/discovery/transfer-function.html)
 //!
 
-#[cfg(feature = "std")]
-use std::fmt;
-
-#[cfg(not(feature = "std"))]
-use core::fmt;
+// #[cfg(feature = "std")]
+// use std::fmt;
+//
+// #[cfg(not(feature = "std"))]
+// use core::fmt;
 
 use nalgebra::{Complex, RealField};
 use num_traits::Float;
@@ -110,23 +110,23 @@ where
             })
     }
 }
-struct FmtLengthCounter {
-    length: usize,
-}
+// struct FmtLengthCounter {
+//     length: usize,
+// }
+//
+// impl fmt::Write for FmtLengthCounter {
+//     fn write_str(&mut self, s: &str) -> fmt::Result {
+//         self.length += s.len();
+//         Ok(())
+//     }
+// }
 
-impl fmt::Write for FmtLengthCounter {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.length += s.len();
-        Ok(())
-    }
-}
-
-fn formatted_length<T: fmt::Display>(value: &T) -> usize {
-    use fmt::Write;
-    let mut counter = FmtLengthCounter { length: 0 };
-    write!(&mut counter, "{}", value).unwrap();
-    counter.length
-}
+// fn formatted_length<T: fmt::Display>(value: &T) -> usize {
+//     use fmt::Write;
+//     let mut counter = FmtLengthCounter { length: 0 };
+//     write!(&mut counter, "{}", value).unwrap();
+//     counter.length
+// }
 
 /// TODO: Fix formating
 // impl<T, const M: usize, const N: usize> fmt::Display for TransferFunction<T, M, N>
