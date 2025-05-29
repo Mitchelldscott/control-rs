@@ -1,93 +1,532 @@
-// use super::*;
+use super::*;
 
-// fn validate_polynomial_neg<T>() {
-//     let empty_p =
-// }
-//
-// #[test]
-// fn test_neg() {
-//     let p_f32 = Polynomial::new([3.0f32, -2.0f32, 1.0f32]); // 1 - 2x + 3x^2
-//     let neg_p_f32 = -p_f32;
-//     assert_eq!(neg_p_f32.coefficients, [-1.0f32, 2.0f32, -3.0f32], "neg_p_f32 is not [-1, 2, -3]");
-//
-//     let p_isize = Polynomial::new([3isize, -2isize, 1isize]);
-//     let neg_p_isize = -p_isize;
-//     assert_eq!(neg_p_isize.coefficients, [-3isize, 2isize, -1isize], "neg_p_isize is not [-1, 2, -3]");
-//
-//     let p_i8 = Polynomial::new([0i8, -128i8, 1i8]);
-//     let neg_p_i8 = -p_i8;
-//     assert_eq!(neg_p_i8.coefficients, [-1i8, 127i8, -0i8], "neg_p_i8 is not [-1, 127, -0]");
-// }
-//
-// #[test]
-// fn test_add_scalar() {
-//     let p_f32 = Polynomial::new([3.0f32, 2.0f32, 1.0f32]); // 1 + 2x + 3x^2
-//     let result_f32 = p_f32 + 5.0f32; // 6 + 2x + 3x^2
-//     assert_eq!(result_f32.coefficients, [6.0f32, 2.0f32, 3.0f32], "p_f32 scalar addition failed");
-//
-//     let p_i128 = Polynomial::new([3i128, 2i128, 1i128]);
-//     let result_i128 = p_i128 + 5i128; // 6 + 2x + 3x^2
-//     assert_eq!(result_i128.coefficients, [6i128, 2i128, 3i128], "p_i128 scalar addition failed");
-//
-//     let p_i8 = Polynomial::new([3i8, 2i8, 127i8]);
-//     let result_i8 = p_i8 + 5i8; // 6 + 2x + 3x^2
-//     assert_eq!(result_i8.coefficients, [-124i8, 2i8, 3i8], "p_i8 scalar addition w/ overflow failed");
-// }
-//
-// #[test]
-// fn test_add_assign_scalar() {
-//     let mut p = Polynomial::new([3.0, 2.0, 1.0]);
-//     p += 5.0;
-//     assert_eq!(p.coefficients, [6.0, 2.0, 3.0]);
-// }
-//
-// #[test]
-// fn test_mul_scalar() {
-//     let p_f64 = Polynomial::new([1.0f64, 2.0f64, 3.0f64]); // 3 + 2x + x^2
-//     let result_f64 = p_f64 * 2.0f64; // 6 + 4x + 2x^2
-//     assert_eq!(result_f64.coefficients, [6.0f64, 4.0f64, 2.0f64], "p_f64 scalar multiplication failed");
-// }
-//
-// #[test]
-// fn test_mul_assign_scalar() {
-//     let mut p = Polynomial::new([1.0, 2.0, 3.0]);
-//     p *= 2.0;
-//     assert_eq!(p.coefficients, [2.0, 4.0, 6.0]);
-// }
-//
-// #[test]
-// fn test_add_polynomial_same_size() {
-//     let p1 = Polynomial::new([1.0, 2.0]);    // 1 + 2x
-//     let p2 = Polynomial::new([3.0, 4.0]);    // 3 + 4x
-//     let p_sum = p1 + p2;                     // 4 + 6x
-//     assert_eq!(p_sum.coefficients, [4.0, 6.0]);
-// }
-//
-// #[test]
-// fn test_add_polynomial_different_sizes() {
-//     let p1 = Polynomial::new([1.0, 2.0, 3.0]); // 1 + 2x + 3x^2
-//     let p2 = Polynomial::new([4.0, 5.0]);      // 4 + 5x
-//     let p_sum = p1 + p2;                      // 5 + 7x + 3x^2
-//     assert_eq!(p_sum.coefficients, [5.0, 7.0, 3.0]);
-//
-//     let p3 = Polynomial::new([1.0, 2.0]);      // 1 + 2x
-//     let p4 = Polynomial::new([3.0, 4.0, 5.0]); // 3 + 4x + 5x^2
-//     let p_sum2 = p3 + p4;                     // 4 + 6x + 5x^2
-//     assert_eq!(p_sum2.coefficients, [4.0, 6.0, 5.0]);
-// }
-//
-// #[test]
-// fn test_mul_polynomial() {
-//     // (1 + x) * (2 + x) = 2 + x + 2x + x^2 = 2 + 3x + x^2
-//     let p1 = Polynomial::new([1.0, 1.0]); // 1 + x
-//     let p2 = Polynomial::new([2.0, 1.0]); // 2 + x
-//     let p_prod = p1 * p2;
-//     assert_eq!(p_prod.coefficients, [2.0, 3.0, 1.0, 0.0]); // N+M-1 = 2+2-1 = 3
-//
-//     // (1 + 2x) * (3 + x^2) = 3 + x^2 + 6x + 2x^3 = 3 + 6x + x^2 + 2x^3
-//     let p3 = Polynomial::new([1.0, 2.0]); // 1 + 2x
-//     let p4 = Polynomial::new([3.0, 0.0, 1.0]); // 3 + 0x + x^2
-//     let p_prod2 = p3 * p4;
-//     // Expected size N+M-1 = 2+3-1 = 4
-//     assert_eq!(p_prod2.coefficients, [3.0, 6.0, 1.0, 2.0, 0.0, 0.0]);
-// }
+mod neg {
+    use super::*;
+
+    #[test]
+    fn empty_neg() {
+        let empty = Polynomial::from_data([0.0f32; 0]);
+        assert_eq!(-empty, empty);
+    }
+
+    #[test]
+    fn constant_neg() {
+        let constant = Polynomial::from_data([1.0f64]);
+        assert_eq!(-constant, Polynomial::from_data([-1.0f64]));
+    }
+
+    #[test]
+    fn line_neg() {
+        let line = Polynomial::from_data([0, 1]);
+        assert_eq!(-line, Polynomial::from_data([0, -1]));
+    }
+
+    #[test]
+    fn quadratic_neg() {
+        let quadratic = Polynomial::from_data([0, 0, 1]);
+        assert_eq!(-quadratic, Polynomial::from_data([0, 0, -1]));
+    }
+
+    #[test]
+    fn large_neg() {
+        let polynomial: Polynomial<i8, 16> = Polynomial::from_element(1);
+        assert_eq!(-polynomial, Polynomial::from_element(-1));
+    }
+}
+
+mod scalar_add {
+    use super::*;
+    #[test]
+    fn empty_post_add() {
+        let empty: Polynomial<i8, 0> = Polynomial::from_element(1);
+        assert!(!(empty + 1).is_empty());
+    }
+    #[test]
+    fn empty_pre_add() {
+        let empty: Polynomial<u8, 0> = Polynomial::from_element(1);
+        assert!(!(1 + empty).is_empty());
+    }
+    // #[test]
+    // fn empty_add_assign() {
+    //     let mut empty: Polynomial<i16, 0> = Polynomial::from_element(1);
+    //     empty += 1;
+    //     assert!(!empty.is_empty());
+    // }
+    #[test]
+    fn constant_post_add() {
+        let constant: Polynomial<u16, 1> = Polynomial::from_element(1);
+        assert_eq!(constant + 1, Polynomial::from_data([2]));
+    }
+    #[test]
+    fn constant_pre_add() {
+        let constant: Polynomial<i32, 1> = Polynomial::from_element(1);
+        assert_eq!(1 + constant, Polynomial::from_data([2i32]));
+    }
+    #[test]
+    fn constant_add_assign() {
+        let mut constant: Polynomial<isize, 1> = Polynomial::from_element(1);
+        constant += 1;
+        assert_eq!(constant, Polynomial::from_data([2isize]));
+    }
+    #[test]
+    fn line_post_add() {
+        let line: Polynomial<usize, 2> = Polynomial::from_element(1);
+        assert_eq!(line + 1, Polynomial::from_data([2, 1]));
+    }
+    #[test]
+    fn line_pre_add() {
+        let line: Polynomial<f32, 2> = Polynomial::from_element(1.0);
+        assert_eq!(1.0 + line, Polynomial::from_data([2.0, 1.0]));
+    }
+    #[test]
+    fn line_add_assign() {
+        let mut line: Polynomial<f64, 2> = Polynomial::from_element(1.0);
+        line += 1.0;
+        assert_eq!(line, Polynomial::from_data([2.0, 1.0]));
+    }
+    #[test]
+    fn quadratic_post_add() {
+        let quadratic: Polynomial<i64, 3> = Polynomial::from_element(1);
+        assert_eq!(quadratic + 1, Polynomial::from_data([2, 1, 1]));
+    }
+    #[test]
+    fn quadratic_pre_add() {
+        let quadratic: Polynomial<u32, 3> = Polynomial::from_element(1);
+        assert_eq!(1 + quadratic, Polynomial::from_data([2, 1, 1]));
+    }
+    #[test]
+    fn quadratic_add_assign() {
+        let mut quadratic: Polynomial<i64, 3> = Polynomial::from_element(1);
+        quadratic += 1;
+        assert_eq!(quadratic, Polynomial::from_data([2, 1, 1]));
+    }
+    #[test]
+    fn large_post_add() {
+        let large: Polynomial<i32, 16> = Polynomial::from_element(1);
+        assert_eq!(large + 1, Polynomial::from_data([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]));
+    }
+    #[test]
+    fn large_pre_add() {
+        let large: Polynomial<u32, 16> = Polynomial::from_element(1);
+        assert_eq!(1 + large, Polynomial::from_data([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]));
+    }
+    #[test]
+    fn large_add_assign() {
+        let mut large: Polynomial<i64, 16> = Polynomial::from_element(1);
+        large += 1;
+        assert_eq!(large, Polynomial::from_data([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]));
+    }
+}
+
+mod scalar_sub {
+    use super::*;
+    #[test]
+    fn empty_post_sub() {
+        let empty: Polynomial<i8, 0> = Polynomial::from_element(1);
+        assert!(!(empty + 1).is_empty());
+    }
+    #[test]
+    fn empty_pre_sub() {
+        let empty: Polynomial<u8, 0> = Polynomial::from_element(1);
+        assert!(!(1 + empty).is_empty());
+    }
+    // #[test]
+    // fn empty_sub_assign() {
+    //     let mut empty: Polynomial<i16, 0> = Polynomial::from_element(1);
+    //     empty += 1;
+    //     assert!(!empty.is_empty());
+    // }
+    #[test]
+    fn constant_post_sub() {
+        let constant: Polynomial<u16, 1> = Polynomial::from_element(1);
+        assert_eq!(constant - 1, Polynomial::from_data([0]));
+    }
+    #[test]
+    fn constant_pre_sub() {
+        let constant: Polynomial<i32, 1> = Polynomial::from_element(1);
+        assert_eq!(1 - constant, Polynomial::from_data([0i32]));
+    }
+    #[test]
+    fn constant_sub_assign() {
+        let mut constant: Polynomial<isize, 1> = Polynomial::from_element(1);
+        constant -= 1;
+        assert_eq!(constant, Polynomial::from_data([0isize]));
+    }
+    #[test]
+    fn line_post_sub() {
+        let line: Polynomial<usize, 2> = Polynomial::from_element(1);
+        assert_eq!(line - 1, Polynomial::from_data([0, 1]));
+    }
+    #[test]
+    fn line_pre_sub() {
+        let line: Polynomial<f32, 2> = Polynomial::from_element(1.0);
+        assert_eq!(1.0 - line, Polynomial::from_data([0.0, -1.0]));
+    }
+    #[test]
+    fn line_sub_assign() {
+        let mut line: Polynomial<f64, 2> = Polynomial::from_element(1.0);
+        line -= 1.0;
+        assert_eq!(line, Polynomial::from_data([0.0, 1.0]));
+    }
+    #[test]
+    fn quadratic_post_sub() {
+        let quadratic: Polynomial<i64, 3> = Polynomial::from_element(1);
+        assert_eq!(quadratic - 1, Polynomial::from_data([0, 1, 1]));
+    }
+    #[test]
+    fn quadratic_pre_sub() {
+        let quadratic: Polynomial<u32, 3> = Polynomial::from_element(1);
+        assert_eq!(1 - quadratic, Polynomial::from_data([0, -1, -1]));
+    }
+    #[test]
+    fn quadratic_sub_assign() {
+        let mut quadratic: Polynomial<i64, 3> = Polynomial::from_element(1);
+        quadratic -= 1;
+        assert_eq!(quadratic, Polynomial::from_data([0, 1, 1]));
+    }
+    #[test]
+    fn large_post_sub() {
+        let large: Polynomial<i32, 16> = Polynomial::from_element(1);
+        assert_eq!(large - 1, Polynomial::from_data([0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]));
+    }
+    #[test]
+    fn large_pre_sub() {
+        let large: Polynomial<u32, 16> = Polynomial::from_element(1);
+        assert_eq!(1 - large, Polynomial::from_data([0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]));
+    }
+    #[test]
+    fn large_sub_assign() {
+        let mut large: Polynomial<i64, 16> = Polynomial::from_element(1);
+        large -= 1;
+        assert_eq!(large, Polynomial::from_data([0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]));
+    }
+}
+
+mod scalar_mul {
+    use super::*;
+    #[test]
+    fn empty_post_mul() {
+        let empty: Polynomial<i8, 0> = Polynomial::from_element(1);
+        assert!((empty * 1).is_empty());
+    }
+    #[test]
+    fn empty_pre_mul() {
+        let empty: Polynomial<u8, 0> = Polynomial::from_element(1);
+        assert!((1 * empty).is_empty());
+    }
+    #[test]
+    fn empty_mul_assign() {
+        let mut empty: Polynomial<i16, 0> = Polynomial::from_element(1);
+        empty *= 1;
+        assert!(empty.is_empty());
+    }
+    #[test]
+    fn constant_post_mul() {
+        let constant: Polynomial<u16, 1> = Polynomial::from_element(1);
+        assert_eq!(constant * 0, Polynomial::from_data([0]));
+    }
+    #[test]
+    fn constant_pre_mul() {
+        let constant: Polynomial<i32, 1> = Polynomial::from_element(1);
+        assert_eq!(0 * constant, Polynomial::from_data([0i32]));
+    }
+    #[test]
+    fn constant_mul_assign() {
+        let mut constant: Polynomial<isize, 1> = Polynomial::from_element(1);
+        constant *= 0;
+        assert_eq!(constant, Polynomial::from_data([0isize]));
+    }
+    #[test]
+    fn line_post_mul() {
+        let line: Polynomial<usize, 2> = Polynomial::from_element(1);
+        assert_eq!(line * 0, Polynomial::from_data([0, 0]));
+    }
+    #[test]
+    fn line_pre_mul() {
+        let line: Polynomial<f32, 2> = Polynomial::from_element(1.0);
+        assert_eq!(0.0 * line, Polynomial::from_data([0.0, 0.0]));
+    }
+    #[test]
+    fn line_mul_assign() {
+        let mut line: Polynomial<f64, 2> = Polynomial::from_element(1.0);
+        line *= 0.0;
+        assert_eq!(line, Polynomial::from_data([0.0, 0.0]));
+    }
+    #[test]
+    fn quadratic_post_mul() {
+        let quadratic: Polynomial<i64, 3> = Polynomial::from_element(1);
+        assert_eq!(quadratic * 0, Polynomial::from_data([0, 0, 0]));
+    }
+    #[test]
+    fn quadratic_pre_mul() {
+        let quadratic: Polynomial<u32, 3> = Polynomial::from_element(1);
+        assert_eq!(0 * quadratic, Polynomial::from_data([0, 0, 0]));
+    }
+    #[test]
+    fn quadratic_mul_assign() {
+        let mut quadratic: Polynomial<i64, 3> = Polynomial::from_element(1);
+        quadratic *= 0;
+        assert_eq!(quadratic, Polynomial::from_data([0, 0, 0]));
+    }
+    #[test]
+    fn large_post_mul() {
+        let large: Polynomial<i32, 16> = Polynomial::from_element(1);
+        assert_eq!(large * 0, Polynomial::from_iterator([]));
+    }
+    #[test]
+    fn large_pre_mul() {
+        let large: Polynomial<u32, 16> = Polynomial::from_element(1);
+        assert_eq!(0 * large, Polynomial::from_iterator([]));
+    }
+    #[test]
+    fn large_mul_assign() {
+        let mut large: Polynomial<i64, 16> = Polynomial::from_element(1);
+        large *= 0;
+        assert_eq!(large, Polynomial::from_iterator([]));
+    }
+}
+
+mod scalar_div {
+    use super::*;
+    #[test]
+    fn empty_post_div() {
+        let empty: Polynomial<i8, 0> = Polynomial::from_element(1);
+        assert!((empty / 1).is_empty());
+    }
+    // #[test]
+    // fn empty_pre_div() {
+    //     let empty: Polynomial<u8, 0> = Polynomial::from_element(1);
+    //     assert!((1 / empty).is_empty());
+    // }
+    #[test]
+    fn empty_div_assign() {
+        let mut empty: Polynomial<i16, 0> = Polynomial::from_element(1);
+        empty /= 1;
+        assert!(empty.is_empty());
+    }
+    #[test]
+    fn constant_post_div() {
+        let constant: Polynomial<u16, 1> = Polynomial::from_element(1);
+        assert_eq!(constant / 1, Polynomial::from_data([1]));
+    }
+    #[test]
+    fn constant_pre_div() {
+        let constant: Polynomial<i32, 1> = Polynomial::from_element(2);
+        assert_eq!(2 / constant, Polynomial::from_data([1i32]));
+    }
+    #[test]
+    fn constant_div_assign() {
+        let mut constant: Polynomial<isize, 1> = Polynomial::from_element(3);
+        constant /= 3;
+        assert_eq!(constant, Polynomial::from_data([1isize]));
+    }
+    #[test]
+    fn line_post_div() {
+        let line: Polynomial<usize, 2> = Polynomial::from_element(4);
+        assert_eq!(line / 4, Polynomial::from_data([1, 1]));
+    }
+    #[test]
+    fn line_div_assign() {
+        let mut line: Polynomial<f64, 2> = Polynomial::from_element(6.0);
+        line /= 6.0;
+        assert_eq!(line, Polynomial::from_data([1.0, 1.0]));
+    }
+    #[test]
+    fn quadratic_post_div() {
+        let quadratic: Polynomial<i64, 3> = Polynomial::from_element(7);
+        assert_eq!(quadratic / 7, Polynomial::from_data([1, 1, 1]));
+    }
+    #[test]
+    fn quadratic_div_assign() {
+        let mut quadratic: Polynomial<i64, 3> = Polynomial::from_element(9);
+        quadratic /= 9;
+        assert_eq!(quadratic, Polynomial::from_data([1, 1, 1]));
+    }
+    #[test]
+    fn large_post_div() {
+        let large: Polynomial<i32, 16> = Polynomial::from_element(10);
+        assert_eq!(large / 10, Polynomial::from_element(1));
+    }
+    #[test]
+    fn large_div_assign() {
+        let mut large: Polynomial<i64, 16> = Polynomial::from_element(12);
+        large /= 12;
+        assert_eq!(large, Polynomial::from_element(1));
+    }
+}
+
+mod const_mul {
+    use super::*;
+    // #[test]
+    // fn empty_post_mul() {
+    //     let empty: Polynomial<i8, 0> = Polynomial::from_element(1);
+    //     let constant = Polynomial::from_data([1i8]);
+    //     assert!((empty * constant).is_empty());
+    // }
+    // #[test]
+    // fn empty_pre_mul() {
+    //     let empty: Polynomial<u8, 0> = Polynomial::from_element(1);
+    //     let constant = Polynomial::from_data([1u8]);
+    //     assert!((constant * empty).is_empty());
+    // }
+    // #[test]
+    // fn empty_mul_assign() {
+    //     let mut empty: Polynomial<i16, 0> = Polynomial::from_element(1);
+    //     let constant = Polynomial::from_data([1i16]);
+    //     empty *= constant;
+    //     assert!(empty.is_empty());
+    // }
+    #[test]
+    fn constant_mul() {
+        let constant_a: Polynomial<u16, 1> = Polynomial::from_element(2);
+        let constant_b = Polynomial::from_data([2u16]);
+        assert_eq!(constant_a * constant_b, Polynomial::from_data([4]));
+    }
+    #[test]
+    fn constant_mul_assign() {
+        let mut constant_a: Polynomial<u16, 1> = Polynomial::from_element(2);
+        let constant_b = Polynomial::from_data([2u16]);
+        constant_a *= constant_b;
+        assert_eq!(constant_a, Polynomial::from_data([4]));
+    }
+    #[test]
+    fn line_post_mul() {
+        let line: Polynomial<usize, 2> = Polynomial::from_element(1);
+        let constant = Polynomial::from_data([0usize]);
+        assert_eq!(line * constant, Polynomial::from_data([0, 0]));
+    }
+    #[test]
+    fn line_pre_mul() {
+        let line: Polynomial<f32, 2> = Polynomial::from_element(1.0);
+        let constant = Polynomial::from_data([0.0f32]);
+        assert_eq!(constant * line, Polynomial::from_data([0.0, 0.0]));
+    }
+    #[test]
+    fn line_mul_assign() {
+        let mut line: Polynomial<f64, 2> = Polynomial::from_element(1.0);
+        let constant = Polynomial::from_data([0.0f64]);
+        line *= constant;
+        assert_eq!(line, Polynomial::from_data([0.0, 0.0]));
+    }
+    #[test]
+    fn quadratic_post_mul() {
+        let quadratic: Polynomial<i64, 3> = Polynomial::from_element(1);
+        let constant = Polynomial::from_data([0i64]);
+        assert_eq!(quadratic * constant, Polynomial::from_data([0, 0, 0]));
+    }
+    #[test]
+    fn quadratic_pre_mul() {
+        let quadratic: Polynomial<u32, 3> = Polynomial::from_element(1);
+        let constant = Polynomial::from_data([0u32]);
+        assert_eq!(constant * quadratic, Polynomial::from_data([0, 0, 0]));
+    }
+    #[test]
+    fn quadratic_mul_assign() {
+        let mut quadratic: Polynomial<i64, 3> = Polynomial::from_element(1);
+        let constant = Polynomial::from_data([0i64]);
+        quadratic *= constant;
+        assert_eq!(quadratic, Polynomial::from_data([0, 0, 0]));
+    }
+    #[test]
+    fn large_post_mul() {
+        let large: Polynomial<i32, 16> = Polynomial::from_element(1);
+        let constant = Polynomial::from_data([0i32]);
+        assert_eq!(large * constant, Polynomial::from_iterator([]));
+    }
+    #[test]
+    fn large_pre_mul() {
+        let large: Polynomial<u32, 16> = Polynomial::from_element(1);
+        let constant = Polynomial::from_data([0u32]);
+        assert_eq!(constant * large, Polynomial::from_iterator([]));
+    }
+    #[test]
+    fn large_mul_assign() {
+        let mut large: Polynomial<i64, 16> = Polynomial::from_element(1);
+        let constant = Polynomial::from_data([0i64]);
+        large *= constant;
+        assert_eq!(large, Polynomial::from_iterator([]));
+    }
+}
+
+mod line_mul {
+    use super::*;
+    #[test]
+    // fn empty_post_mul() {
+    //     let empty: Polynomial<i8, 0> = Polynomial::from_element(1);
+    //     let line = Polynomial::from_data([1i8, 1i8]);
+    //     assert!((empty * line).is_empty());
+    // }
+    // #[test]
+    // fn empty_pre_mul() {
+    //     let empty: Polynomial<u8, 0> = Polynomial::from_element(1);
+    //     let line = Polynomial::from_data([1u8, 1u8]);
+    //     assert!((line * empty).is_empty());
+    // }
+    // #[test]
+    // fn empty_mul_assign() {
+    //     let mut empty: Polynomial<i16, 0> = Polynomial::from_element(1);
+    //     let line = Polynomial::from_data([1i16, 1i16]);
+    //     empty *= line;
+    //     assert!(empty.is_empty());
+    // }
+    #[test]
+    fn constant_mul_assign() {
+        let mut constant: Polynomial<u16, 1> = Polynomial::from_element(2);
+        let line = Polynomial::from_data([1u16, 1u16]);
+        constant *= line;
+        assert_eq!(constant, Polynomial::from_data([4]));
+    }
+    #[test]
+    fn line_mul() {
+        let line_a: Polynomial<usize, 2> = Polynomial::from_element(1);
+        let line_b = Polynomial::from_data([0usize, 0usize]);
+        assert_eq!(line_a * line_b, Polynomial::from_data([0, 0, 0]));
+    }
+    // #[test]
+    // fn line_mul_assign() {
+    //     let mut line_a: Polynomial<f64, 2> = Polynomial::from_element(1.0);
+    //     let line_b = Polynomial::from_data([0.0f64, 0.0f64]);
+    //     line_a *= line_b;
+    //     assert_eq!(line_a, Polynomial::from_data([0.0, 0.0]));
+    // }
+    #[test]
+    fn quadratic_post_mul() {
+        let quadratic: Polynomial<i64, 3> = Polynomial::from_element(1);
+        let line = Polynomial::from_data([0i64, 0i64]);
+        assert_eq!(quadratic * line, Polynomial::from_data([0, 0, 0]));
+    }
+    #[test]
+    fn quadratic_pre_mul() {
+        let quadratic: Polynomial<u32, 3> = Polynomial::from_element(1);
+        let line = Polynomial::from_data([0u32, 0u32]);
+        assert_eq!(line * quadratic, Polynomial::from_data([0, 0, 0]));
+    }
+    #[test]
+    fn quadratic_mul_assign() {
+        let mut quadratic: Polynomial<i64, 3> = Polynomial::from_element(1);
+        let line = Polynomial::from_data([0i64, 0i64]);
+        quadratic *= line;
+        assert_eq!(quadratic, Polynomial::from_data([0, 0, 0]));
+    }
+    #[test]
+    fn large_post_mul() {
+        let large: Polynomial<i32, 16> = Polynomial::from_element(1);
+        let line = Polynomial::from_data([0i32, 0i32]);
+        assert_eq!(large * line, Polynomial::from_iterator([]));
+    }
+    #[test]
+    fn large_pre_mul() {
+        let large: Polynomial<u32, 16> = Polynomial::from_element(1);
+        let line = Polynomial::from_data([0u32, 0u32]);
+        assert_eq!(line * large, Polynomial::from_iterator([]));
+    }
+    #[test]
+    fn large_mul_assign() {
+        let mut large: Polynomial<i64, 16> = Polynomial::from_element(1);
+        let line = Polynomial::from_data([0i64, 0i64]);
+        large *= line;
+        assert_eq!(large, Polynomial::from_iterator([]));
+    }
+}
+
+

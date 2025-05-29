@@ -12,19 +12,12 @@
 use nalgebra::{SMatrix, Scalar};
 use num_traits::{One, Zero};
 
-#[cfg(feature = "std")]
-use std::{
-    fmt,
-    ops::{Add, Div, Mul, Neg},
-};
-
-#[cfg(not(feature = "std"))]
 use core::{
     fmt,
     ops::{Add, Div, Mul, Neg},
 };
 
-use super::{math::system_traits::DynamicModel};
+use crate::math::systems::DynamicalSystem;
 
 // ===============================================================================================
 //      StateSpace Submodules
@@ -144,7 +137,8 @@ impl<A, B, C, D> StateSpace<A, B, C, D> {
 //      StateSpace as DynamicModel
 // ===============================================================================================
 
-impl<Input, State, Output, A, B, C, D> DynamicModel<Input, State, Output> for StateSpace<A, B, C, D>
+impl<Input, State, Output, A, B, C, D> DynamicalSystem<Input, State, Output>
+    for StateSpace<A, B, C, D>
 where
     Input: Clone,
     State: Clone + Add<Output = State>,
@@ -190,7 +184,7 @@ mod basic_ss_tests {
     use crate::{
         state_space::utils::{
             // control_canonical,
-            zoh
+            zoh,
         },
         // transfer_function::{as_monic, TransferFunction},
     };

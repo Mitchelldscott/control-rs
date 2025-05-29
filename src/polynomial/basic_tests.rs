@@ -21,30 +21,48 @@
 //!         * leading_coefficient_mut()
 //!         * resize(polynomial: Polynomial)
 
-
 #[cfg(feature = "std")]
-use std::{fmt, any::type_name};
+use std::{any::type_name, fmt};
 
 #[cfg(not(feature = "std"))]
-use core::{fmt, any::type_name};
+use core::{any::type_name, fmt};
 
 use crate::polynomial::Polynomial;
 
-use num_traits::{Zero, One};
+use num_traits::{One, Zero};
 
-fn is_empty_degree_constant_monic_validator<T: Clone + Zero + One + PartialEq + fmt::Debug, const N: usize>(
+fn is_empty_degree_constant_monic_validator<
+    T: Clone + Zero + One + PartialEq + fmt::Debug,
+    const N: usize,
+>(
     _test_name: &str,
     polynomial: Polynomial<T, N>,
     is_empty: bool,
     expected_degree: Option<usize>,
     expected_constant: Option<&T>,
-    expected_monic: bool
+    expected_monic: bool,
 ) {
     let _type_name = type_name::<T>();
-    assert_eq!(polynomial.is_empty(), is_empty, "Polynomial::<{_type_name}, {N}>::{_test_name}().is_empty()");
-    assert_eq!(polynomial.degree(), expected_degree, "Polynomial::<{_type_name}, {N}>::{_test_name}().degree()");
-    assert_eq!(polynomial.constant(), expected_constant, "Polynomial::<{_type_name}, {N}>::{_test_name}().constant()");
-    assert_eq!(polynomial.is_monic(), expected_monic, "Polynomial::<{_type_name}, {N}>::{_test_name}().is_monic()");
+    assert_eq!(
+        polynomial.is_empty(),
+        is_empty,
+        "Polynomial::<{_type_name}, {N}>::{_test_name}().is_empty()"
+    );
+    assert_eq!(
+        polynomial.degree(),
+        expected_degree,
+        "Polynomial::<{_type_name}, {N}>::{_test_name}().degree()"
+    );
+    assert_eq!(
+        polynomial.constant(),
+        expected_constant,
+        "Polynomial::<{_type_name}, {N}>::{_test_name}().constant()"
+    );
+    assert_eq!(
+        polynomial.is_monic(),
+        expected_monic,
+        "Polynomial::<{_type_name}, {N}>::{_test_name}().is_monic()"
+    );
 }
 
 fn from_data_validator<T>()
@@ -52,10 +70,24 @@ where
     T: Clone + Zero + One + PartialEq + fmt::Debug,
 {
     let empty_polynomial: Polynomial<T, 0> = Polynomial::from_data([]);
-    is_empty_degree_constant_monic_validator("from_data", empty_polynomial, true, None, None, false);
+    is_empty_degree_constant_monic_validator(
+        "from_data",
+        empty_polynomial,
+        true,
+        None,
+        None,
+        false,
+    );
 
     let constant = Polynomial::from_data([T::one()]);
-    is_empty_degree_constant_monic_validator("from_data", constant, false, Some(0), Some(&T::one()), true);
+    is_empty_degree_constant_monic_validator(
+        "from_data",
+        constant,
+        false,
+        Some(0),
+        Some(&T::one()),
+        true,
+    );
     // TODO: Line + Quadratic + Cubic + ...
 }
 
@@ -67,8 +99,18 @@ where
     is_empty_degree_constant_monic_validator("from_fn", empty_polynomial, true, None, None, false);
 
     let mut counter = T::zero();
-    let constant: Polynomial<T, 1> = Polynomial::from_fn(|_| {counter = counter.clone() + T::one(); counter.clone() });
-    is_empty_degree_constant_monic_validator("from_fn", constant, false, Some(0), Some(&T::one()), true);
+    let constant: Polynomial<T, 1> = Polynomial::from_fn(|_| {
+        counter = counter.clone() + T::one();
+        counter.clone()
+    });
+    is_empty_degree_constant_monic_validator(
+        "from_fn",
+        constant,
+        false,
+        Some(0),
+        Some(&T::one()),
+        true,
+    );
     // TODO: Line + Quadratic + Cubic + ...
 }
 
@@ -77,10 +119,24 @@ where
     T: Clone + Copy + Zero + One + PartialEq + fmt::Debug,
 {
     let empty_polynomial: Polynomial<T, 0> = Polynomial::from_iterator([]);
-    is_empty_degree_constant_monic_validator("from_iterator", empty_polynomial, true, None, None, false);
+    is_empty_degree_constant_monic_validator(
+        "from_iterator",
+        empty_polynomial,
+        true,
+        None,
+        None,
+        false,
+    );
 
     let constant: Polynomial<T, 1> = Polynomial::from_iterator([T::zero()]);
-    is_empty_degree_constant_monic_validator("from_iterator", constant, false, None, Some(&T::zero()), false);
+    is_empty_degree_constant_monic_validator(
+        "from_iterator",
+        constant,
+        false,
+        None,
+        Some(&T::zero()),
+        false,
+    );
     // TODO: Line + Quadratic + Cubic + ...
 }
 
@@ -96,7 +152,14 @@ where
         true => None,
         _ => Some(0),
     };
-    is_empty_degree_constant_monic_validator("default", constant, false, degree, Some(&T::default()), T::default() == T::one());
+    is_empty_degree_constant_monic_validator(
+        "default",
+        constant,
+        false,
+        degree,
+        Some(&T::default()),
+        T::default() == T::one(),
+    );
     // TODO: Line + Quadratic + Cubic + ...
 }
 
@@ -108,7 +171,14 @@ where
     is_empty_degree_constant_monic_validator("monomial", empty_polynomial, true, None, None, false);
 
     let constant: Polynomial<T, 1> = Polynomial::monomial(T::one());
-    is_empty_degree_constant_monic_validator("monomial", constant, false, Some(0), Some(&T::one()), true);
+    is_empty_degree_constant_monic_validator(
+        "monomial",
+        constant,
+        false,
+        Some(0),
+        Some(&T::one()),
+        true,
+    );
     // TODO: Line + Quadratic + Cubic + ...
 }
 
@@ -117,10 +187,24 @@ where
     T: Clone + Copy + Zero + One + PartialEq + fmt::Debug,
 {
     let empty_polynomial: Polynomial<T, 0> = Polynomial::from_element(T::zero());
-    is_empty_degree_constant_monic_validator("from_element", empty_polynomial, true, None, None, false);
+    is_empty_degree_constant_monic_validator(
+        "from_element",
+        empty_polynomial,
+        true,
+        None,
+        None,
+        false,
+    );
 
     let constant: Polynomial<T, 1> = Polynomial::from_element(T::one());
-    is_empty_degree_constant_monic_validator("from_element", constant, false, Some(0), Some(&T::one()), true);
+    is_empty_degree_constant_monic_validator(
+        "from_element",
+        constant,
+        false,
+        Some(0),
+        Some(&T::one()),
+        true,
+    );
     // TODO: Line + Quadratic + Cubic + ...
 }
 

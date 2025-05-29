@@ -61,9 +61,7 @@ pub struct TransferFunction<T, const M: usize, const N: usize> {
     pub denominator: Polynomial<T, N>,
 }
 
-impl<T: Copy, const M: usize, const N: usize>
-    TransferFunction<T, M, N>
-{
+impl<T: Copy, const M: usize, const N: usize> TransferFunction<T, M, N> {
     /// Create a new transfer function from arrays of coefficients
     ///
     /// # Arguments
@@ -91,7 +89,6 @@ impl<T: Copy, const M: usize, const N: usize>
         }
     }
 }
-
 
 impl<T, const M: usize, const N: usize> FrequencyTools<T, 1, 1> for TransferFunction<T, M, N>
 where

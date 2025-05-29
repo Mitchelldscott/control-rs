@@ -1,86 +1,83 @@
 //! Type alias of polynomial that implements a constant.
 
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign};
 
 use crate::Polynomial;
 
 /// Specialization of `Polynomial` that has only the constant term.
 pub type Constant<T> = Polynomial<T, 1>;
 
-
 // ===============================================================================================
-//      Polynomial-Scalar Arithmatic
+//      Constant-Scalar Arithmatic
 // ===============================================================================================
 
-/// Implementation of [Add] for Polynomial<T, 1> and T
+/// # Polynomial<T, 1> + T
 ///
+/// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([0]);
 /// let p2 = p1 + 1;
 /// assert_eq!(*p2.constant().unwrap(), 1);
 /// ```
-/// TODO: Unit Test
 impl<T: Clone + Add<Output = T>> Add<T> for Constant<T> {
     type Output = Constant<T>;
 
     fn add(self, rhs: T) -> Self::Output {
         Self::from_data([
             // SAFETY: `N` is 1, so the index is always valid
-            unsafe {
-                self.get_unchecked(0).clone() + rhs
-            }
+            unsafe { self.get_unchecked(0).clone() + rhs },
         ])
     }
 }
 
-/// Implementation of [AddAssign] for Polynomial<T, 1> and T
+/// # Polynomial<T, 1> += T
 ///
+/// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([0]);
 /// p1 += 1;
 /// assert_eq!(*p1.constant().unwrap(), 1);
 /// ```
-/// TODO: Unit Test
 impl<T: AddAssign> AddAssign<T> for Constant<T> {
     fn add_assign(&mut self, rhs: T) {
         // SAFETY: `N` is 1, so the index is always valid
-        unsafe { *self.get_unchecked_mut(0) += rhs; }
+        unsafe {
+            *self.get_unchecked_mut(0) += rhs;
+        }
     }
 }
 
-/// Implementation of [Sub] for Polynomial<T, 1> and T
+/// # Polynomial<T, 1> - T
 ///
+/// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([0]);
-/// let p2 = p1 + 1;
+/// let p2 = p1 - 1;
 /// assert_eq!(*p2.constant().unwrap(), 1);
 /// ```
-/// TODO: Unit Test
 impl<T: Clone + Sub<Output = T>> Sub<T> for Constant<T> {
     type Output = Self;
 
     fn sub(self, rhs: T) -> Self::Output {
         Self::from_data([
             // SAFETY: `N` is 1, so the index is always valid
-            unsafe {
-                self.get_unchecked(0).clone() - rhs
-            }
+            unsafe { self.get_unchecked(0).clone() - rhs },
         ])
     }
 }
 
-/// Implementation of [SubAssign] for Polynomial<T, 1> and T
+/// # Polynomial<T, 1> -= T
 ///
+/// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([0]);
 /// p1 -= 1;
 /// assert_eq!(*p1.constant().unwrap(), -1);
 /// ```
-/// TODO: Unit Test
 impl<T: SubAssign> SubAssign<T> for Constant<T> {
     fn sub_assign(&mut self, rhs: T) {
         // SAFETY: `N` is 1, so the index is always valid
@@ -90,12 +87,154 @@ impl<T: SubAssign> SubAssign<T> for Constant<T> {
     }
 }
 
+macro_rules! impl_constant_left_scalar_ops {
+    ($($scalar:ty),*) => {
+        $(
+            impl Add<Constant<$scalar>> for $scalar {
+                type Output = Constant<$scalar>;
+
+                fn add(self, rhs: Constant<$scalar>) -> Self::Output {
+                    Self::Output::from_data([
+                        // SAFETY: `N` is 1, so the index is always valid
+                        unsafe { self.clone() + rhs.get_unchecked(0) },
+                    ])
+                }
+            }
+            impl AddAssign<Constant<$scalar>> for $scalar {
+                fn add_assign(&mut self, rhs: Constant<$scalar>) {
+                    // SAFETY: `N` is 1, so the index is always valid
+                    unsafe {
+                        *self += rhs.get_unchecked(0);
+                    }
+                }
+            }
+            impl SubAssign<Constant<$scalar>> for $scalar {
+                fn sub_assign(&mut self, rhs: Constant<$scalar>) {
+                    // SAFETY: `N` is 1, so the index is always valid
+                    unsafe {
+                        *self -= rhs.get_unchecked(0);
+                    }
+                }
+            }
+            impl Div<Constant<$scalar>> for $scalar {
+                type Output = Constant<$scalar>;
+
+                fn div(self, rhs: Constant<$scalar>) -> Self::Output {
+                    Self::Output::from_data([
+                        // SAFETY: `N` is 1, so the index is always valid
+                        unsafe { self.clone() / rhs.get_unchecked(0) },
+                    ])
+                }
+            }
+        )*
+    };
+}
+
+macro_rules! impl_constant_left_scalar_sub {
+    ($($scalar:ty),*) => {
+        $(
+            impl Sub<Constant<$scalar>> for $scalar {
+                type Output = Constant<$scalar>;
+
+                fn sub(self, rhs: Constant<$scalar>) -> Self::Output {
+                    Polynomial::from_data([
+                        // SAFETY: `N` is 1, so the index is always valid
+                        unsafe { self.clone() - rhs.get_unchecked(0) }
+                    ])
+                }
+            }
+
+        )*
+    };
+}
+
+impl_constant_left_scalar_ops!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
+impl_constant_left_scalar_sub!(i8, i16, i32, isize, f32, f64);
+
 // ===============================================================================================
-//      Polynomial-Polynomial Arithmatic
+//      Constant-Empty Polynomial Arithmatic
 // ===============================================================================================
 
-/// Implementation of [Add] for Polynomial<T, 1> and Polynomial<T, 1>
+
+/// # Polynomial<T, 1> + Polynomial<T, 0>
 ///
+/// # Example
+/// ```
+/// use control_rs::polynomial::Polynomial;
+/// let p1 = Polynomial::new([1]);
+/// let p2 = Polynomial::new([]);
+/// let p3 = p1 + p2;
+/// assert_eq!(*p3.constant().unwrap(), 1);
+/// ```
+/// TODO: Unit Test
+impl<T: Clone> Add<Polynomial<T, 0>> for Constant<T> {
+    type Output = Self;
+
+    fn add(self, _rhs: Polynomial<T, 0>) -> Self::Output {
+        self.clone()
+    }
+}
+
+/// # Polynomial<T, 1> += Polynomial<T, 0>
+///
+/// This function has no effect, it is only implemented for completeness.
+///
+/// # Example
+/// ```
+/// use control_rs::polynomial::Polynomial;
+/// let mut p1 = Polynomial::new([1]);
+/// let p2 = Polynomial::new([]);
+/// p1 += p2;
+/// assert_eq!(*p1.constant().unwrap(), 1);
+/// ```
+/// TODO: Unit Test
+impl<T> AddAssign<Polynomial<T, 0>> for Constant<T> {
+    fn add_assign(&mut self, _rhs: Polynomial<T, 0>) {}
+}
+
+/// # Polynomial<T, 1> - Polynomial<T, 0>
+///
+/// # Example
+/// ```
+/// use control_rs::polynomial::Polynomial;
+/// let p1 = Polynomial::new([1]);
+/// let p2 = Polynomial::new([]);
+/// let p3 = p1 - p2;
+/// assert_eq!(*p3.constant().unwrap(), 1);
+/// ```
+/// TODO: Unit Test
+impl<T: Clone> Sub<Polynomial<T, 0>> for Constant<T> {
+    type Output = Self;
+
+    fn sub(self, _rhs: Polynomial<T, 0>) -> Self::Output {
+        self.clone()
+    }
+}
+
+/// # Polynomial<T, 1> -= Polynomial<T, 0>
+///
+/// This function has no effect, it is only implemented for completeness.
+///
+/// # Example
+/// ```
+/// use control_rs::polynomial::Polynomial;
+/// let mut p1 = Polynomial::new([1]);
+/// let p2 = Polynomial::new([]);
+/// p1 -= p2;
+/// assert_eq!(*p1.constant().unwrap(), 1);
+/// ```
+/// TODO: Unit Test
+impl<T> SubAssign<Polynomial<T, 0>> for Constant<T> {
+    fn sub_assign(&mut self, _rhs: Polynomial<T, 0>) {}
+}
+
+// ===============================================================================================
+//      Constant-Constant Arithmatic
+// ===============================================================================================
+
+/// # Polynomial<T, 1> + Polynomial<T, 1>
+///
+/// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([0]);
@@ -110,16 +249,14 @@ impl<T: Clone + Add<Output = T>> Add for Constant<T> {
     fn add(self, rhs: Self) -> Self::Output {
         Self::from_data([
             // SAFETY: `N` is 1, so the index is always valid
-            unsafe {
-                self.get_unchecked(0).clone()
-                    + rhs.get_unchecked(0).clone()
-            }
+            unsafe { self.get_unchecked(0).clone() + rhs.get_unchecked(0).clone() },
         ])
     }
 }
 
-/// Implementation of [AddAssign] for Polynomial<T, 1> and Polynomial<T, 1>
+/// # Polynomial<T, 1> += Polynomial<T, 1>
 ///
+/// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([0]);
@@ -137,8 +274,9 @@ impl<T: Clone + AddAssign> AddAssign for Constant<T> {
     }
 }
 
-/// Implementation of [Sub] for Polynomial<T, 1> and Polynomial<T, 1>
+/// # Polynomial<T, 1> - Polynomial<T, 1>
 ///
+/// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([1]);
@@ -153,16 +291,14 @@ impl<T: Clone + Sub<Output = T>> Sub for Constant<T> {
     fn sub(self, rhs: Self) -> Self::Output {
         Self::from_data([
             // SAFETY: `N` is 1, so the index is always valid
-            unsafe {
-                self.get_unchecked(0).clone()
-                    - rhs.get_unchecked(0).clone()
-            }
+            unsafe { self.get_unchecked(0).clone() - rhs.get_unchecked(0).clone() },
         ])
     }
 }
 
-/// Implementation of [SubAssign] for Polynomial<T, 1> and Polynomial<T, 1>
+/// # Polynomial<T, 1> -= Polynomial<T, 1>
 ///
+/// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([1]);
@@ -180,8 +316,9 @@ impl<T: Clone + SubAssign> SubAssign for Constant<T> {
     }
 }
 
-/// Implementation of [Mul] for Polynomial<T, 1> and Polynomial<T, 1>
+/// # Polynomial<T, 1> * Polynomial<T, 1>
 ///
+/// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([2]);
@@ -196,15 +333,14 @@ impl<T: Clone + Mul<Output = T>> Mul for Constant<T> {
     fn mul(self, rhs: Self) -> Self::Output {
         Self::from_data([
             // SAFETY: `N` is 1, so the index is always valid
-            unsafe {
-                self.get_unchecked(0).clone() * rhs.get_unchecked(0).clone()
-            }
+            unsafe { self.get_unchecked(0).clone() * rhs.get_unchecked(0).clone() },
         ])
     }
 }
 
-/// Implementation of [MulAssign] for Polynomial<T, 1> and Polynomial<T, 1>
+/// # Polynomial<T, 1> *= Polynomial<T, 1>
 ///
+/// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([2]);
@@ -222,8 +358,9 @@ impl<T: Clone + MulAssign> MulAssign for Constant<T> {
     }
 }
 
-/// Implementation of [Div] for Polynomial<T, 1> and Polynomial<T, 1>
+/// # Polynomial<T, 1> / Polynomial<T, 1>
 ///
+/// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([2]);
@@ -238,15 +375,14 @@ impl<T: Clone + Div<Output = T>> Div for Constant<T> {
     fn div(self, rhs: Self) -> Self::Output {
         Self::from_data([
             // SAFETY: `N` is 1, so the index is always valid
-            unsafe {
-                self.get_unchecked(0).clone() / rhs.get_unchecked(0).clone()
-            }
+            unsafe { self.get_unchecked(0).clone() / rhs.get_unchecked(0).clone() },
         ])
     }
 }
 
-/// Implementation of [DivAssign] for Polynomial<T, 1> and Polynomial<T, 1>
+/// # Polynomial<T, 1> /= Polynomial<T, 1>
 ///
+/// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([2]);
@@ -264,8 +400,9 @@ impl<T: Clone + DivAssign> DivAssign for Constant<T> {
     }
 }
 
-/// Implementation of [Rem] for Polynomial<T, 1> and Polynomial<T, 1>
+/// # Polynomial<T, 1> % Polynomial<T, 1>
 ///
+/// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([2]);
@@ -280,15 +417,14 @@ impl<T: Clone + Rem<Output = T>> Rem for Constant<T> {
     fn rem(self, rhs: Self) -> Self::Output {
         Self::from_data([
             // SAFETY: `N` is 1, so the index is always valid
-            unsafe {
-                self.get_unchecked(0).clone() % rhs.get_unchecked(0).clone()
-            }
+            unsafe { self.get_unchecked(0).clone() % rhs.get_unchecked(0).clone() },
         ])
     }
 }
 
-/// Implementation of [RemAssign] for Polynomial<T, 1> and Polynomial<T, 1>
+/// # Polynomial<T, 1> %= Polynomial<T, 1>
 ///
+/// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([2]);

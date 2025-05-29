@@ -7,7 +7,7 @@ mod basic_model_tests {
             utils::{control_canonical, zoh},
             StateSpace,
         },
-        system_traits::{DynamicModel, NLModel},
+        systems::{DynamicalSystem, NLModel},
     };
     use nalgebra::{Matrix2x1, Vector2};
 
@@ -23,7 +23,7 @@ mod basic_model_tests {
         control: ParticleInput,
     }
 
-    impl DynamicModel<ParticleInput, ParticleState, ParticleOutput> for Particle1D {
+    impl DynamicalSystem<ParticleInput, ParticleState, ParticleOutput> for Particle1D {
         fn dynamics(&self, state: ParticleState, input: ParticleInput) -> ParticleState {
             ParticleState::new(state[1], input - 0.1 * state[1])
         }
