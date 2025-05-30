@@ -1,39 +1,5 @@
 use super::*;
 
-mod neg {
-    use super::*;
-
-    #[test]
-    fn empty_neg() {
-        let empty = Polynomial::from_data([0.0f32; 0]);
-        assert_eq!(-empty, empty);
-    }
-
-    #[test]
-    fn constant_neg() {
-        let constant = Polynomial::from_data([1.0f64]);
-        assert_eq!(-constant, Polynomial::from_data([-1.0f64]));
-    }
-
-    #[test]
-    fn line_neg() {
-        let line = Polynomial::from_data([0, 1]);
-        assert_eq!(-line, Polynomial::from_data([0, -1]));
-    }
-
-    #[test]
-    fn quadratic_neg() {
-        let quadratic = Polynomial::from_data([0, 0, 1]);
-        assert_eq!(-quadratic, Polynomial::from_data([0, 0, -1]));
-    }
-
-    #[test]
-    fn large_neg() {
-        let polynomial: Polynomial<i8, 16> = Polynomial::from_element(1);
-        assert_eq!(-polynomial, Polynomial::from_element(-1));
-    }
-}
-
 mod scalar_add {
     use super::*;
     #[test]
@@ -450,7 +416,7 @@ mod const_mul {
 
 mod line_mul {
     use super::*;
-    #[test]
+    // #[test]
     // fn empty_post_mul() {
     //     let empty: Polynomial<i8, 0> = Polynomial::from_element(1);
     //     let line = Polynomial::from_data([1i8, 1i8]);

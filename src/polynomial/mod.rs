@@ -1,8 +1,8 @@
-//! A safe and statically sized univariate-polynomial
+//! Array-based univariate-polynomial
 //!
-//! This file contains the base implementation of a generic typed and sized array polynomial. To
-//! guarantee safe implementations of all arithmatic operations some implementations may only be
-//! available for certain specializations.
+//! This module contains a base implementation of a generic array polynomial. To guarantee safe and
+//! deterministic implementations of all arithmatic some implementations are only available for
+//! certain specializations.
 //!
 //! # Examples
 //!
@@ -15,21 +15,23 @@
 //!
 //! let line = Line::new([1.0, 0.0]);
 //! assert_eq!(line.degree(), Some(1));
-//! assert_eq!(line.leading_coefficient(), Some(&1));
+//! assert_eq!(line.leading_coefficient(), Some(&1.0));
 //! ```
 //!
-//! TODO:
-//!     * calculus
-//!         * `evaluate<U>(x: U) -> U`
-//!         * `derivative(p_src: &Polynomial<T, M>) -> Self`
-//!         * `integral(p_src: &Polynomial<T, M>) -> Self`
-//!         * `foil_roots(&mut self, roots: &[T]) -> Result<(), Polynomial>`
-//!         * `foil_complex_roots(&mut self, roots: &[Complex<T>]) -> Result<(), Polynomial>`
-//!         * `real_roots(p: Polynomial, roots: &mut [T]) -> Result<(), PolynomialError>`
-//!         * `complex_roots(p: Polynomial, roots: &mut [Complex<T>]) -> Result<(), PolynomialError>`
-//!     * formatting
-//!         * Display precision option
-//!         * Latex / symbolic formatter
+// TODO:
+//     * algebra
+//         * `compose(f: Polynomial, g: Polynomial) -> Polynomial`
+//     * calculus
+//         * `evaluate<U>(x: U) -> U`
+//         * `derivative(p_src: &Polynomial<T, M>) -> Self`
+//         * `integral(p_src: &Polynomial<T, M>) -> Self`
+//         * `foil_roots(&mut self, roots: &[T]) -> Result<(), Polynomial>`
+//         * `foil_complex_roots(&mut self, roots: &[Complex<T>]) -> Result<(), Polynomial>`
+//         * `real_roots(p: Polynomial, roots: &mut [T]) -> Result<(), PolynomialError>`
+//         * `complex_roots(p: Polynomial, roots: &mut [Complex<T>]) -> Result<(), PolynomialError>`
+//     * formatting
+//         * Display precision option
+//         * Latex / symbolic formatter
 
 use core::{
     array, fmt,
@@ -43,7 +45,7 @@ use nalgebra::{allocator::Allocator, Const, Complex, DefaultAllocator, DimDiff, 
 //      Polynomial Specializations
 // ===============================================================================================
 
-pub mod constant;
+mod constant;
 pub use constant::Constant;
 
 mod line;

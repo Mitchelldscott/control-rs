@@ -1,4 +1,4 @@
-//! A variety of methods to integrate [DynamicModel]s
+//! A variety of methods to integrate [DynamicalSystem]s
 //!
 use crate::math::systems::DynamicalSystem;
 
@@ -7,7 +7,7 @@ use core::ops::{Add, Div, Mul};
 /// Integrate the system for a given time interval
 ///
 /// The time interval is assumed to be small enough the input will be constant for the
-/// duration of the integration. For simulations with time-varying input call this repeatedly
+/// duration of the integration. For simulations with time-varying input, call this repeatedly
 /// in a loop.
 ///
 /// # Arguments

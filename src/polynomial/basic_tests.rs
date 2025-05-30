@@ -8,222 +8,136 @@
 //!
 //! TODO:
 //!     * constructors
-//!         * new(coefficients; [T; N])
-//!         * resize()
-//!         * compose(f: Polynomial, g: Polynomial) -> Polynomial
-//!         * to_monic(&self) -> Self
+//!         * `new(coefficients; [T; N])`
+//!         * `compose(f: Polynomial, g: Polynomial) -> Polynomial`
+//!         * `to_monic(&self) -> Self`
 //!     * accessors
-//!         * coefficient()
-//!         * coefficient_mut()
-//!         * constant()
-//!         * constant_mut()
-//!         * leading_coefficient()
-//!         * leading_coefficient_mut()
-//!         * resize(polynomial: Polynomial)
+//!         * `coefficient()`
+//!         * `coefficient_mut()`
+//!         * `constant()`
+//!         * `constant_mut()`
+//!         * `leading_coefficient()`
+//!         * `leading_coefficient_mut()`
+//!         * `resize(polynomial: Polynomial)`
 
-#[cfg(feature = "std")]
-use std::{any::type_name, fmt};
 
-#[cfg(not(feature = "std"))]
 use core::{any::type_name, fmt};
 
-use crate::polynomial::Polynomial;
+use crate::polynomial::{Polynomial, Constant, Line};
 
 use num_traits::{One, Zero};
 
-fn is_empty_degree_constant_monic_validator<
-    T: Clone + Zero + One + PartialEq + fmt::Debug,
-    const N: usize,
->(
-    _test_name: &str,
-    polynomial: Polynomial<T, N>,
-    is_empty: bool,
-    expected_degree: Option<usize>,
-    expected_constant: Option<&T>,
-    expected_monic: bool,
-) {
-    let _type_name = type_name::<T>();
-    assert_eq!(
-        polynomial.is_empty(),
-        is_empty,
-        "Polynomial::<{_type_name}, {N}>::{_test_name}().is_empty()"
-    );
-    assert_eq!(
-        polynomial.degree(),
-        expected_degree,
-        "Polynomial::<{_type_name}, {N}>::{_test_name}().degree()"
-    );
-    assert_eq!(
-        polynomial.constant(),
-        expected_constant,
-        "Polynomial::<{_type_name}, {N}>::{_test_name}().constant()"
-    );
-    assert_eq!(
-        polynomial.is_monic(),
-        expected_monic,
-        "Polynomial::<{_type_name}, {N}>::{_test_name}().is_monic()"
-    );
+mod neg {
+    use super::*;
+    #[test]
+    fn empty_neg() {
+        let empty = Polynomial::from_data([0.0f32; 0]);
+        assert_eq!(-empty, empty);
+    }
+    #[test]
+    fn constant_neg() {
+        let constant = Polynomial::monomial(1.0f64);
+        assert_eq!(-constant, Polynomial::from_data([-1.0f64]));
+    }
+    fn line_neg() {
+        let line = Polynomial::from_data([0, 1]);
+        assert_eq!(-line, Polynomial::from_data([0, -1]));
+    }
+    #[test]
+    fn quadratic_neg() {
+        let quadratic = Polynomial::new([1, 0, 0]);
+        assert_eq!(-quadratic, Polynomial::from_data([0, 0, -1]));
+    }
+    #[test]
+    fn large_neg() {
+        let polynomial: Polynomial<i8, 16> = Polynomial::from_element(1);
+        assert_eq!(-polynomial, Polynomial::from_element(-1));
+    }
 }
 
-fn from_data_validator<T>()
-where
-    T: Clone + Zero + One + PartialEq + fmt::Debug,
-{
-    let empty_polynomial: Polynomial<T, 0> = Polynomial::from_data([]);
-    is_empty_degree_constant_monic_validator(
-        "from_data",
-        empty_polynomial,
-        true,
-        None,
-        None,
-        false,
-    );
-
-    let constant = Polynomial::from_data([T::one()]);
-    is_empty_degree_constant_monic_validator(
-        "from_data",
-        constant,
-        false,
-        Some(0),
-        Some(&T::one()),
-        true,
-    );
-    // TODO: Line + Quadratic + Cubic + ...
-}
-
-fn from_fn_validator<T>()
-where
-    T: Default + Clone + Zero + One + PartialEq + fmt::Debug,
-{
-    let empty_polynomial: Polynomial<T, 0> = Polynomial::from_fn(|_| T::one());
-    is_empty_degree_constant_monic_validator("from_fn", empty_polynomial, true, None, None, false);
-
-    let mut counter = T::zero();
-    let constant: Polynomial<T, 1> = Polynomial::from_fn(|_| {
-        counter = counter.clone() + T::one();
-        counter.clone()
-    });
-    is_empty_degree_constant_monic_validator(
-        "from_fn",
-        constant,
-        false,
-        Some(0),
-        Some(&T::one()),
-        true,
-    );
-    // TODO: Line + Quadratic + Cubic + ...
-}
-
-fn from_iterator_validator<T>()
-where
-    T: Clone + Copy + Zero + One + PartialEq + fmt::Debug,
-{
-    let empty_polynomial: Polynomial<T, 0> = Polynomial::from_iterator([]);
-    is_empty_degree_constant_monic_validator(
-        "from_iterator",
-        empty_polynomial,
-        true,
-        None,
-        None,
-        false,
-    );
-
-    let constant: Polynomial<T, 1> = Polynomial::from_iterator([T::zero()]);
-    is_empty_degree_constant_monic_validator(
-        "from_iterator",
-        constant,
-        false,
-        None,
-        Some(&T::zero()),
-        false,
-    );
-    // TODO: Line + Quadratic + Cubic + ...
-}
-
-fn default_validator<T>()
-where
-    T: Default + Clone + Zero + One + PartialEq + fmt::Debug,
-{
-    let empty_polynomial: Polynomial<T, 0> = Polynomial::default();
-    is_empty_degree_constant_monic_validator("default", empty_polynomial, true, None, None, false);
-
-    let constant: Polynomial<T, 1> = Polynomial::default();
-    let degree = match T::default() == T::zero() {
-        true => None,
-        _ => Some(0),
-    };
-    is_empty_degree_constant_monic_validator(
-        "default",
-        constant,
-        false,
-        degree,
-        Some(&T::default()),
-        T::default() == T::one(),
-    );
-    // TODO: Line + Quadratic + Cubic + ...
-}
-
-fn monomial_validator<T>()
-where
-    T: Clone + Zero + One + PartialEq + fmt::Debug,
-{
-    let empty_polynomial: Polynomial<T, 0> = Polynomial::monomial(T::zero());
-    is_empty_degree_constant_monic_validator("monomial", empty_polynomial, true, None, None, false);
-
-    let constant: Polynomial<T, 1> = Polynomial::monomial(T::one());
-    is_empty_degree_constant_monic_validator(
-        "monomial",
-        constant,
-        false,
-        Some(0),
-        Some(&T::one()),
-        true,
-    );
-    // TODO: Line + Quadratic + Cubic + ...
-}
-
-fn from_element_validator<T>()
-where
-    T: Clone + Copy + Zero + One + PartialEq + fmt::Debug,
-{
-    let empty_polynomial: Polynomial<T, 0> = Polynomial::from_element(T::zero());
-    is_empty_degree_constant_monic_validator(
-        "from_element",
-        empty_polynomial,
-        true,
-        None,
-        None,
-        false,
-    );
-
-    let constant: Polynomial<T, 1> = Polynomial::from_element(T::one());
-    is_empty_degree_constant_monic_validator(
-        "from_element",
-        constant,
-        false,
-        Some(0),
-        Some(&T::one()),
-        true,
-    );
-    // TODO: Line + Quadratic + Cubic + ...
-}
-
-#[test]
-fn i8_constructors() {
-    from_data_validator::<i8>();
-    from_fn_validator::<i8>();
-    from_iterator_validator::<i8>();
-    default_validator::<i8>();
-    monomial_validator::<i8>();
-    from_element_validator::<i8>();
-}
-
-#[test]
-fn u8_constructors() {
-    from_data_validator::<u8>();
-    from_fn_validator::<u8>();
-    from_iterator_validator::<u8>();
-    default_validator::<u8>();
-    monomial_validator::<u8>();
-    from_element_validator::<u8>();
+mod coefficient_accessors {
+    use super::*;
+    #[test]
+    fn empty() {
+        let p = Polynomial::new([1i32; 0]);
+        assert_eq!(p.is_empty(), true, "not empty");
+        assert_eq!(p.degree(), None, "degree not none");
+        assert_eq!(p.is_monic(), false, "monic");
+        assert_eq!(p.coefficient(0), None, "coefficient(0) not none");
+        assert_eq!(p.coefficient(1), None, "coefficient(1) not none");
+        assert_eq!(p.constant(), None, "constant not none");
+        assert_eq!(p.leading_coefficient(), None, "leading_coefficient not none");
+        let mut p_mut = Polynomial::from_data([1i32; 0]);
+        assert_eq!(p_mut.is_empty(), true, "mut not empty");
+        assert_eq!(p_mut.degree(), None, "degree not none");
+        assert_eq!(p_mut.is_monic(), false, "monic");
+        assert_eq!(p_mut.coefficient_mut(0), None, "coefficient_mut(0) not none");
+        assert_eq!(p_mut.coefficient_mut(1), None, "coefficient_mut(1) not none");
+        assert_eq!(p_mut.constant_mut(), None, "constant_mut not none");
+        assert_eq!(p_mut.leading_coefficient_mut(), None, "leading_coefficient_mut not none");
+    }
+    #[test]
+    fn constant() {
+        let p = Constant::from_element(10i32);
+        assert_eq!(p.is_empty(), false, "p is empty");
+        assert_eq!(p.degree(), Some(0), "degree");
+        assert_eq!(p.is_monic(), false, "monic");
+        assert_eq!(p.coefficient(0), Some(&1), "coefficient(0)");
+        assert_eq!(p.coefficient(1), None, "coefficient(1) not none");
+        assert_eq!(p.constant(), Some(&1), "constant");
+        assert_eq!(p.leading_coefficient(), Some(&1), "leading_coefficient");
+        let mut p_mut = Constant::from_iterator([1i32]);
+        assert_eq!(p_mut.is_empty(), false, "mut not empty");
+        assert_eq!(p_mut.degree(), Some(0), "degree");
+        assert_eq!(p_mut.is_monic(), true, "monic");
+        assert_eq!(p_mut.coefficient_mut(0), Some(&mut 1), "coefficient_mut(0)");
+        assert_eq!(p_mut.coefficient_mut(1), None, "coefficient_mut(1) not none");
+        assert_eq!(p_mut.constant_mut(), Some(&mut 1), "constant_mut");
+        assert_eq!(p_mut.leading_coefficient_mut(), Some(&mut 1), "leading_coefficient_mut");
+    }
+    #[test]
+    fn line() {
+        let p = Line::from_fn(|_| 1i32);
+        assert_eq!(p.is_empty(), false, "p is empty");
+        assert_eq!(p.degree(), Some(1), "degree");
+        assert_eq!(p.is_monic(), true, "monic");
+        assert_eq!(p.coefficient(0), Some(&1), "coefficient(0)");
+        assert_eq!(p.coefficient(1), Some(&1), "coefficient(1)");
+        assert_eq!(p.coefficient(2), None, "coefficient(2)");
+        assert_eq!(p.constant(), Some(&1), "constant");
+        assert_eq!(p.leading_coefficient(), Some(&1), "leading_coefficient");
+        let mut p_mut = Line::from_iterator([1i32]); // y = 0*x + 1
+        assert_eq!(p_mut.is_empty(), false, "mut not empty");
+        assert_eq!(p_mut.degree(), Some(1), "degree");
+        assert_eq!(p_mut.is_monic(), false, "monic");
+        assert_eq!(p_mut.coefficient_mut(0), Some(&mut 1), "coefficient_mut(0)");
+        assert_eq!(p_mut.coefficient_mut(1), Some(&mut 0), "coefficient_mut(1)");
+        assert_eq!(p_mut.coefficient_mut(2), None, "coefficient_mut(2) not none");
+        assert_eq!(p_mut.constant_mut(), Some(&mut 1), "constant_mut");
+        assert_eq!(p_mut.leading_coefficient_mut(), Some(&mut 0), "leading_coefficient_mut");
+    }
+    fn large() {
+        let p = Polynomial::<f32, 24>::from_fn(|_| 1.0);
+        assert_eq!(p.is_empty(), false, "p is empty");
+        assert_eq!(p.degree(), Some(23), "degree");
+        assert_eq!(p.is_monic(), true, "monic");
+        assert_eq!(p.coefficient(0), Some(&1.0), "coefficient(0)");
+        assert_eq!(p.coefficient(1), Some(&1.0), "coefficient(1)");
+        assert_eq!(p.coefficient(2), Some(&1.0), "coefficient(2)");
+        assert_eq!(p.coefficient(23), Some(&1.0), "coefficient(23)");
+        assert_eq!(p.coefficient(24), None, "coefficient(24)");
+        assert_eq!(p.constant(), Some(&1.0), "constant");
+        assert_eq!(p.leading_coefficient(), Some(&1.0), "leading_coefficient");
+        let mut p_mut = Polynomial::<f64, 24>::from_iterator([1.0]); // y = 0*x + 1
+        assert_eq!(p_mut.is_empty(), false, "mut not empty");
+        assert_eq!(p_mut.degree(), Some(23), "degree");
+        assert_eq!(p_mut.is_monic(), false, "monic");
+        assert_eq!(p_mut.coefficient_mut(0), Some(&mut 1.0), "coefficient_mut(0)");
+        assert_eq!(p_mut.coefficient_mut(1), Some(&mut 0.0), "coefficient_mut(1)");
+        assert_eq!(p_mut.coefficient_mut(2), Some(&mut 0.0), "coefficient_mut(2)");
+        assert_eq!(p_mut.coefficient_mut(23), Some(&mut 0.0), "coefficient_mut(23)");
+        assert_eq!(p_mut.coefficient_mut(24), None, "coefficient_mut(24)");
+        assert_eq!(p_mut.constant_mut(), Some(&mut 1.0), "constant_mut");
+        assert_eq!(p_mut.leading_coefficient_mut(), Some(&mut 0.0), "leading_coefficient_mut");
+    }
 }

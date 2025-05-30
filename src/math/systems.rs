@@ -46,10 +46,10 @@ pub trait DynamicalSystem<Input, State, Output> {
 /// ## References
 /// - *Nonlinear Systems*, Khalil, Ch. 2: Nonlinear Models.
 ///
-/// ## TODO:
-///     - [ ] add generic linearization so users don't need to define a custom one (derive?)
-///     - [ ] add LinearModel trait so custom models can be linearized to other forms (linear multivariate polynomial?)
 pub trait NLModel<Input, State, Output, A, B, C, D>: DynamicalSystem<Input, State, Output> {
+    // # TODO:
+    //     * Generic linearization so users don't need to define a custom one (derive?)
+    //     * LinearModel trait so custom models can be linearized to other forms (linear multivariate polynomial?)
     /// Linearizes the system about a nominal state and input
     fn linearize(&self, x: State, u: Input) -> StateSpace<A, B, C, D>;
 }
