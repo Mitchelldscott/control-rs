@@ -439,7 +439,7 @@ impl<T: PartialEq + One, const N: usize> Polynomial<T, N> {
 }
 
 // ===============================================================================================
-//      Polynomial Coefficient Accessors
+//      Generic Polynomial Coefficient Access
 // ===============================================================================================
 
 impl<T, const N: usize> Polynomial<T, N> {
@@ -532,6 +532,8 @@ impl<T, const N: usize> Polynomial<T, N> {
     #[inline]
     #[must_use]
     pub fn leading_coefficient(&self) -> Option<&T> {
+        // this can't directly call self.coefficient(N - 1) because that
+        // will fail if N is 0
         if self.is_empty() {
             None
         } else {
@@ -669,8 +671,8 @@ where
     /// Computes the roots of the polynomial.
     ///
     /// Edge cases:
-    /// - if the leading coefficient is zero this should reduce the order and recurse, having
-    /// issues with trait bounds (currently returning NaN)
+    /// - if the leading coefficient is zero, this should reduce the order and recurse, having
+    /// issues with trait bounds (currently returns NaN)
     /// - all coefficients are zero: all roots are infinite
     /// - if there are two coefficients and the lead is non-zero: the root is
     /// `-coefficient[1]/coefficient[0]`
@@ -731,6 +733,16 @@ where
 
 // ===============================================================================================
 //      Generic Polynomial-Scalar Arithmatic
+//
+//  The following operations are provided for all polynomials:
+//      * Neg
+//      * Mul<T> & Mul<Polynomial<T,N>> for T
+//      * MulAssign<T>
+//      * Div<T>
+//      * DivAssign<T>
+//      * Rem<T>
+//      * RemAssign<T>
+//
 // ===============================================================================================
 
 /// # -Polynomial<T, N>
@@ -755,30 +767,6 @@ impl<T: Clone + Neg<Output = T>, const N: usize> Neg for Polynomial<T, N> {
         })
     }
 }
-
-// /// # Polynomial<T, N> + T
-// ///
-// /// # Example
-// /// ```
-// /// use control_rs::polynomial::Polynomial;
-// /// let p1 = Polynomial::new([0]);
-// /// let p2 = p1 + 1;
-// /// assert_eq!(*p2.constant().unwrap(), 1);
-// /// ```
-// /// TODO: Unit Test
-// impl<T: Clone + Add<Output = T>, const N: usize> Add<T> for Polynomial<T, N> {
-//     type Output = Polynomial<T, N>;
-// 
-//     fn add(self, rhs: T) -> Self::Output {
-//         // Self::from_data([
-//         //     // SAFETY: `N` is 1, so the index is always valid
-//         //     unsafe { self.get_unchecked(0).clone() + rhs },
-//         // ])
-//         let mut result = self.clone();
-//         if let Some(constant) = result.constant_mut() { *constant = constant.clone() + rhs; }
-//         result
-//     }
-// }
 
 /// # Polynomial<T, N> * T
 ///
@@ -898,7 +886,7 @@ impl<T: Clone + RemAssign, const N: usize> RemAssign<T> for Polynomial<T, N> {
     }
 }
 
-macro_rules! impl_generic_left_scalar_arithmetic {
+macro_rules! impl_generic_left_scalar_mul {
     ($($scalar:ty),*) => {
         $(
             impl<const N: usize> Mul<Polynomial<$scalar, N>> for $scalar {
@@ -912,7 +900,7 @@ macro_rules! impl_generic_left_scalar_arithmetic {
     };
 }
 
-impl_generic_left_scalar_arithmetic!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
+impl_generic_left_scalar_mul!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
 
 // ===============================================================================================
 //      Empty Polynomial-Scalar Arithmatic
@@ -955,14 +943,14 @@ impl<T> Add<T> for Polynomial<T, 0> {
 impl<T: Neg<Output = T>> Sub<T> for Polynomial<T, 0> {
     type Output = Polynomial<T, 1>;
 
-    /// Returns a new polynomial with the constant term equal to 0 - rhs
+    /// Returns a new polynomial with the constant term equal to -rhs
     #[inline]
     fn sub(self, rhs: T) -> Self::Output {
         Self::Output::from_data([rhs.neg()])
     }
 }
 
-macro_rules! impl_base_case_left_scalar_add {
+macro_rules! impl_base_case_left_scalar_arithmatic {
     ($($scalar:ty),*) => {
         $(
             impl Add<Polynomial<$scalar, 0>> for $scalar {
@@ -975,16 +963,6 @@ macro_rules! impl_base_case_left_scalar_add {
             impl AddAssign<Polynomial<$scalar, 0>> for $scalar {
                 fn add_assign(&mut self, _rhs: Polynomial<$scalar, 0>) {}
             }
-            impl SubAssign<Polynomial<$scalar, 0>> for $scalar {
-                fn sub_assign(&mut self, _rhs: Polynomial<$scalar, 0>) {}
-            }
-        )*
-    };
-}
-
-macro_rules! impl_base_case_left_scalar_sub {
-    ($($scalar:ty),*) => {
-        $(
             impl Sub<Polynomial<$scalar, 0>> for $scalar {
                 type Output = Polynomial<$scalar, 1>;
 
@@ -992,12 +970,14 @@ macro_rules! impl_base_case_left_scalar_sub {
                     Polynomial::from_data([self.clone()])
                 }
             }
+            impl SubAssign<Polynomial<$scalar, 0>> for $scalar {
+                fn sub_assign(&mut self, _rhs: Polynomial<$scalar, 0>) {}
+            }
         )*
     };
 }
 
-impl_base_case_left_scalar_add!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
-impl_base_case_left_scalar_sub!(i8, i16, i32, isize, f32, f64);
+impl_base_case_left_scalar_arithmatic!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
 
 // ===============================================================================================
 //      Empty Polynomial-Generic Polynomial Arithmatic
@@ -1054,7 +1034,7 @@ where
     T: Clone + Zero + One + PartialOrd + Neg<Output = T> + fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (i, a_i) in self.coefficients.iter().enumerate().rev() {
+        for (i, a_i) in self.iter().enumerate().rev() {
             if a_i.is_zero() {
                 continue;
             }

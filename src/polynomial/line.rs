@@ -1,6 +1,6 @@
 //! Type alias of polynomial that implements a constant.
 
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Mul, Neg, Sub, SubAssign};
 
 use crate::Polynomial;
 
