@@ -1,8 +1,8 @@
-//! A safe and statically sized univariate-polynomial
+//! Array-based univariate-polynomial
 //!
-//! This file contains the base implementation of a generic typed and sized array polynomial. To
-//! guarantee safe implementations of all arithmatic operations some implementations may only be
-//! available for certain specializations.
+//! This module contains a base implementation of a generic array polynomial. To guarantee safe and
+//! deterministic implementations of all arithmatic some implementations are only available for
+//! certain specializations.
 //!
 //! # Examples
 //!
@@ -15,21 +15,23 @@
 //!
 //! let line = Line::new([1.0, 0.0]);
 //! assert_eq!(line.degree(), Some(1));
-//! assert_eq!(line.leading_coefficient(), Some(&1));
+//! assert_eq!(line.leading_coefficient(), Some(&1.0));
 //! ```
 //!
-//! TODO:
-//!     * calculus
-//!         * `evaluate<U>(x: U) -> U`
-//!         * `derivative(p_src: &Polynomial<T, M>) -> Self`
-//!         * `integral(p_src: &Polynomial<T, M>) -> Self`
-//!         * `foil_roots(&mut self, roots: &[T]) -> Result<(), Polynomial>`
-//!         * `foil_complex_roots(&mut self, roots: &[Complex<T>]) -> Result<(), Polynomial>`
-//!         * `real_roots(p: Polynomial, roots: &mut [T]) -> Result<(), PolynomialError>`
-//!         * `complex_roots(p: Polynomial, roots: &mut [Complex<T>]) -> Result<(), PolynomialError>`
-//!     * formatting
-//!         * Display precision option
-//!         * Latex / symbolic formatter
+// TODO:
+//     * algebra
+//         * `compose(f: Polynomial, g: Polynomial) -> Polynomial`
+//     * calculus
+//         * `evaluate<U>(x: U) -> U`
+//         * `derivative(p_src: &Polynomial<T, M>) -> Self`
+//         * `integral(p_src: &Polynomial<T, M>) -> Self`
+//         * `foil_roots(&mut self, roots: &[T]) -> Result<(), Polynomial>`
+//         * `foil_complex_roots(&mut self, roots: &[Complex<T>]) -> Result<(), Polynomial>`
+//         * `real_roots(p: Polynomial, roots: &mut [T]) -> Result<(), PolynomialError>`
+//         * `complex_roots(p: Polynomial, roots: &mut [Complex<T>]) -> Result<(), PolynomialError>`
+//     * formatting
+//         * Display precision option
+//         * Latex / symbolic formatter
 
 use core::{
     array, fmt,
@@ -37,17 +39,17 @@ use core::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign},
     slice,
 };
-use num_traits::{One, Zero};
-
+use num_traits::{One, Zero, Num, Float};
+use nalgebra::{allocator::Allocator, Const, Complex, DefaultAllocator, DimDiff, DimName, DimSub, OMatrix, RealField, U1};
 // ===============================================================================================
 //      Polynomial Specializations
 // ===============================================================================================
 
-pub mod constant;
+mod constant;
 pub use constant::Constant;
 
 mod line;
-// pub use line::Line;
+pub use line::Line;
 
 // ===============================================================================================
 //      Polynomial Tests
@@ -437,7 +439,7 @@ impl<T: PartialEq + One, const N: usize> Polynomial<T, N> {
 }
 
 // ===============================================================================================
-//      Polynomial Coefficient Accessors
+//      Generic Polynomial Coefficient Access
 // ===============================================================================================
 
 impl<T, const N: usize> Polynomial<T, N> {
@@ -530,6 +532,8 @@ impl<T, const N: usize> Polynomial<T, N> {
     #[inline]
     #[must_use]
     pub fn leading_coefficient(&self) -> Option<&T> {
+        // this can't directly call self.coefficient(N - 1) because that
+        // will fail if N is 0
         if self.is_empty() {
             None
         } else {
@@ -593,9 +597,152 @@ impl<T, const N: usize> Polynomial<T, N> {
         }
     }
 }
+// ===============================================================================================
+//      Calculus
+// ===============================================================================================
+
+impl<T, const N: usize> Polynomial<T, N>
+where
+    T: 'static + Clone + Num + Neg<Output = T> + fmt::Debug,
+    Const<N>: DimSub<U1>,
+    DimDiff<Const<N>, U1>: DimName,
+    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>,
+{
+    /// Constructs the companion matrix of the polynomial.
+    ///
+    /// The companion matrix is a square matrix whose eigenvalues are the roots of the polynomial.
+    /// It is constructed from an identity matrix, a zero column and a row of the polynomial's
+    /// coefficients scaled by the highest term.
+    ///
+    /// <pre>
+    /// |  a[0...n-1] / a_n  |
+    /// |     I      0     |
+    /// </pre>
+    /// <pre>
+    /// |  -a_(n-1)/a_n  -a_(n-2)/a_n  -a_(n-3)/a_n  ...  -a_1/a_0  -a_0/a_n  |
+    /// |     1         0         0      ...       0            0         |
+    /// |     0         1         0      ...       0            0         |
+    /// |     0         0         1      ...       0            0         |
+    /// |    ...       ...       ...     ...      ...          ...        |
+    /// |     0         0         0      ...       1            0         |
+    /// </pre>
+    ///
+    /// # Returns
+    /// * `OMatrix<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>` - The companion matrix
+    /// representation of the polynomial.
+    ///
+    /// # Example
+    /// ```rust
+    /// use control_rs::polynomial::Polynomial;
+    ///
+    /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]);
+    /// let companion_matrix = p.companion();
+    /// ```
+    pub fn companion(&self) -> OMatrix<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>> {
+        // return companion;
+        if let Some(leading_coefficient) = self.leading_coefficient() {
+            OMatrix::<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>::from_fn(|i, j| {
+                if i == 0 {
+                    // SAFETY: the index j is less than N
+                    unsafe { -self.get_unchecked(N - j - 1).clone() / leading_coefficient.clone() }
+                } else {
+                    if i == j + 1 {
+                        T::one()
+                    } else {
+                        T::zero()
+                    }
+                }
+            })
+        } else {
+            OMatrix::<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>::zeros()
+        }
+    }
+}
+impl<T, const N: usize> Polynomial<T, N>
+where
+    T: 'static + Clone + Num + Neg<Output = T> + fmt::Debug + RealField + Float,
+    Const<N>: DimSub<U1>,
+    DimDiff<Const<N>, U1>: DimName + DimSub<U1>,
+    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>
+        + Allocator<DimDiff<Const<N>, U1>, DimDiff<DimDiff<Const<N>, U1>, U1>>
+        + Allocator<DimDiff<DimDiff<Const<N>, U1>, U1>>
+        + Allocator<DimDiff<Const<N>, U1>>,
+{
+    /// Computes the roots of the polynomial.
+    ///
+    /// Edge cases:
+    /// - if the leading coefficient is zero, this should reduce the order and recurse, having
+    /// issues with trait bounds (currently returns NaN)
+    /// - all coefficients are zero: all roots are infinite
+    /// - if there are two coefficients and the lead is non-zero: the root is
+    /// `-coefficient[1]/coefficient[0]`
+    /// - if all but the first coefficient are zero: all roots are zero
+    ///
+    /// For very high-order polynomials this may be inefficient, especially for degenerate cases.
+    ///
+    /// # Returns
+    /// * `OMatrix<Complex<T>, Const<D>, U1>` - A column vector containing the computed roots.
+    ///
+    /// # Example
+    /// ```rust
+    /// use control_rs::polynomial::Polynomial;
+    ///
+    /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]);
+    /// let roots = p.roots();
+    /// ```
+    pub fn roots(&self) -> OMatrix<Complex<T>, DimDiff<Const<N>, U1>, U1> {
+        if !self.coefficients[0].is_zero() {
+            if N == 2 {
+                OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
+                    -self.coefficients[1].clone() / self.coefficients[0].clone(),
+                    T::zero(),
+                ))
+            } else {
+                let num_zeros = (0..N).fold(0, |acc, i| match self.coefficients[i] == T::zero() {
+                    true => acc + 1,
+                    false => acc,
+                });
+
+                if num_zeros == N {
+                    // zero/degenerate polynomial, all infinite roots
+                    OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
+                        T::infinity(),
+                        T::infinity(),
+                    ))
+                } else if num_zeros == N - 1 {
+                    // unit case, all zero roots
+                    OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
+                        T::zero(),
+                        T::zero(),
+                    ))
+                } else {
+                    // need to know more specifics about what matrices work with complex_eigenvalues,
+                    // the current cases fixed an infinite loop in the test, but certainly not a guaranteed solution
+                    self.companion().complex_eigenvalues()
+                }
+            }
+        } else {
+            // should be able to reduce order and keep trying, but having issues with recursive trait bounds
+            OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
+                T::nan(),
+                T::nan(),
+            ))
+        }
+    }
+}
 
 // ===============================================================================================
 //      Generic Polynomial-Scalar Arithmatic
+//
+//  The following operations are provided for all polynomials:
+//      * Neg
+//      * Mul<T> & Mul<Polynomial<T,N>> for T
+//      * MulAssign<T>
+//      * Div<T>
+//      * DivAssign<T>
+//      * Rem<T>
+//      * RemAssign<T>
+//
 // ===============================================================================================
 
 /// # -Polynomial<T, N>
@@ -620,30 +767,6 @@ impl<T: Clone + Neg<Output = T>, const N: usize> Neg for Polynomial<T, N> {
         })
     }
 }
-
-// /// # Polynomial<T, N> + T
-// ///
-// /// # Example
-// /// ```
-// /// use control_rs::polynomial::Polynomial;
-// /// let p1 = Polynomial::new([0]);
-// /// let p2 = p1 + 1;
-// /// assert_eq!(*p2.constant().unwrap(), 1);
-// /// ```
-// /// TODO: Unit Test
-// impl<T: Clone + Add<Output = T>, const N: usize> Add<T> for Polynomial<T, N> {
-//     type Output = Polynomial<T, N>;
-// 
-//     fn add(self, rhs: T) -> Self::Output {
-//         // Self::from_data([
-//         //     // SAFETY: `N` is 1, so the index is always valid
-//         //     unsafe { self.get_unchecked(0).clone() + rhs },
-//         // ])
-//         let mut result = self.clone();
-//         if let Some(constant) = result.constant_mut() { *constant = constant.clone() + rhs; }
-//         result
-//     }
-// }
 
 /// # Polynomial<T, N> * T
 ///
@@ -763,7 +886,7 @@ impl<T: Clone + RemAssign, const N: usize> RemAssign<T> for Polynomial<T, N> {
     }
 }
 
-macro_rules! impl_generic_left_scalar_arithmetic {
+macro_rules! impl_generic_left_scalar_mul {
     ($($scalar:ty),*) => {
         $(
             impl<const N: usize> Mul<Polynomial<$scalar, N>> for $scalar {
@@ -777,7 +900,7 @@ macro_rules! impl_generic_left_scalar_arithmetic {
     };
 }
 
-impl_generic_left_scalar_arithmetic!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
+impl_generic_left_scalar_mul!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
 
 // ===============================================================================================
 //      Empty Polynomial-Scalar Arithmatic
@@ -820,14 +943,14 @@ impl<T> Add<T> for Polynomial<T, 0> {
 impl<T: Neg<Output = T>> Sub<T> for Polynomial<T, 0> {
     type Output = Polynomial<T, 1>;
 
-    /// Returns a new polynomial with the constant term equal to 0 - rhs
+    /// Returns a new polynomial with the constant term equal to -rhs
     #[inline]
     fn sub(self, rhs: T) -> Self::Output {
         Self::Output::from_data([rhs.neg()])
     }
 }
 
-macro_rules! impl_base_case_left_scalar_add {
+macro_rules! impl_base_case_left_scalar_arithmatic {
     ($($scalar:ty),*) => {
         $(
             impl Add<Polynomial<$scalar, 0>> for $scalar {
@@ -840,16 +963,6 @@ macro_rules! impl_base_case_left_scalar_add {
             impl AddAssign<Polynomial<$scalar, 0>> for $scalar {
                 fn add_assign(&mut self, _rhs: Polynomial<$scalar, 0>) {}
             }
-            impl SubAssign<Polynomial<$scalar, 0>> for $scalar {
-                fn sub_assign(&mut self, _rhs: Polynomial<$scalar, 0>) {}
-            }
-        )*
-    };
-}
-
-macro_rules! impl_base_case_left_scalar_sub {
-    ($($scalar:ty),*) => {
-        $(
             impl Sub<Polynomial<$scalar, 0>> for $scalar {
                 type Output = Polynomial<$scalar, 1>;
 
@@ -857,12 +970,14 @@ macro_rules! impl_base_case_left_scalar_sub {
                     Polynomial::from_data([self.clone()])
                 }
             }
+            impl SubAssign<Polynomial<$scalar, 0>> for $scalar {
+                fn sub_assign(&mut self, _rhs: Polynomial<$scalar, 0>) {}
+            }
         )*
     };
 }
 
-impl_base_case_left_scalar_add!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
-impl_base_case_left_scalar_sub!(i8, i16, i32, isize, f32, f64);
+impl_base_case_left_scalar_arithmatic!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
 
 // ===============================================================================================
 //      Empty Polynomial-Generic Polynomial Arithmatic
@@ -919,7 +1034,7 @@ where
     T: Clone + Zero + One + PartialOrd + Neg<Output = T> + fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (i, a_i) in self.coefficients.iter().enumerate().rev() {
+        for (i, a_i) in self.iter().enumerate().rev() {
             if a_i.is_zero() {
                 continue;
             }
