@@ -1,7 +1,7 @@
 //! Array-based univariate-polynomial
 //!
 //! This module contains a base implementation of a generic array polynomial. To guarantee safe and
-//! deterministic implementations of all arithmatic some implementations are only available for
+//! deterministic implementations of all arithmatic, some implementations are only available for
 //! certain specializations.
 //!
 //! # Examples
