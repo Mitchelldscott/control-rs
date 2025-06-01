@@ -11,7 +11,7 @@ use core::{
 
 use num_traits::{One, Zero};
 
-use nalgebra::{Const, DimSub, U1};
+use nalgebra::{Const, DimDiff, DimSub, U1};
 
 #[inline]
 fn from_iterator_with_default<I, T, const N: usize>(
@@ -217,6 +217,33 @@ where
     }
 }
 
+pub struct Equation<T, N, S> {
+    data: S,
+    _phantoms: PhantomData<(T, N)>,
+}
+
+pub struct Roots<T, N, S> {
+    roots: S,
+    _phantoms: PhantomData<(T, N)>,
+}
+
+use nalgebra::{DefaultAllocator, allocator::Allocator, Dim, Scalar, Owned, DimAdd};
+impl<T: Scalar + Zero, D: Dim> Roots<T, D, Owned<T, D, U1>>
+where
+    D: DimAdd<U1>,
+    DefaultAllocator: Allocator<D, U1>,
+{
+    fn roots<const N: usize>(degree: D, p: Polynomial<T, N>) -> Self 
+    where
+        Const<N>: DimSub<U1, Output = D>
+    {
+        Self {
+            roots: DefaultAllocator::allocate_from_iterator(degree, U1, p.coefficients.into_iter()),
+            _phantoms: PhantomData,
+        }
+    }
+}
+
 fn main() {
     let p = Polynomial::from([1, 2, 3]);
     if let PolynomialDerivative::Ok(dp) = p.derivative() {
@@ -231,4 +258,7 @@ fn main() {
             }
         }
     }
+    
+    let roots = Roots::roots(Const::<2>, p);
+    println!("{:?}", roots.roots);
 }
