@@ -6,26 +6,21 @@
 //! re-used for all specializations. The types should cover numbers and the sizes should not exceed
 //! 4096 bytes.
 //!
-//! TODO:
-//!     * constructors
-//!         * `new(coefficients; [T; N])`
-//!         * `compose(f: Polynomial, g: Polynomial) -> Polynomial`
-//!         * `to_monic(&self) -> Self`
-//!     * accessors
-//!         * `coefficient()`
-//!         * `coefficient_mut()`
-//!         * `constant()`
-//!         * `constant_mut()`
-//!         * `leading_coefficient()`
-//!         * `leading_coefficient_mut()`
-//!         * `resize(polynomial: Polynomial)`
+// TODO:
+//     * constructors
+//         * `new(coefficients; [T; N])`
+//         * `compose(f: Polynomial, g: Polynomial) -> Polynomial`
+//         * `to_monic(&self) -> Self`
+//     * accessors
+//         * `coefficient()`
+//         * `coefficient_mut()`
+//         * `constant()`
+//         * `constant_mut()`
+//         * `leading_coefficient()`
+//         * `leading_coefficient_mut()`
+//         * `resize(polynomial: Polynomial)`
 
-
-use core::{any::type_name, fmt};
-
-use crate::polynomial::{Polynomial, Constant, Line};
-
-use num_traits::{One, Zero};
+use crate::polynomial::{Constant, Line, Polynomial};
 
 mod neg {
     use super::*;
@@ -66,15 +61,35 @@ mod coefficient_accessors {
         assert_eq!(p.coefficient(0), None, "coefficient(0) not none");
         assert_eq!(p.coefficient(1), None, "coefficient(1) not none");
         assert_eq!(p.constant(), None, "constant not none");
-        assert_eq!(p.leading_coefficient(), None, "leading_coefficient not none");
+        assert_eq!(
+            p.leading_coefficient(),
+            None,
+            "leading_coefficient not none"
+        );
+    }
+    
+    #[test]
+    fn empty_mut() {
         let mut p_mut = Polynomial::from_data([1i32; 0]);
         assert_eq!(p_mut.is_empty(), true, "mut not empty");
         assert_eq!(p_mut.degree(), None, "degree not none");
         assert_eq!(p_mut.is_monic(), false, "monic");
-        assert_eq!(p_mut.coefficient_mut(0), None, "coefficient_mut(0) not none");
-        assert_eq!(p_mut.coefficient_mut(1), None, "coefficient_mut(1) not none");
+        assert_eq!(
+            p_mut.coefficient_mut(0),
+            None,
+            "coefficient_mut(0) not none"
+        );
+        assert_eq!(
+            p_mut.coefficient_mut(1),
+            None,
+            "coefficient_mut(1) not none"
+        );
         assert_eq!(p_mut.constant_mut(), None, "constant_mut not none");
-        assert_eq!(p_mut.leading_coefficient_mut(), None, "leading_coefficient_mut not none");
+        assert_eq!(
+            p_mut.leading_coefficient_mut(),
+            None,
+            "leading_coefficient_mut not none"
+        );
     }
     #[test]
     fn constant() {
@@ -91,9 +106,17 @@ mod coefficient_accessors {
         assert_eq!(p_mut.degree(), Some(0), "degree");
         assert_eq!(p_mut.is_monic(), true, "monic");
         assert_eq!(p_mut.coefficient_mut(0), Some(&mut 1), "coefficient_mut(0)");
-        assert_eq!(p_mut.coefficient_mut(1), None, "coefficient_mut(1) not none");
+        assert_eq!(
+            p_mut.coefficient_mut(1),
+            None,
+            "coefficient_mut(1) not none"
+        );
         assert_eq!(p_mut.constant_mut(), Some(&mut 1), "constant_mut");
-        assert_eq!(p_mut.leading_coefficient_mut(), Some(&mut 1), "leading_coefficient_mut");
+        assert_eq!(
+            p_mut.leading_coefficient_mut(),
+            Some(&mut 1),
+            "leading_coefficient_mut"
+        );
     }
     #[test]
     fn line() {
@@ -112,9 +135,17 @@ mod coefficient_accessors {
         assert_eq!(p_mut.is_monic(), false, "monic");
         assert_eq!(p_mut.coefficient_mut(0), Some(&mut 1), "coefficient_mut(0)");
         assert_eq!(p_mut.coefficient_mut(1), Some(&mut 0), "coefficient_mut(1)");
-        assert_eq!(p_mut.coefficient_mut(2), None, "coefficient_mut(2) not none");
+        assert_eq!(
+            p_mut.coefficient_mut(2),
+            None,
+            "coefficient_mut(2) not none"
+        );
         assert_eq!(p_mut.constant_mut(), Some(&mut 1), "constant_mut");
-        assert_eq!(p_mut.leading_coefficient_mut(), Some(&mut 0), "leading_coefficient_mut");
+        assert_eq!(
+            p_mut.leading_coefficient_mut(),
+            Some(&mut 0),
+            "leading_coefficient_mut"
+        );
     }
     fn large() {
         let p = Polynomial::<f32, 24>::from_fn(|_| 1.0);
@@ -132,12 +163,32 @@ mod coefficient_accessors {
         assert_eq!(p_mut.is_empty(), false, "mut not empty");
         assert_eq!(p_mut.degree(), Some(23), "degree");
         assert_eq!(p_mut.is_monic(), false, "monic");
-        assert_eq!(p_mut.coefficient_mut(0), Some(&mut 1.0), "coefficient_mut(0)");
-        assert_eq!(p_mut.coefficient_mut(1), Some(&mut 0.0), "coefficient_mut(1)");
-        assert_eq!(p_mut.coefficient_mut(2), Some(&mut 0.0), "coefficient_mut(2)");
-        assert_eq!(p_mut.coefficient_mut(23), Some(&mut 0.0), "coefficient_mut(23)");
+        assert_eq!(
+            p_mut.coefficient_mut(0),
+            Some(&mut 1.0),
+            "coefficient_mut(0)"
+        );
+        assert_eq!(
+            p_mut.coefficient_mut(1),
+            Some(&mut 0.0),
+            "coefficient_mut(1)"
+        );
+        assert_eq!(
+            p_mut.coefficient_mut(2),
+            Some(&mut 0.0),
+            "coefficient_mut(2)"
+        );
+        assert_eq!(
+            p_mut.coefficient_mut(23),
+            Some(&mut 0.0),
+            "coefficient_mut(23)"
+        );
         assert_eq!(p_mut.coefficient_mut(24), None, "coefficient_mut(24)");
         assert_eq!(p_mut.constant_mut(), Some(&mut 1.0), "constant_mut");
-        assert_eq!(p_mut.leading_coefficient_mut(), Some(&mut 0.0), "leading_coefficient_mut");
+        assert_eq!(
+            p_mut.leading_coefficient_mut(),
+            Some(&mut 0.0),
+            "leading_coefficient_mut"
+        );
     }
 }

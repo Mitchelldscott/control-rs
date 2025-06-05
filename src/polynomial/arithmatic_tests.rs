@@ -4,7 +4,6 @@
 //!
 use super::*;
 
-
 mod scalar_add {
     use super::*;
     #[test]
@@ -58,7 +57,7 @@ mod scalar_add {
     #[test]
     fn quadratic_post_add() {
         let quadratic: Polynomial<i64, 3> = Polynomial::from_element(1);
-        assert_eq!(quadratic + 1, Polynomial::from_data([2, 1, 1]));
+        assert_eq!(quadratic + 1i64, Polynomial::from_data([2, 1, 1]));
     }
     #[test]
     fn quadratic_pre_add() {
@@ -74,18 +73,27 @@ mod scalar_add {
     #[test]
     fn large_post_add() {
         let large: Polynomial<i32, 16> = Polynomial::from_element(1);
-        assert_eq!(large + 1, Polynomial::from_data([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]));
+        assert_eq!(
+            large + 1,
+            Polynomial::from_data([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+        );
     }
     #[test]
     fn large_pre_add() {
         let large: Polynomial<u32, 16> = Polynomial::from_element(1);
-        assert_eq!(1 + large, Polynomial::from_data([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]));
+        assert_eq!(
+            1 + large,
+            Polynomial::from_data([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+        );
     }
     #[test]
     fn large_add_assign() {
         let mut large: Polynomial<i64, 16> = Polynomial::from_element(1);
         large += 1;
-        assert_eq!(large, Polynomial::from_data([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]));
+        assert_eq!(
+            large,
+            Polynomial::from_data([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+        );
     }
 }
 
@@ -158,18 +166,27 @@ mod scalar_sub {
     #[test]
     fn large_post_sub() {
         let large: Polynomial<i32, 16> = Polynomial::from_element(1);
-        assert_eq!(large - 1, Polynomial::from_data([0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]));
+        assert_eq!(
+            large - 1,
+            Polynomial::from_data([0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+        );
     }
     #[test]
     fn large_pre_sub() {
         let large: Polynomial<u32, 16> = Polynomial::from_element(1);
-        assert_eq!(1 - large, Polynomial::from_data([0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]));
+        assert_eq!(
+            1 - large,
+            Polynomial::from_data([0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1])
+        );
     }
     #[test]
     fn large_sub_assign() {
         let mut large: Polynomial<i64, 16> = Polynomial::from_element(1);
         large -= 1;
-        assert_eq!(large, Polynomial::from_data([0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]));
+        assert_eq!(
+            large,
+            Polynomial::from_data([0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+        );
     }
 }
 
@@ -325,7 +342,6 @@ mod scalar_div {
         assert_eq!(large, Polynomial::from_element(1));
     }
 }
-
 
 mod const_add {
     use super::*;
@@ -657,7 +673,10 @@ mod const_div {
         let mut line: Polynomial<f64, 2> = Polynomial::from_element(1.0);
         let constant = Polynomial::from_data([0.0f64]);
         line /= constant;
-        assert_eq!(line, Polynomial::from_data([f64::infinity(), f64::infinity()]));
+        assert_eq!(
+            line,
+            Polynomial::from_data([f64::infinity(), f64::infinity()])
+        );
     }
     #[test]
     fn quadratic_post_div() {
@@ -791,5 +810,3 @@ mod line_mul {
         assert_eq!(large, Polynomial::from_iterator([]));
     }
 }
-
-

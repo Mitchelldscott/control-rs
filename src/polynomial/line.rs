@@ -135,7 +135,6 @@ impl_line_left_scalar_sub!(i8, i16, i32, isize, f32, f64);
 //      Line-Empty Polynomial Arithmatic
 // ===============================================================================================
 
-
 /// # Polynomial<T, 2> + Polynomial<T, 0>
 ///
 /// # Example
@@ -329,9 +328,11 @@ impl<T: Clone + Add<Output = T> + Mul<Output = T>> Mul for Line<T> {
         Polynomial::<T, 3>::from_data([
             // SAFETY: `N` is 2, so the index is always valid
             unsafe { self.get_unchecked(0).clone() * rhs.get_unchecked(0).clone() },
-            unsafe { self.get_unchecked(0).clone() * rhs.get_unchecked(1).clone()
-                + self.get_unchecked(1).clone() * rhs.get_unchecked(0).clone() },
-            unsafe { self.get_unchecked(1).clone() * rhs.get_unchecked(1).clone() }
+            unsafe {
+                self.get_unchecked(0).clone() * rhs.get_unchecked(1).clone()
+                    + self.get_unchecked(1).clone() * rhs.get_unchecked(0).clone()
+            },
+            unsafe { self.get_unchecked(1).clone() * rhs.get_unchecked(1).clone() },
         ])
     }
 }

@@ -19,19 +19,19 @@
 //! ```
 //!
 // TODO:
-//     * algebra
-//         * `compose(f: Polynomial, g: Polynomial) -> Polynomial`
-//     * calculus
-//         * `evaluate<U>(x: U) -> U`
-//         * `derivative(p_src: &Polynomial<T, M>) -> Self`
-//         * `integral(p_src: &Polynomial<T, M>) -> Self`
-//         * `foil_roots(&mut self, roots: &[T]) -> Result<(), Polynomial>`
-//         * `foil_complex_roots(&mut self, roots: &[Complex<T>]) -> Result<(), Polynomial>`
-//         * `real_roots(p: Polynomial, roots: &mut [T]) -> Result<(), PolynomialError>`
-//         * `complex_roots(p: Polynomial, roots: &mut [Complex<T>]) -> Result<(), PolynomialError>`
-//     * formatting
-//         * Display precision option
-//         * Latex / symbolic formatter
+//  * calculus
+//      * `compose(f: Polynomial, g: Polynomial) -> Polynomial`
+//      * `from_roots(&mut self, roots: &[T]) -> Result<(), Polynomial>`
+//      * `from_complex_roots(&mut self, roots: &[Complex<T>]) -> Result<(), Polynomial>`
+//      * `roots(p: Polynomial, roots: &mut [T]) -> Result<(), PolynomialError>`
+//      * `complex_roots(p: Polynomial, roots: &mut [Complex<T>]) -> Result<(), PolynomialError>`
+//  * formatting
+//      * Display precision option
+//      * Latex / symbolic formatter
+//  * Move internal function to separate files (keep private) so other mods can use them without polynomial
+//      * roots
+//      * derivative/integral
+//      * from_array_initializers
 
 use core::{
     array, fmt,
@@ -39,8 +39,11 @@ use core::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign},
     slice,
 };
-use num_traits::{One, Zero, Num, Float};
-use nalgebra::{allocator::Allocator, Const, Complex, DefaultAllocator, DimDiff, DimName, DimSub, OMatrix, RealField, U1};
+use nalgebra::{
+    allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimName, DimSub, OMatrix,
+    RealField, U1,
+};
+use num_traits::{Float, Num, One, Zero};
 // ===============================================================================================
 //      Polynomial Specializations
 // ===============================================================================================
@@ -82,8 +85,8 @@ const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
 /// Initialize an array from an iterator.
 ///
 /// # Arguments
-/// * `iterator` - An [Iterator] over a collection of `T`
-/// * `default` - the default value to use if the iterator is not long enough
+/// * `iterator` - An [Iterator] over a collection of `T`.
+/// * `default` - the default value to use if the iterator is not long enough.
 ///
 /// # Returns
 /// * `initialized_array` - An array with all elements initialized
@@ -142,8 +145,8 @@ where
 /// or constant term, index n is the highest degree term).
 ///
 /// # Generic Arguments
-/// * `T` - Type of the coefficients in the polynomial
-/// * `N` - Capacity of the underlying array
+/// * `T` - Type of the coefficients in the polynomial.
+/// * `N` - Capacity of the underlying array.
 ///
 /// # Example
 /// ```rust
@@ -163,10 +166,10 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///
     /// # Arguments
     /// * `coefficients` - An array of coefficients `[a_0, a_1 ... a_n]`,
-    /// where `a_0` is the constant and `a_n` the nth degree term
+    /// where `a_0` is the constant and `a_n` the nth degree term.
     ///
     /// # Returns
-    /// * `polynomial` - A polynomial with the given coefficients
+    /// * `polynomial` - A polynomial with the given coefficients.
     ///
     /// # Example
     /// ```
@@ -188,10 +191,10 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///
     /// # Arguments
     /// * `cb` - The generator function, which takes the degree as input and returns the
-    /// coefficient for that degree
+    /// coefficient for that degree.
     ///
     /// # Returns
-    /// * `polynomial` - A new instance with the generated coefficients
+    /// * `polynomial` - A new instance with the generated coefficients.
     ///
     /// # Example
     /// ```
@@ -212,7 +215,7 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// Checks if the capacity is zero
     ///
     /// # Returns
-    /// * `bool` - true if the capacity is zero
+    /// * `bool` - true if the capacity is zero.
     ///
     /// # Example
     ///
@@ -242,13 +245,13 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// Creates a new polynomial from an [Iterator].
     ///
     /// If the iterator has more than N items, the trailing items will be ignored. If the iterator
-    /// has less than N items, the remaining indices will be filled with zeros.
+    /// has fewer than N items, the remaining indices will be filled with zeros.
     ///
     /// # Arguments
     /// * `iterator` - [Iterator] over items of `T`
     ///
     /// # Returns
-    /// * `polynomial` - A zero-padded polynomial with the given coefficients
+    /// * `polynomial` - A zero-padded polynomial with the given coefficients.
     ///
     /// ```
     /// use control_rs::Polynomial;
@@ -274,10 +277,10 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// * Calling this on same sized polynomials will copy one into the other.
     ///
     /// # Arguments
-    /// * `other` - the polynomial to resize
+    /// * `other` - the polynomial to resize.
     ///
     /// # Returns
-    /// * `resized_polynomial` - a polynomial with capacity `N`
+    /// * `resized_polynomial` - a polynomial with capacity `N`.
     ///
     /// # Example
     /// ```
@@ -300,7 +303,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// given constant.
     ///
     /// # Returns
-    /// * `Polynomial` - a polynomial with a single non-zero element
+    /// * `Polynomial` - a polynomial with a single non-zero element.
     ///
     /// # Example
     /// ```
@@ -308,15 +311,9 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// let quadratic = Polynomial::<f32, 3>::monomial(1.0);
     /// assert_eq!(*quadratic.coefficient(2).unwrap(), 1.0);
     /// ```
-    ///
-    /// TODO: Cleanup
     #[inline]
     pub fn monomial(coefficient: T) -> Self {
-        let mut polynomial = Self::from_fn(|_| T::zero());
-        if let Some(a_n) = polynomial.leading_coefficient_mut() {
-            *a_n = coefficient
-        }
-        polynomial
+        Self::from_iterator(core::iter::repeat(T::zero()).chain([coefficient]))
     }
 }
 
@@ -324,10 +321,10 @@ impl<T: Copy, const N: usize> Polynomial<T, N> {
     /// Creates a new polynomial with all coefficients set to the same element
     ///
     /// # Arguments
-    /// * `element` - The value to be copied into the coefficient array
+    /// * `element` - The value to be copied into the coefficient array.
     ///
     /// # Returns
-    /// * `polynomial` - polynomial with all coefficients set to `element`
+    /// * `polynomial` - polynomial with all coefficients set to `element`.
     ///
     /// # Example
     /// ```
@@ -345,10 +342,10 @@ impl<T: Copy, const N: usize> Polynomial<T, N> {
     /// a degree-major array.
     ///
     /// # Arguments
-    /// * `coefficients` - An array of coefficients in degree-major order `[a_n, ... a_1, a_0]`
+    /// * `coefficients` - An array of coefficients in degree-major order `[a_n, ... a_1, a_0]`.
     ///
     /// # Returns
-    /// * `polynomial` - polynomial with the given coefficients
+    /// * `polynomial` - polynomial with the given coefficients.
     ///
     /// # Example
     /// ```
@@ -601,6 +598,161 @@ impl<T, const N: usize> Polynomial<T, N> {
 //      Calculus
 // ===============================================================================================
 
+/// Result of taking the derivative of a polynomial.
+///
+/// This enum represents the possible outcomes when computing the derivative of a polynomial:
+/// - A zero polynomial (when differentiating a constant)
+/// - A valid polynomial of the same capacity
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum PolynomialDerivative<T, const N: usize> {
+    /// Represents a zero polynomial with the given zero value.
+    /// This variant is returned when differentiating a constant polynomial.
+    Zero,
+    /// Represents a valid polynomial resulting from the derivative operation.
+    Ok(Polynomial<T, N>),
+}
+
+impl<T: Clone + Zero + One + Add<Output = T> + Mul<Output = T>, const N: usize> Polynomial<T, N> {
+    /// Calculates the derivative of a polynomial using the power rule.
+    ///
+    /// This function performs the core derivative calculation by applying the power rule
+    /// `d/dx(ax^n) = n * ax^{n-1}` to each term of the polynomial.
+    /// It iterates through the coefficients, effectively shifting them to a lower exponent
+    /// and multiplying by the original exponent.
+    ///
+    /// This function is safe for any size polynomial (`N`) and correctly handles
+    /// polynomials of any degree, including first-order and constant terms.
+    /// The constant term (coefficient of x^0) is implicitly handled by `skip(1)`,
+    /// as its derivative is zero and thus not included in the resulting polynomial coefficients.
+    ///
+    /// This function is private because calling it on a zero or empty polynomial will have no
+    /// effect. Users should call [Polynomial::derivative] to ensure the base case is handled
+    /// properly.
+    ///
+    /// # Examples
+    ///
+    /// If `self` represents the polynomial $3x^3 + 2x^2 + 5x + 10$:
+    /// The resulting polynomial from `derivative_internal` would represent $9x^2 + 4x + 5$.
+    #[inline]
+    fn derivative_internal(&self) -> Self {
+        let mut exponent = T::zero();
+        Polynomial::from_iterator(self.iter().skip(1).map(|a_i| {
+            exponent = exponent.clone() + T::one();
+            a_i.clone() * exponent.clone()
+        }))
+    }
+
+    /// Computes the derivative of a polynomial.
+    ///
+    /// This function determines if the polynomial is constant or empty (degree does not exist).
+    /// If the polynomial has a degree (meaning it's not empty), it delegates to
+    /// `derivative_internal` to perform the actual power rule calculations.
+    /// If the polynomial is empty or represents a constant (e.g., $f(x) = C$),
+    /// its derivative is the zero polynomial.
+    ///
+    /// # Returns
+    ///
+    /// - `PolynomialDerivative::Zero`: If the polynomial is constant (degree 0) or empty (degree
+    /// None)
+    /// - `PolynomialDerivative::Ok(Polynomial<T, N>)`: If the polynomial's degree is
+    ///   greater than 0, containing the coefficients of the resulting derivative polynomial.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use control_rs::polynomial::{Polynomial, PolynomialDerivative}; // Assuming these traits/structs are in your crate
+    /// use num_traits::{Zero, One};
+    /// // Example for a polynomial of degree 2
+    /// let p1 = Polynomial::new([1_i32, 2_i32, 3_i32]); // Represents 3x^2 + 2x + 1
+    /// assert_eq!(
+    ///     p1.derivative(),
+    ///     PolynomialDerivative::Ok(Polynomial::from_data([2_i32, 6_i32, 0_i32])),
+    ///     "Expected a valid polynomial derivative"
+    /// );
+    ///
+    /// // Example for a constant polynomial
+    /// let p2 = Polynomial::new([5_i32]); // Represents 5
+    /// assert_eq!(p2.derivative(), PolynomialDerivative::Zero, "Expected a zero polynomial derivative");
+    ///
+    /// // Example for an empty polynomial (assuming it can be constructed like this)
+    /// let p3 = Polynomial::from_iterator(std::iter::empty()); // Represents an empty polynomial
+    /// assert_eq!(p3.derivative(), PolynomialDerivative::Zero, "Expected a zero polynomial derivative")
+    /// ```
+    #[inline]
+    pub fn derivative(&self) -> PolynomialDerivative<T, N> {
+        if let Some(_) = self.degree() {
+            PolynomialDerivative::Ok(self.derivative_internal())
+        } else { PolynomialDerivative::Zero }
+    }
+}
+
+/// Result of integrating a polynomial.
+///
+/// This enum represents the possible outcomes when computing the integral of a polynomial:
+/// - A constant (when integrating a zero or empty polynomial)
+/// - A valid polynomial with the same capacity
+/// - A truncated polynomial (when the result would exceed the maximum capacity N)
+pub enum PolynomialIntegral<T, const N: usize> {
+    /// Represents a constant value resulting from integrating a zero polynomial.
+    /// This variant contains the integration constant.
+    Constant(Polynomial<T, 1>),
+    /// Represents a valid polynomial resulting from the integration operation.
+    /// This variant is returned when the integral fits within the polynomial's capacity.
+    Ok(Polynomial<T, N>),
+    /// Represents a truncated polynomial resulting from the integration operation.
+    /// This variant is returned when the integral would exceed the polynomial's capacity (N),
+    /// so the result is truncated to fit.
+    Truncated(Polynomial<T, N>),
+}
+
+impl<T: Clone + Zero + One + Add<Output = T> + Div<Output = T>, const N: usize> Polynomial<T, N> {
+    /// Calculates the indefinite integral of a polynomial using the power rule.
+    ///
+    /// This internal function computes the indefinite integral of the polynomial by
+    /// applying the reverse power rule ($\int ax^n dx = \frac{a}{n+1}x^{n+1}$) to each term.
+    /// It also incorporates the provided `constant` of integration as the new constant term.
+    ///
+    /// The process involves:
+    /// 1. Prepending the `constant` of integration as the coefficient of $x^0$.
+    /// 2. Iterating through the original polynomial's coefficients $a_i$ (corresponding to $x^i$).
+    /// 3. For each $a_i$, calculating the new coefficient as $a_i / (i+1)$, where
+    ///    $(i+1)$ is the new exponent.
+    ///
+    /// This function will not resize a polynomial. If there is not enough space, it will truncate
+    /// the highest order term.
+    ///
+    /// # Arguments
+    /// * `constant`: The constant of integration, $C$. This will become the coefficient
+    ///   of $x^0$ in the resulting polynomial.
+    ///
+    // TODO: Examples
+    #[inline]
+    fn integral_internal(&self, constant: T) -> Self {
+        let mut exponent = T::one();
+        Polynomial::from_iterator([constant].into_iter().chain(self.iter().enumerate().map(
+            |(_, a_i)| {
+                exponent = exponent.clone() + T::one();
+                a_i.clone() / exponent.clone()
+            },
+        )))
+    }
+
+
+    #[inline]
+    pub fn integral(&self, constant: T) -> PolynomialIntegral<T, N> {
+        if let Some(degree) = self.degree() {
+            let integral = self.integral_internal(constant);
+            if degree + 1 == N {
+                PolynomialIntegral::Truncated(integral)
+            } else {
+                PolynomialIntegral::Ok(integral)
+            }
+        } else {
+            PolynomialIntegral::Constant(Polynomial::from_data([constant]))
+        }
+    }
+}
+
 impl<T, const N: usize> Polynomial<T, N>
 where
     T: 'static + Clone + Num + Neg<Output = T> + fmt::Debug,
@@ -678,7 +830,7 @@ where
     /// `-coefficient[1]/coefficient[0]`
     /// - if all but the first coefficient are zero: all roots are zero
     ///
-    /// For very high-order polynomials this may be inefficient, especially for degenerate cases.
+    /// For very high-order polynomial's this may be inefficient, especially for degenerate cases.
     ///
     /// # Returns
     /// * `OMatrix<Complex<T>, Const<D>, U1>` - A column vector containing the computed roots.
@@ -734,7 +886,7 @@ where
 // ===============================================================================================
 //      Generic Polynomial-Scalar Arithmatic
 //
-//  The following operations are provided for all polynomials:
+//  The following operations are provided for polynomials of any capacity:
 //      * Neg
 //      * Mul<T> & Mul<Polynomial<T,N>> for T
 //      * MulAssign<T>
@@ -983,8 +1135,8 @@ impl_base_case_left_scalar_arithmatic!(i8, u8, i16, u16, i32, u32, isize, usize,
 //      Empty Polynomial-Generic Polynomial Arithmatic
 //
 //  Assignment operators are not implemented because it would lead to unexpected behavior (i.e.
-// `p1 += p2` would have a different result than `p3 = p1 + p2`). Similarly, multiplying and
-// dividing with an empty polynomial is logically invalid.
+// `p1 += p2` would have a different result than `p3 = p1 + p2`). Similarly, multiplication and
+// division with an empty polynomial is logically invalid.
 // ===============================================================================================
 
 /// # Polynomial<T, 0> + Polynomial<T, N>
@@ -1034,27 +1186,25 @@ where
     T: Clone + Zero + One + PartialOrd + Neg<Output = T> + fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut n = N;
         for (i, a_i) in self.iter().enumerate().rev() {
             if a_i.is_zero() {
+                n = n.saturating_sub(1);
                 continue;
             }
-
-            if i > 0 {
+            if n > 1 && n > i + 1 {
                 write!(f, " {} ", if *a_i >= T::zero() { "+" } else { "-" })?;
             } else if *a_i < T::zero() {
                 write!(f, "-")?;
             }
-
             let abs_a_i = if *a_i < T::zero() {
                 a_i.clone().neg()
             } else {
                 a_i.clone()
             };
-
-            if abs_a_i != T::one() || i == 0 {
+            if !abs_a_i.is_one() || i == 0 {
                 write!(f, "{}", abs_a_i)?;
             }
-
             if i > 0 {
                 write!(f, "x")?;
                 if i > 1 {
@@ -1062,7 +1212,6 @@ where
                 }
             }
         }
-
         Ok(())
     }
 }
