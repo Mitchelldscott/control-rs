@@ -737,7 +737,12 @@ impl<T: Clone + Zero + One + Add<Output = T> + Div<Output = T>, const N: usize> 
         )))
     }
 
-
+    /// Computes the indefinite integral of a polynomial.
+    ///
+    /// If the polynomial has a degree (meaning it's not empty), it delegates to
+    /// `integral_internal` to perform the actual power rule calculations. If the 
+    /// polynomial is empty teh result is a constant polynomial. If the degree is
+    /// `N-1` then the result will truncate the highest order coefficient.
     #[inline]
     pub fn integral(&self, constant: T) -> PolynomialIntegral<T, N> {
         if let Some(degree) = self.degree() {

@@ -4,8 +4,6 @@ use crate::state_space::StateSpace;
 
 use num_traits::{One, Zero};
 
-use core::ops::{Add, Div, Mul};
-
 /// # Dynamical System
 ///
 /// This trait provides a universal interface for propagating systems with internal states.
@@ -80,22 +78,30 @@ where
     }
 }
 
-fn feedback<T, G, H, GH, CL>(sys1: &G, sys2: &H, sign_in: T, sign_feedback: T) -> CL
-where
-    T: Clone + Zero + One + Mul<G, Output = G> + Mul<GH, Output = GH>,
-    G: System + Mul<H, Output = GH> + Div<GH, Output = CL>,
-    GH: System + Add<Output = GH>,
-    H: System,
-{
-    sign_in.clone() * sys1.clone()
-        / (GH::identity() + sign_feedback.clone() * sys1.clone() * sys2.clone())
-}
-
 #[cfg(test)]
 mod feedback_test {
     use super::*;
 
+    use core::ops::{Add, Div, Mul};
+
     use crate::polynomial::Constant;
+
+    /// Feedback of two systems
+    ///
+    /// This function implements the feedback of two systems.
+    ///
+    /// # Generic Arguments
+    /// * `T` - Type of the input variable(s)
+    fn feedback<T, G, H, GH, CL>(sys1: &G, sys2: &H, sign_in: T, sign_feedback: T) -> CL
+    where
+        T: Clone + Zero + One + Mul<G, Output = G> + Mul<GH, Output = GH>,
+        G: System + Mul<H, Output = GH> + Div<GH, Output = CL>,
+        GH: System + Add<Output = GH>,
+        H: System,
+    {
+        sign_in.clone() * sys1.clone()
+            / (GH::identity() + sign_feedback.clone() * sys1.clone() * sys2.clone())
+    }
 
     #[test]
     fn zero_constant() {

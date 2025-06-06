@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 
 /// A trait for storage types that manage a 1D, statically known, fixed-size buffer.
@@ -265,7 +264,7 @@ impl<T: Clone, const N: usize> StaticStorage<(usize, T), N> for SparseArray<T, N
     }
 
     fn linear_index(&self, index: Self::Index) -> usize {
-        for (j, (i, value)) in self.as_slice().iter().enumerate() {
+        for (j, (i, _)) in self.as_slice().iter().enumerate() {
             if *i == index {
                 return j;
             }
