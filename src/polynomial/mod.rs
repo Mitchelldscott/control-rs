@@ -313,7 +313,11 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// ```
     #[inline]
     pub fn monomial(coefficient: T) -> Self {
-        Self::from_iterator(core::iter::repeat(T::zero()).chain([coefficient]))
+        Self::from_iterator(
+            core::iter::repeat(T::zero())
+                .take(N - 1)
+                .chain([coefficient]),
+        )
     }
 }
 
@@ -419,18 +423,18 @@ impl<T: Clone, const N: usize> Polynomial<T, N> {
             .rfold(U::zero(), |acc, a_i| acc * value.clone() + a_i.clone())
     }
 }
-impl<T: PartialEq + One, const N: usize> Polynomial<T, N> {
+impl<T: PartialEq + One + Zero, const N: usize> Polynomial<T, N> {
     /// Checks if a polynomial is monic
     ///
     /// # Returns
     /// * `bool` - true if the leading coefficient is one, false otherwise
     #[inline]
     pub fn is_monic(&self) -> bool {
-        if self.is_empty() {
-            false
+        if let Some(degree) = self.degree() {
+            // SAFETY: degree < N so degree is valid
+            unsafe { self.get_unchecked(degree).is_one() }
         } else {
-            // SAFETY: N > 0 so N-1 is valid
-            unsafe { self.get_unchecked(N - 1).is_one() }
+            false
         }
     }
 }
@@ -518,27 +522,6 @@ impl<T, const N: usize> Polynomial<T, N> {
         self.coefficient(0)
     }
 
-    /// Returns the highest order term of the polynomial
-    ///
-    /// # Returns
-    /// * `Option<&T>`
-    ///     * `Some(leading_coefficient)` - when N > 0
-    ///     * `None` - when N == 0
-    ///
-    /// TODO: Unit Test
-    #[inline]
-    #[must_use]
-    pub fn leading_coefficient(&self) -> Option<&T> {
-        // this can't directly call self.coefficient(N - 1) because that
-        // will fail if N is 0
-        if self.is_empty() {
-            None
-        } else {
-            // SAFETY: N > 0 so N-1 is valid
-            unsafe { Some(self.get_unchecked(N - 1)) }
-        }
-    }
-
     /// Returns a coefficient of the polynomial
     ///
     /// # Arguments
@@ -574,8 +557,33 @@ impl<T, const N: usize> Polynomial<T, N> {
     pub fn constant_mut(&mut self) -> Option<&mut T> {
         self.coefficient_mut(0)
     }
+}
 
-    /// Returns the highest order term of the polynomial
+impl<T: Zero, const N: usize> Polynomial<T, N> {
+    /// Returns the highest order term of the polynomial.
+    ///
+    /// Leading zeros will be ignored, this is equivalent to `polynomial.coefficient(degree)`.
+    ///
+    /// # Returns
+    /// * `Option<&T>`
+    ///     * `Some(leading_coefficient)` - when N > 0
+    ///     * `None` - when N == 0
+    ///
+    /// TODO: Unit Test
+    #[inline]
+    #[must_use]
+    pub fn leading_coefficient(&self) -> Option<&T> {
+        if let Some(degree) = self.degree() {
+            // SAFETY: degree < N so degree is valid
+            unsafe { Some(self.get_unchecked(degree)) }
+        } else {
+            None
+        }
+    }
+
+    /// Returns the highest order term of the polynomial.
+    ///
+    /// Leading zeros will be ignored, this is equivalent to `polynomial.coefficient_mut(degree)`.
     ///
     /// # Returns
     /// * `Option<&mut T>`
@@ -586,14 +594,15 @@ impl<T, const N: usize> Polynomial<T, N> {
     #[inline]
     #[must_use]
     pub fn leading_coefficient_mut(&mut self) -> Option<&mut T> {
-        if self.is_empty() {
-            None
+        if let Some(degree) = self.degree() {
+            // SAFETY: degree < N so degree is valid
+            unsafe { Some(self.get_unchecked_mut(degree)) }
         } else {
-            // SAFETY: N > 0 so N-1 is valid
-            unsafe { Some(self.get_unchecked_mut(N - 1)) }
+            None
         }
     }
 }
+
 // ===============================================================================================
 //      Calculus
 // ===============================================================================================
@@ -682,7 +691,9 @@ impl<T: Clone + Zero + One + Add<Output = T> + Mul<Output = T>, const N: usize> 
     pub fn derivative(&self) -> PolynomialDerivative<T, N> {
         if let Some(_) = self.degree() {
             PolynomialDerivative::Ok(self.derivative_internal())
-        } else { PolynomialDerivative::Zero }
+        } else {
+            PolynomialDerivative::Zero
+        }
     }
 }
 
@@ -740,7 +751,7 @@ impl<T: Clone + Zero + One + Add<Output = T> + Div<Output = T>, const N: usize> 
     /// Computes the indefinite integral of a polynomial.
     ///
     /// If the polynomial has a degree (meaning it's not empty), it delegates to
-    /// `integral_internal` to perform the actual power rule calculations. If the 
+    /// `integral_internal` to perform the actual power rule calculations. If the
     /// polynomial is empty teh result is a constant polynomial. If the degree is
     /// `N-1` then the result will truncate the highest order coefficient.
     #[inline]
@@ -815,6 +826,7 @@ where
         }
     }
 }
+
 impl<T, const N: usize> Polynomial<T, N>
 where
     T: 'static + Clone + Num + Neg<Output = T> + fmt::Debug + RealField + Float,

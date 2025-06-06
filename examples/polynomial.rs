@@ -1,7 +1,6 @@
-
-use core::ops::{Add, AddAssign, Sub, SubAssign, Mul, Div};
+use core::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
+use nalgebra::{Const, DimAdd, DimMax, DimSub, U1};
 use num_traits::Zero;
-use nalgebra::{Const, DimMax, DimAdd, DimSub, U1};
 
 /// Statically sized univariate polynomial
 ///
@@ -44,7 +43,6 @@ impl<T: Copy + Zero, const N: usize> Polynomial<T, N> {
 }
 
 impl<T: Zero, const N: usize> Polynomial<T, N> {
-
     pub fn degree(&self) -> Option<usize> {
         for i in (0..N).rev() {
             // SAFETY: `i < N` is a valid index of [T; N]
@@ -70,22 +68,28 @@ where
 
     /// Adds two polynomials
     ///
-    /// The result is a polynomial with capacity `max(N, M)`. This function utilizes the 
+    /// The result is a polynomial with capacity `max(N, M)`. This function utilizes the
     /// [Polynomial::addassign_polynomial_with_smaller_capacity] method to add the polynomials.
-    /// This implementation avoids the need for a zero-filled or [MaybeUninit] array 
-    /// initialization. This should also allow for compile time branch optimizations because 
-    /// the compiler can determine which branch to take at compile time (not sure if this is 
+    /// This implementation avoids the need for a zero-filled or [MaybeUninit] array
+    /// initialization. This should also allow for compile time branch optimizations because
+    /// the compiler can determine which branch to take at compile time (not sure if this is
     /// true).
     ///
     /// # Generic Arguments
     /// * `M` - Degree of the rhs polynomial.
     fn add(self, rhs: Polynomial<T, M>) -> Self::Output {
-        let mut result = Polynomial { coefficients: [T::zero(); L] };
+        let mut result = Polynomial {
+            coefficients: [T::zero(); L],
+        };
         for (i, c) in result.coefficients.iter_mut().enumerate() {
             // SAFETY: `i < N` is a valid index of [T; N]
-            if i < N { unsafe { *c = self.coefficients.get_unchecked(i).clone() } }
+            if i < N {
+                unsafe { *c = self.coefficients.get_unchecked(i).clone() }
+            }
             // SAFETY: `i < M` is a valid index of [T; M]
-            if i < M { unsafe { *c += rhs.coefficients.get_unchecked(i).clone() } }
+            if i < M {
+                unsafe { *c += rhs.coefficients.get_unchecked(i).clone() }
+            }
         }
         result
     }
@@ -95,7 +99,6 @@ impl<T, const N: usize> AddAssign<Polynomial<T, N>> for Polynomial<T, N>
 where
     T: Copy + Zero + AddAssign,
 {
-
     /// Adds two polynomials
     fn add_assign(&mut self, rhs: Polynomial<T, N>) {
         for (a, b) in self.coefficients.iter_mut().zip(rhs.coefficients.iter()) {
@@ -118,12 +121,18 @@ where
     /// # Generic Arguments
     /// * `M` - Degree of the rhs polynomial.
     fn sub(self, rhs: Polynomial<T, M>) -> Self::Output {
-        let mut result = Polynomial { coefficients: [T::zero(); L] };
+        let mut result = Polynomial {
+            coefficients: [T::zero(); L],
+        };
         for (i, c) in result.coefficients.iter_mut().enumerate() {
             // SAFETY: `i < N` is a valid index of [T; N]
-            if i < N { unsafe { *c = self.coefficients.get_unchecked(i).clone() } }
+            if i < N {
+                unsafe { *c = self.coefficients.get_unchecked(i).clone() }
+            }
             // SAFETY: `i < M` is a valid index of [T; M]
-            if i < M { unsafe { *c -= rhs.coefficients.get_unchecked(i).clone() } }
+            if i < M {
+                unsafe { *c -= rhs.coefficients.get_unchecked(i).clone() }
+            }
         }
         result
     }
@@ -153,7 +162,9 @@ where
     /// assert_eq!(p3.coefficients, [1i32, 1i32, 1i32], "wrong multiplication result");
     /// ```
     fn mul(self, rhs: Polynomial<T, M>) -> Self::Output {
-        let mut result = Polynomial { coefficients: [T::zero(); L] };
+        let mut result = Polynomial {
+            coefficients: [T::zero(); L],
+        };
         for i in 0..N {
             for j in 0..M {
                 // SAFETY: `i + j = (N - 1) + (M - 1) < L` is a valid index of [T; L]
@@ -194,14 +205,16 @@ where
 ///     r ← r − t × d
 /// return (q, r)
 ///</pre>
-impl<T, const N: usize> Div<Polynomial<T, N>> for Polynomial<T, N> 
-where 
+impl<T, const N: usize> Div<Polynomial<T, N>> for Polynomial<T, N>
+where
     T: Copy + Zero + Div<Output = T> + Mul<Output = T> + AddAssign + SubAssign + core::fmt::Debug,
     Const<N>: DimMax<Const<N>>,
 {
     type Output = Polynomial<T, N>;
     fn div(self, rhs: Polynomial<T, N>) -> Self::Output {
-        let mut quotient = Polynomial { coefficients: [T::zero(); N] };
+        let mut quotient = Polynomial {
+            coefficients: [T::zero(); N],
+        };
 
         // Find actual degrees
         let deg_self = self.degree();
@@ -212,7 +225,7 @@ where
             if let Some(deg_rhs) = deg_rhs {
                 let mut remainder = self.coefficients;
                 let leading_divisor = rhs.coefficients[deg_rhs];
-                
+
                 for i in (deg_rhs..=deg_self).rev() {
                     if remainder[i].is_zero() {
                         continue;
@@ -233,24 +246,52 @@ where
     }
 }
 
-fn main()  {
-    let p1 = Polynomial { coefficients: [1i32; 0] };
-    let p2 = Polynomial { coefficients: [0i32; 1] };
+fn main() {
+    let p1 = Polynomial {
+        coefficients: [1i32; 0],
+    };
+    let p2 = Polynomial {
+        coefficients: [0i32; 1],
+    };
 
     assert_eq!((p1 + p2).coefficients, [0i32; 1], "wrong addition result");
 
-    let p3 = Polynomial { coefficients: [1i32; 2] };
-    let p4 = Polynomial { coefficients: [1i32; 1] };
+    let p3 = Polynomial {
+        coefficients: [1i32; 2],
+    };
+    let p4 = Polynomial {
+        coefficients: [1i32; 1],
+    };
 
-    assert_eq!((p3 - p4).coefficients, [0i32, 1i32], "wrong subtraction result");
+    assert_eq!(
+        (p3 - p4).coefficients,
+        [0i32, 1i32],
+        "wrong subtraction result"
+    );
 
-    let p5 = Polynomial { coefficients: [1i32; 2] };
-    let p6 = Polynomial { coefficients: [1i32; 2] };
+    let p5 = Polynomial {
+        coefficients: [1i32; 2],
+    };
+    let p6 = Polynomial {
+        coefficients: [1i32; 2],
+    };
 
-    assert_eq!((p5 * p6).coefficients, [1i32, 2i32, 1i32], "wrong multiplication result");
+    assert_eq!(
+        (p5 * p6).coefficients,
+        [1i32, 2i32, 1i32],
+        "wrong multiplication result"
+    );
 
-    let p7 = Polynomial { coefficients: [-4i32, 0i32, -2i32, 1i32] };
-    let p8 = Polynomial { coefficients: [-3i32, 1i32, 0i32, 0i32] };
+    let p7 = Polynomial {
+        coefficients: [-4i32, 0i32, -2i32, 1i32],
+    };
+    let p8 = Polynomial {
+        coefficients: [-3i32, 1i32, 0i32, 0i32],
+    };
 
-    assert_eq!((p7 / p8).coefficients, [3i32, 1i32, 1i32, 0i32], "wrong division result");
+    assert_eq!(
+        (p7 / p8).coefficients,
+        [3i32, 1i32, 1i32, 0i32],
+        "wrong division result"
+    );
 }
