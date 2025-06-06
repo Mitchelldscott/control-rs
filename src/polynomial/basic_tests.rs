@@ -34,6 +34,7 @@ mod neg {
         let constant = Polynomial::monomial(1.0f64);
         assert_eq!(-constant, Polynomial::from_data([-1.0f64]));
     }
+    #[test]
     fn line_neg() {
         let line = Polynomial::from_data([0, 1]);
         assert_eq!(-line, Polynomial::from_data([0, -1]));
@@ -147,6 +148,7 @@ mod coefficient_accessors {
             "leading_coefficient_mut"
         );
     }
+    #[test]
     fn large() {
         let p = Polynomial::<f32, 24>::from_fn(|_| 1.0);
         assert_eq!(p.is_empty(), false, "p is empty");
