@@ -1203,6 +1203,7 @@ where
     T: Clone + Zero + One + PartialOrd + Neg<Output = T> + fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let precision = f.precision().unwrap_or(crate::math::DEFAULT_PRECISION);
         let mut n = N;
         for (i, a_i) in self.iter().enumerate().rev() {
             if a_i.is_zero() {
@@ -1220,7 +1221,7 @@ where
                 a_i.clone()
             };
             if !abs_a_i.is_one() || i == 0 {
-                write!(f, "{}", abs_a_i)?;
+                write!(f, "{:.precision$}", abs_a_i)?;
             }
             if i > 0 {
                 write!(f, "x")?;

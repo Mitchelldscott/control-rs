@@ -17,9 +17,9 @@ use num_traits::{One, Zero};
 /// Where <pre>f</pre> is the dynamics function and <pre>h</pre> is the output function.
 ///
 /// # Generic Arguments
-/// * `Input` - Type of the input variable(s)
-/// * `State` - Type of the state variable(s)
-/// * `Output` - Type of the output variable(s)
+/// * `Input` - Input variable(s)
+/// * `State` - State variable(s)
+/// * `Output` - Output variable(s)
 pub trait DynamicalSystem<Input, State, Output> {
     /// Evaluates the dynamics of the state for the given state and input
     fn dynamics(&self, x: State, u: Input) -> State;
@@ -33,13 +33,13 @@ pub trait DynamicalSystem<Input, State, Output> {
 /// trait bound for algorithms that use linearization.
 ///
 /// # Generic Arguments
-/// * `Input` - type of the input vector
-/// * `State` - type of the state vector
-/// * `Output` - type of the output vector
-/// * `A` - type of the state matrix
-/// * `B` - type of the input matrix
-/// * `C` - type of the output matrix
-/// * `D` - type of the feedthrough matrix
+/// * `Input` - input vector
+/// * `State` - state vector
+/// * `Output` - output vector
+/// * `A` - state matrix
+/// * `B` - input matrix
+/// * `C` - output matrix
+/// * `D` - feedthrough matrix
 ///
 /// ## References
 /// - *Nonlinear Systems*, Khalil, Ch. 2: Nonlinear Models.
