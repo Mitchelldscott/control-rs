@@ -2,8 +2,8 @@
 //!
 //! This file provides basic usage testing, initialization, accessors and setters, for
 //! specialized polynomial types.
-//! 
-//! The tests currently cover u8, i8, u16, i16, u32, i32, f32, f64.(neg tests do not cover 
+//!
+//! The tests currently cover u8, i8, u16, i16, u32, i32, f32, f64.(neg tests do not cover
 //! unsigned integers). u64, i64, u128, i128, and other big nums are not covered untill they
 //! have their own features.
 
@@ -96,7 +96,11 @@ mod coefficient_accessors {
         assert_eq!(p_mut.is_empty(), false, "mut not empty");
         assert_eq!(p_mut.degree(), Some(0), "degree");
         assert_eq!(p_mut.is_monic(), false, "monic");
-        assert_eq!(p_mut.coefficient_mut(0), Some(&mut 10), "coefficient_mut(0)");
+        assert_eq!(
+            p_mut.coefficient_mut(0),
+            Some(&mut 10),
+            "coefficient_mut(0)"
+        );
         assert_eq!(
             p_mut.coefficient_mut(10),
             None,

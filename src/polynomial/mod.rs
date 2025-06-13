@@ -35,15 +35,20 @@
 
 use core::{
     array, fmt,
-    mem::MaybeUninit,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign},
     slice,
 };
 use nalgebra::{
-    allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimName, DimSub, OMatrix,
-    RealField, U1,
+    allocator::Allocator, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimSub, RealField, U1,
 };
-use num_traits::{Float, Num, One, Zero};
+use num_traits::{Num, One, Zero};
+
+// ===============================================================================================
+//      Polynomial Submodules
+// ===============================================================================================
+
+pub mod utils;
+
 // ===============================================================================================
 //      Polynomial Specializations
 // ===============================================================================================
@@ -66,72 +71,6 @@ mod arithmatic_tests;
 // ===============================================================================================
 //      Polynomial
 // ===============================================================================================
-
-/// Helper function to reverse arrays given to [Polynomial::new()]
-#[inline(always)]
-const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
-    let mut output = input;
-    let mut i = 0;
-    while i < N / 2 {
-        let tmp = output[i];
-        output[i] = output[N - 1 - i];
-        output[N - 1 - i] = tmp;
-        i += 1;
-    }
-
-    output
-}
-
-/// Initialize an array from an iterator.
-///
-/// # Arguments
-/// * `iterator` - An [Iterator] over a collection of `T`.
-/// * `default` - the default value to use if the iterator is not long enough.
-///
-/// # Returns
-/// * `initialized_array` - An array with all elements initialized
-///
-/// # Safety
-/// This function uses `MaybeUninit` and raw pointer casting to avoid requiring `T: Default + Copy`.
-/// The safety relies on:
-/// - Fully initializing all elements of the `[MaybeUninit<T>; N]` array before calling `read()`
-/// - Not reading from or dropping uninitialized memory
-fn initialize_array_from_iterator_with_default<I, T, const N: usize>(
-    iterator: I,
-    default: T,
-) -> [T; N]
-where
-    T: Clone,
-    I: IntoIterator<Item = T>,
-{
-    // SAFETY: `[MaybeUninit<T>; N]` is valid.
-    let mut uninit_array: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
-    let mut degree = 0;
-
-    // SAFETY: zip() will only iterate over `N.min(iter.len())` elements so no out-of-bounds access
-    // can occur.
-    for (c, d) in uninit_array.iter_mut().zip(iterator.into_iter()) {
-        *c = MaybeUninit::new(d);
-        degree += 1;
-    }
-
-    // SAFETY: `T: Clone`, and we are initializing all remaining uninitialized slots.
-    for c in uninit_array.iter_mut().skip(degree) {
-        *c = MaybeUninit::new(default.clone());
-    }
-
-    // SAFETY:
-    // - All `N` elements of `uninit_array` have now been initialized.
-    // - `MaybeUninit<T>` does not drop its content, so no double-drop will occur.
-    // - We can safely transmute it to `[T; N]` by reading the pointer.
-    unsafe {
-        // Get a pointer to the `uninit_array` array.
-        // Cast it to a pointer to an array of `T`.
-        // Then `read()` the value from that pointer.
-        // This is equivalent to transmute from `[MaybeUninit<T>; N]` to `[T; N]`.
-        (uninit_array.as_ptr() as *const [T; N]).read()
-    }
-}
 
 /// Statically sized univariate polynomial
 ///
@@ -224,7 +163,7 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// let p = Polynomial::new([]);
     /// assert_eq!(p.is_empty(), true);
     /// ```
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         N == 0
@@ -264,7 +203,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     where
         I: IntoIterator<Item = T>,
     {
-        Self::from_data(initialize_array_from_iterator_with_default(
+        Self::from_data(utils::initialize_array_from_iterator_with_default(
             iterator,
             T::zero(),
         ))
@@ -362,7 +301,7 @@ impl<T: Copy, const N: usize> Polynomial<T, N> {
     /// TODO: Unit Test
     #[inline]
     pub const fn new(coefficients: [T; N]) -> Self {
-        Self::from_data(reverse_array(coefficients))
+        Self::from_data(utils::reverse_array(coefficients))
     }
 }
 
@@ -386,12 +325,7 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     ///     * `None` - if the length is zero or all coefficients are zero
     #[inline]
     pub fn degree(&self) -> Option<usize> {
-        for (i, a_i) in self.coefficients.iter().enumerate().rev() {
-            if !a_i.is_zero() {
-                return Some(i);
-            }
-        }
-        None
+        utils::largest_nonzero_index(&self.coefficients)
     }
 }
 impl<T: Clone, const N: usize> Polynomial<T, N> {
@@ -423,6 +357,7 @@ impl<T: Clone, const N: usize> Polynomial<T, N> {
             .rfold(U::zero(), |acc, a_i| acc * value.clone() + a_i.clone())
     }
 }
+
 impl<T: PartialEq + One + Zero, const N: usize> Polynomial<T, N> {
     /// Checks if a polynomial is monic
     ///
@@ -430,9 +365,8 @@ impl<T: PartialEq + One + Zero, const N: usize> Polynomial<T, N> {
     /// * `bool` - true if the leading coefficient is one, false otherwise
     #[inline]
     pub fn is_monic(&self) -> bool {
-        if let Some(degree) = self.degree() {
-            // SAFETY: degree < N so degree is valid
-            unsafe { self.get_unchecked(degree).is_one() }
+        if let Some(coefficient) = self.leading_coefficient() {
+            coefficient.is_one()
         } else {
             false
         }
@@ -607,296 +541,107 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
 //      Calculus
 // ===============================================================================================
 
-/// Result of taking the derivative of a polynomial.
-///
-/// This enum represents the possible outcomes when computing the derivative of a polynomial:
-/// - A zero polynomial (when differentiating a constant)
-/// - A valid polynomial of the same capacity
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum PolynomialDerivative<T, const N: usize> {
-    /// Represents a zero polynomial with the given zero value.
-    /// This variant is returned when differentiating a constant polynomial.
-    Zero,
-    /// Represents a valid polynomial resulting from the derivative operation.
-    Ok(Polynomial<T, N>),
-}
-
-impl<T: Clone + Zero + One + Add<Output = T> + Mul<Output = T>, const N: usize> Polynomial<T, N> {
-    /// Calculates the derivative of a polynomial using the power rule.
-    ///
-    /// This function performs the core derivative calculation by applying the power rule
-    /// `d/dx(ax^n) = n * ax^{n-1}` to each term of the polynomial.
-    /// It iterates through the coefficients, effectively shifting them to a lower exponent
-    /// and multiplying by the original exponent.
-    ///
-    /// This function is safe for any size polynomial (`N`) and correctly handles
-    /// polynomials of any degree, including first-order and constant terms.
-    /// The constant term (coefficient of x^0) is implicitly handled by `skip(1)`,
-    /// as its derivative is zero and thus not included in the resulting polynomial coefficients.
-    ///
-    /// This function is private because calling it on a zero or empty polynomial will have no
-    /// effect. Users should call [Polynomial::derivative] to ensure the base case is handled
-    /// properly.
-    ///
-    /// # Examples
-    ///
-    /// If `self` represents the polynomial $3x^3 + 2x^2 + 5x + 10$:
-    /// The resulting polynomial from `derivative_internal` would represent $9x^2 + 4x + 5$.
-    #[inline]
-    fn derivative_internal(&self) -> Self {
-        let mut exponent = T::zero();
-        Polynomial::from_iterator(self.iter().skip(1).map(|a_i| {
-            exponent = exponent.clone() + T::one();
-            a_i.clone() * exponent.clone()
-        }))
-    }
-
+impl<T: Clone + AddAssign + Zero + One, const N: usize> Polynomial<T, N> {
     /// Computes the derivative of a polynomial.
     ///
-    /// This function determines if the polynomial is constant or empty (degree does not exist).
-    /// If the polynomial has a degree (meaning it's not empty), it delegates to
-    /// `derivative_internal` to perform the actual power rule calculations.
-    /// If the polynomial is empty or represents a constant (e.g., $f(x) = C$),
-    /// its derivative is the zero polynomial.
+    /// See [utils::polynomial_derivative] for more.
     ///
     /// # Returns
-    ///
-    /// - `PolynomialDerivative::Zero`: If the polynomial is constant (degree 0) or empty (degree
-    /// None)
-    /// - `PolynomialDerivative::Ok(Polynomial<T, N>)`: If the polynomial's degree is
-    ///   greater than 0, containing the coefficients of the resulting derivative polynomial.
+    /// * `Polynomial` - a polynomial with capacity `N - 1`
     ///
     /// # Examples
-    ///
     /// ```
-    /// use control_rs::polynomial::{Polynomial, PolynomialDerivative}; // Assuming these traits/structs are in your crate
-    /// use num_traits::{Zero, One};
-    /// // Example for a polynomial of degree 2
+    /// use control_rs::polynomial::Polynomial;
     /// let p1 = Polynomial::new([1_i32, 2_i32, 3_i32]); // Represents 3x^2 + 2x + 1
     /// assert_eq!(
     ///     p1.derivative(),
-    ///     PolynomialDerivative::Ok(Polynomial::from_data([2_i32, 6_i32, 0_i32])),
-    ///     "Expected a valid polynomial derivative"
+    ///     Polynomial::from_data([2_i32, 6_i32]), // 6x + 2
+    ///     "Incorrect polynomial derivative"
     /// );
-    ///
-    /// // Example for a constant polynomial
-    /// let p2 = Polynomial::new([5_i32]); // Represents 5
-    /// assert_eq!(p2.derivative(), PolynomialDerivative::Zero, "Expected a zero polynomial derivative");
-    ///
-    /// // Example for an empty polynomial (assuming it can be constructed like this)
-    /// let p3 = Polynomial::from_iterator(std::iter::empty()); // Represents an empty polynomial
-    /// assert_eq!(p3.derivative(), PolynomialDerivative::Zero, "Expected a zero polynomial derivative")
     /// ```
     #[inline]
-    pub fn derivative(&self) -> PolynomialDerivative<T, N> {
-        if let Some(_) = self.degree() {
-            PolynomialDerivative::Ok(self.derivative_internal())
-        } else {
-            PolynomialDerivative::Zero
-        }
+    pub fn derivative<const M: usize>(&self) -> Polynomial<T, M>
+    where
+        Const<N>: DimSub<U1, Output = Const<M>>,
+    {
+        Polynomial::from_data(utils::differentiate::<T, N, M>(&self.coefficients))
     }
 }
 
-/// Result of integrating a polynomial.
-///
-/// This enum represents the possible outcomes when computing the integral of a polynomial:
-/// - A constant (when integrating a zero or empty polynomial)
-/// - A valid polynomial with the same capacity
-/// - A truncated polynomial (when the result would exceed the maximum capacity N)
-pub enum PolynomialIntegral<T, const N: usize> {
-    /// Represents a constant value resulting from integrating a zero polynomial.
-    /// This variant contains the integration constant.
-    Constant(Polynomial<T, 1>),
-    /// Represents a valid polynomial resulting from the integration operation.
-    /// This variant is returned when the integral fits within the polynomial's capacity.
-    Ok(Polynomial<T, N>),
-    /// Represents a truncated polynomial resulting from the integration operation.
-    /// This variant is returned when the integral would exceed the polynomial's capacity (N),
-    /// so the result is truncated to fit.
-    Truncated(Polynomial<T, N>),
-}
-
-impl<T: Clone + Zero + One + Add<Output = T> + Div<Output = T>, const N: usize> Polynomial<T, N> {
-    /// Calculates the indefinite integral of a polynomial using the power rule.
-    ///
-    /// This internal function computes the indefinite integral of the polynomial by
-    /// applying the reverse power rule ($\int ax^n dx = \frac{a}{n+1}x^{n+1}$) to each term.
-    /// It also incorporates the provided `constant` of integration as the new constant term.
-    ///
-    /// The process involves:
-    /// 1. Prepending the `constant` of integration as the coefficient of $x^0$.
-    /// 2. Iterating through the original polynomial's coefficients $a_i$ (corresponding to $x^i$).
-    /// 3. For each $a_i$, calculating the new coefficient as $a_i / (i+1)$, where
-    ///    $(i+1)$ is the new exponent.
-    ///
-    /// This function will not resize a polynomial. If there is not enough space, it will truncate
-    /// the highest order term.
-    ///
-    /// # Arguments
-    /// * `constant`: The constant of integration, $C$. This will become the coefficient
-    ///   of $x^0$ in the resulting polynomial.
-    ///
-    // TODO: Examples
-    #[inline]
-    fn integral_internal(&self, constant: T) -> Self {
-        let mut exponent = T::one();
-        Polynomial::from_iterator([constant].into_iter().chain(self.iter().enumerate().map(
-            |(_, a_i)| {
-                exponent = exponent.clone() + T::one();
-                a_i.clone() / exponent.clone()
-            },
-        )))
-    }
-
+impl<T: Clone + Zero + One + AddAssign + Div<Output = T>, const N: usize> Polynomial<T, N> {
     /// Computes the indefinite integral of a polynomial.
     ///
-    /// If the polynomial has a degree (meaning it's not empty), it delegates to
-    /// `integral_internal` to perform the actual power rule calculations. If the
-    /// polynomial is empty teh result is a constant polynomial. If the degree is
-    /// `N-1` then the result will truncate the highest order coefficient.
-    #[inline]
-    pub fn integral(&self, constant: T) -> PolynomialIntegral<T, N> {
-        if let Some(degree) = self.degree() {
-            let integral = self.integral_internal(constant);
-            if degree + 1 == N {
-                PolynomialIntegral::Truncated(integral)
-            } else {
-                PolynomialIntegral::Ok(integral)
-            }
-        } else {
-            PolynomialIntegral::Constant(Polynomial::from_data([constant]))
-        }
-    }
-}
-
-impl<T, const N: usize> Polynomial<T, N>
-where
-    T: 'static + Clone + Num + Neg<Output = T> + fmt::Debug,
-    Const<N>: DimSub<U1>,
-    DimDiff<Const<N>, U1>: DimName,
-    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>,
-{
-    /// Constructs the companion matrix of the polynomial.
-    ///
-    /// The companion matrix is a square matrix whose eigenvalues are the roots of the polynomial.
-    /// It is constructed from an identity matrix, a zero column and a row of the polynomial's
-    /// coefficients scaled by the highest term.
-    ///
-    /// <pre>
-    /// |  a[0...n-1] / a_n  |
-    /// |     I      0     |
-    /// </pre>
-    /// <pre>
-    /// |  -a_(n-1)/a_n  -a_(n-2)/a_n  -a_(n-3)/a_n  ...  -a_1/a_0  -a_0/a_n  |
-    /// |     1         0         0      ...       0            0         |
-    /// |     0         1         0      ...       0            0         |
-    /// |     0         0         1      ...       0            0         |
-    /// |    ...       ...       ...     ...      ...          ...        |
-    /// |     0         0         0      ...       1            0         |
-    /// </pre>
+    /// See [utils::polynomial_integral] for more.
     ///
     /// # Returns
-    /// * `OMatrix<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>` - The companion matrix
-    /// representation of the polynomial.
+    /// * `Polynomial` - a polynomial with capacity `N + 1`
     ///
-    /// # Example
-    /// ```rust
-    /// use control_rs::polynomial::Polynomial;
-    ///
-    /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]);
-    /// let companion_matrix = p.companion();
+    /// # Examples
     /// ```
-    pub fn companion(&self) -> OMatrix<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>> {
-        // return companion;
-        if let Some(leading_coefficient) = self.leading_coefficient() {
-            OMatrix::<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>::from_fn(|i, j| {
-                if i == 0 {
-                    // SAFETY: the index j is less than N
-                    unsafe { -self.get_unchecked(N - j - 1).clone() / leading_coefficient.clone() }
-                } else {
-                    if i == j + 1 {
-                        T::one()
-                    } else {
-                        T::zero()
-                    }
-                }
-            })
-        } else {
-            OMatrix::<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>::zeros()
-        }
+    /// use control_rs::polynomial::Polynomial;
+    /// let p1 = Polynomial::new([2_i32, 6_i32]); // 6x + 2
+    /// assert_eq!(
+    ///     p1.integral(1i32),
+    ///     Polynomial::from_data([1_i32, 2_i32, 3_i32]), // 3x^2 + 2x + 1
+    ///     "Incorrect polynomial integral"
+    /// );
+    /// ```
+    #[inline]
+    pub fn integral<const M: usize>(&self, constant: T) -> Polynomial<T, M>
+    where
+        Const<N>: DimAdd<U1, Output = Const<M>>,
+    {
+        Polynomial::from_data(utils::integrate::<T, N, M>(&self.coefficients, constant))
     }
 }
 
-impl<T, const N: usize> Polynomial<T, N>
-where
-    T: 'static + Clone + Num + Neg<Output = T> + fmt::Debug + RealField + Float,
-    Const<N>: DimSub<U1>,
-    DimDiff<Const<N>, U1>: DimName + DimSub<U1>,
-    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>
-        + Allocator<DimDiff<Const<N>, U1>, DimDiff<DimDiff<Const<N>, U1>, U1>>
-        + Allocator<DimDiff<DimDiff<Const<N>, U1>, U1>>
-        + Allocator<DimDiff<Const<N>, U1>>,
-{
-    /// Computes the roots of the polynomial.
-    ///
-    /// Edge cases:
-    /// - if the leading coefficient is zero, this should reduce the order and recurse, having
-    /// issues with trait bounds (currently returns NaN)
-    /// - all coefficients are zero: all roots are infinite
-    /// - if there are two coefficients and the lead is non-zero: the root is
-    /// `-coefficient[1]/coefficient[0]`
-    /// - if all but the first coefficient are zero: all roots are zero
-    ///
-    /// For very high-order polynomial's this may be inefficient, especially for degenerate cases.
-    ///
-    /// # Returns
-    /// * `OMatrix<Complex<T>, Const<D>, U1>` - A column vector containing the computed roots.
+impl<T: Copy + Zero + One + Neg<Output = T> + Div<Output = T>, const N: usize> Polynomial<T, N> {
+    /// Computes the Frobenius companion matrix of a polynomial.
     ///
     /// # Example
     /// ```rust
     /// use control_rs::polynomial::Polynomial;
     ///
+    /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]); // x^3 - 6x^2 + 11x - 6
+    /// assert_eq!(p.companion(), [[6.0, -11.0, 6.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]], "incorrect companion");
+    /// ```
+    pub fn companion<const M: usize>(&self) -> [[T; M]; M]
+    where
+        Const<N>: DimSub<U1, Output = Const<M>>,
+    {
+        utils::companion::<T, N, M>(&self.coefficients)
+    }
+}
+
+impl<T, const N: usize> Polynomial<T, N>
+where
+    T: Clone + Num + Neg<Output = T> + RealField,
+{
+    /// Computes the roots of the polynomial
+    ///
+    /// # Example
+    /// ```
+    /// use control_rs::polynomial::Polynomial;
     /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]);
     /// let roots = p.roots();
     /// ```
-    pub fn roots(&self) -> OMatrix<Complex<T>, DimDiff<Const<N>, U1>, U1> {
-        if !self.coefficients[0].is_zero() {
-            if N == 2 {
-                OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
-                    -self.coefficients[1].clone() / self.coefficients[0].clone(),
-                    T::zero(),
-                ))
-            } else {
-                let num_zeros = (0..N).fold(0, |acc, i| match self.coefficients[i] == T::zero() {
-                    true => acc + 1,
-                    false => acc,
-                });
-
-                if num_zeros == N {
-                    // zero/degenerate polynomial, all infinite roots
-                    OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
-                        T::infinity(),
-                        T::infinity(),
-                    ))
-                } else if num_zeros == N - 1 {
-                    // unit case, all zero roots
-                    OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
-                        T::zero(),
-                        T::zero(),
-                    ))
-                } else {
-                    // need to know more specifics about what matrices work with complex_eigenvalues,
-                    // the current cases fixed an infinite loop in the test, but certainly not a guaranteed solution
-                    self.companion().complex_eigenvalues()
-                }
-            }
-        } else {
-            // should be able to reduce order and keep trying, but having issues with recursive trait bounds
-            OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
-                T::nan(),
-                T::nan(),
-            ))
-        }
+    pub fn roots<const M: usize>(&self) -> Result<[Complex<T>; M], utils::NoRoots>
+    where
+        T: Copy
+            + Zero
+            + One
+            + Neg<Output = T>
+            + Sub<Output = T>
+            + Div<Output = T>
+            + PartialOrd
+            + fmt::Debug
+            + RealField,
+        Const<N>: DimSub<U1, Output = Const<M>>,
+        Const<M>: DimSub<U1>,
+        DefaultAllocator:
+            Allocator<Const<M>, DimDiff<Const<M>, U1>> + Allocator<DimDiff<Const<M>, U1>>,
+    {
+        utils::roots::<T, N, M>(&self.coefficients)
     }
 }
 
