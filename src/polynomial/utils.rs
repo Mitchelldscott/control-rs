@@ -1,4 +1,7 @@
 //! Provides core logic of a [Polynomial] without edge case handling and explicit return types.
+//! 
+//! This is used by other parts of [control_rs] that perform their own specialized edge cases and
+//! error handling. Users should call the provided [Polynomial] interface.
 
 use core::{
     fmt,
