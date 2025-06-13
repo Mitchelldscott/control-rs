@@ -23,6 +23,7 @@ pub type Constant<T> = Polynomial<T, 1>;
 impl<T: Clone + Add<Output = T>> Add<T> for Constant<T> {
     type Output = Constant<T>;
 
+    #[inline(always)]
     fn add(self, rhs: T) -> Self::Output {
         Self::from_data([
             // SAFETY: `N` is 1, so the index is always valid
@@ -41,6 +42,7 @@ impl<T: Clone + Add<Output = T>> Add<T> for Constant<T> {
 /// assert_eq!(*p1.constant().unwrap(), 1);
 /// ```
 impl<T: AddAssign> AddAssign<T> for Constant<T> {
+    #[inline(always)]
     fn add_assign(&mut self, rhs: T) {
         // SAFETY: `N` is 1, so the index is always valid
         unsafe {
@@ -61,6 +63,7 @@ impl<T: AddAssign> AddAssign<T> for Constant<T> {
 impl<T: Clone + Sub<Output = T>> Sub<T> for Constant<T> {
     type Output = Self;
 
+    #[inline(always)]
     fn sub(self, rhs: T) -> Self::Output {
         Self::from_data([
             // SAFETY: `N` is 1, so the index is always valid
@@ -79,6 +82,7 @@ impl<T: Clone + Sub<Output = T>> Sub<T> for Constant<T> {
 /// assert_eq!(*p1.constant().unwrap(), -1);
 /// ```
 impl<T: SubAssign> SubAssign<T> for Constant<T> {
+    #[inline(always)]
     fn sub_assign(&mut self, rhs: T) {
         // SAFETY: `N` is 1, so the index is always valid
         unsafe {
@@ -92,7 +96,7 @@ macro_rules! impl_constant_left_scalar_ops {
         $(
             impl Add<Constant<$scalar>> for $scalar {
                 type Output = Constant<$scalar>;
-
+                #[inline(always)]
                 fn add(self, rhs: Constant<$scalar>) -> Self::Output {
                     Self::Output::from_data([
                         // SAFETY: `N` is 1, so the index is always valid
@@ -101,6 +105,7 @@ macro_rules! impl_constant_left_scalar_ops {
                 }
             }
             impl AddAssign<Constant<$scalar>> for $scalar {
+                #[inline(always)]
                 fn add_assign(&mut self, rhs: Constant<$scalar>) {
                     // SAFETY: `N` is 1, so the index is always valid
                     unsafe {
@@ -109,6 +114,7 @@ macro_rules! impl_constant_left_scalar_ops {
                 }
             }
             impl SubAssign<Constant<$scalar>> for $scalar {
+                #[inline(always)]
                 fn sub_assign(&mut self, rhs: Constant<$scalar>) {
                     // SAFETY: `N` is 1, so the index is always valid
                     unsafe {
@@ -118,7 +124,7 @@ macro_rules! impl_constant_left_scalar_ops {
             }
             impl Div<Constant<$scalar>> for $scalar {
                 type Output = Constant<$scalar>;
-
+                #[inline(always)]
                 fn div(self, rhs: Constant<$scalar>) -> Self::Output {
                     Self::Output::from_data([
                         // SAFETY: `N` is 1, so the index is always valid
@@ -135,7 +141,7 @@ macro_rules! impl_constant_left_scalar_sub {
         $(
             impl Sub<Constant<$scalar>> for $scalar {
                 type Output = Constant<$scalar>;
-
+                #[inline(always)]
                 fn sub(self, rhs: Constant<$scalar>) -> Self::Output {
                     Polynomial::from_data([
                         // SAFETY: `N` is 1, so the index is always valid
@@ -170,7 +176,7 @@ where
     T: Add<Polynomial<T, N>, Output = Polynomial<T, N>>,
 {
     type Output = Polynomial<T, N>;
-
+    #[inline(always)]
     fn add(self, rhs: Polynomial<T, N>) -> Self::Output {
         // SAFETY: `N` is 1, so the index is always valid
         unsafe { self.get_unchecked(0).clone() + rhs }
@@ -192,7 +198,7 @@ where
     T: Sub<Polynomial<T, N>, Output = Polynomial<T, N>>,
 {
     type Output = Polynomial<T, N>;
-
+    #[inline(always)]
     fn sub(self, rhs: Polynomial<T, N>) -> Self::Output {
         // SAFETY: `N` is 1, so the index is always valid
         unsafe { self.get_unchecked(0).clone() - rhs }
@@ -214,7 +220,7 @@ where
     T: Mul<Polynomial<T, N>, Output = Polynomial<T, N>>,
 {
     type Output = Polynomial<T, N>;
-
+    #[inline(always)]
     fn mul(self, rhs: Polynomial<T, N>) -> Self::Output {
         // SAFETY: `N` is 1, so the index is always valid
         unsafe { self.get_unchecked(0).clone() * rhs }
@@ -272,6 +278,7 @@ impl<T> SubAssign<Polynomial<T, 0>> for Constant<T> {
 /// assert_eq!(*p1.constant().unwrap(), 1);
 /// ```
 impl<T: Clone + AddAssign> AddAssign for Constant<T> {
+    #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
         // SAFETY: `N` is 1, so the index is always valid
         unsafe {
@@ -291,6 +298,7 @@ impl<T: Clone + AddAssign> AddAssign for Constant<T> {
 /// assert_eq!(*p1.constant().unwrap(), 0);
 /// ```
 impl<T: Clone + SubAssign> SubAssign for Constant<T> {
+    #[inline(always)]
     fn sub_assign(&mut self, rhs: Self) {
         // SAFETY: `N` is 1, so the index is always valid
         unsafe {
@@ -310,6 +318,7 @@ impl<T: Clone + SubAssign> SubAssign for Constant<T> {
 /// assert_eq!(*p1.constant().unwrap(), 4);
 /// ```
 impl<T: Clone + MulAssign> MulAssign for Constant<T> {
+    #[inline(always)]
     fn mul_assign(&mut self, rhs: Self) {
         // SAFETY: `N` is 1, so the index is always valid
         unsafe {
@@ -330,7 +339,7 @@ impl<T: Clone + MulAssign> MulAssign for Constant<T> {
 /// ```
 impl<T: Clone + Div<Output = T>> Div for Constant<T> {
     type Output = Self;
-
+    #[inline(always)]
     fn div(self, rhs: Self) -> Self::Output {
         Self::from_data([
             // SAFETY: `N` is 1, so the index is always valid
@@ -350,6 +359,7 @@ impl<T: Clone + Div<Output = T>> Div for Constant<T> {
 /// assert_eq!(*p1.constant().unwrap(), 1);
 /// ```
 impl<T: Clone + DivAssign> DivAssign for Constant<T> {
+    #[inline(always)]
     fn div_assign(&mut self, rhs: Self) {
         // SAFETY: `N` is 1, so the index is always valid
         unsafe {
@@ -371,7 +381,7 @@ impl<T: Clone + DivAssign> DivAssign for Constant<T> {
 /// TODO: Unit Test
 impl<T: Clone + Rem<Output = T>> Rem for Constant<T> {
     type Output = Self;
-
+    #[inline(always)]
     fn rem(self, rhs: Self) -> Self::Output {
         Self::from_data([
             // SAFETY: `N` is 1, so the index is always valid
@@ -392,6 +402,7 @@ impl<T: Clone + Rem<Output = T>> Rem for Constant<T> {
 /// ```
 /// TODO: Unit Test
 impl<T: Clone + RemAssign> RemAssign for Constant<T> {
+    #[inline(always)]
     fn rem_assign(&mut self, rhs: Self) {
         // SAFETY: `N` is 1, so the index is always valid
         unsafe {
