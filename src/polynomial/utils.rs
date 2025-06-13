@@ -5,6 +5,8 @@
 
 use core::{
     fmt,
+    ptr::copy_nonoverlapping,
+    array,
     mem::MaybeUninit,
     ops::{AddAssign, Div, Mul, Neg, Sub, SubAssign},
 };
@@ -43,7 +45,7 @@ pub const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
 /// The safety relies on:
 /// - Fully initializing all elements of the `[MaybeUninit<T>; N]` array before calling `read()`
 /// - Not reading from or dropping uninitialized memory
-pub(super) fn initialize_array_from_iterator_with_default<I, T, const N: usize>(
+pub(super) fn array_from_iterator_with_default<I, T, const N: usize>(
     iterator: I,
     default: T,
 ) -> [T; N]
@@ -53,24 +55,23 @@ where
 {
     // SAFETY: `[MaybeUninit<T>; N]` is valid.
     let mut uninit_array: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
-    let mut degree = 0;
+    let mut count = 0;
 
-    // SAFETY: zip() will only iterate over `N.min(iter.len())` elements so no out-of-bounds access
-    // can occur.
+    // zip() will only iterate over `N.min(iterator_len)` items so no OOB access will occur.
     for (c, d) in uninit_array.iter_mut().zip(iterator.into_iter()) {
         *c = MaybeUninit::new(d);
-        degree += 1;
+        count += 1;
     }
 
-    // SAFETY: `T: Clone`, and we are initializing all remaining uninitialized slots.
-    for c in uninit_array.iter_mut().skip(degree) {
+    // `T: Clone`, and we are initializing all remaining uninitialized slots.
+    for c in uninit_array.iter_mut().skip(count) {
         *c = MaybeUninit::new(default.clone());
     }
 
     // SAFETY:
-    // - All `N` elements of `uninit_array` have now been initialized.
-    // - `MaybeUninit<T>` does not drop its content, so no double-drop will occur.
-    // - We can safely transmute it to `[T; N]` by reading the pointer.
+    // * All `N` elements of `uninit_array` have been initialized.
+    // * `MaybeUninit<T>` and T are guaranteed to have the same layout.
+    // * `MaybeUninit` does not drop, so there are no double-frees.
     unsafe {
         // Get a pointer to the `uninit_array` array.
         // Cast it to a pointer to an array of `T`.
@@ -78,6 +79,32 @@ where
         // This is equivalent to transmute from `[MaybeUninit<T>; N]` to `[T; N]`.
         (uninit_array.as_ptr() as *const [T; N]).read()
     }
+}
+
+/// # Safety
+///
+/// This function performs a raw memory copy of `N` elements from the input slice `src`
+/// into a newly constructed `[T; N]` array using [copy_nonoverlapping].
+///
+/// ## Preconditions
+/// To avoid undefined behavior, the caller **must** ensure the following:
+/// * `src.len() >= N`: The slice must contain **at least** `N` valid elements.
+/// * `src.as_ptr()` must be properly aligned for type `T` (This is guaranteed for slices of `T`,
+/// unless manually constructed unsafely).
+#[inline]
+const unsafe fn array_from_slice_copy<T: Copy, const N: usize>(src: &[T]) -> [T; N] {
+    let mut dst: MaybeUninit<[T; N]> = MaybeUninit::uninit();
+    // Behavior is undefined if any of the following conditions are violated:
+    // * `src` must be [valid] for reads of `count * size_of::<T>()` bytes.
+    // * `dst` must be [valid] for writes of `count * size_of::<T>()` bytes.
+    // * Both `src` and `dst` must be properly aligned.
+    copy_nonoverlapping(
+        src.as_ptr(),
+        dst.as_mut_ptr() as *mut T,
+        N,
+    );
+    // SAFETY: All elements are initialized
+    dst.assume_init()
 }
 
 /// Finds the **last** non-zero value in an array.
@@ -116,10 +143,10 @@ where
     Const<N>: DimSub<U1, Output = Const<M>>,
 {
     let mut exponent = T::zero();
-    initialize_array_from_iterator_with_default(
-        coefficients.iter().cloned().map(|a_i| {
+    array_from_iterator_with_default(
+        coefficients.iter().skip(1).map(|a_i| {
             exponent += T::one();
-            a_i * exponent.clone()
+            a_i.clone() * exponent.clone()
         }),
         T::zero(),
     )
@@ -148,7 +175,7 @@ where
     Const<N>: DimAdd<U1, Output = Const<M>>,
 {
     let mut exponent = T::zero();
-    initialize_array_from_iterator_with_default(
+    array_from_iterator_with_default(
         [constant]
             .into_iter()
             .chain(coefficients.iter().enumerate().map(|(_, a_i)| {
@@ -185,29 +212,39 @@ where
 /// ```
 pub fn companion<T, const N: usize, const M: usize>(coefficients: &[T; N]) -> [[T; M]; M]
 where
-    T: Copy + Zero + One + Neg<Output = T> + Div<Output = T>,
+    T: Clone + Zero + One + Neg<Output = T> + Div<Output = T>,
     Const<N>: DimSub<U1, Output = Const<M>>,
 {
-    let mut companion = [[T::zero(); M]; M];
+    let mut companion = array::from_fn(|_| array::from_fn(|_| T::zero()));
 
-    // SAFETY: `N - 1` is a valid index if Const<N> impl DimSub<U1> `N > 0`
+    // SAFETY: `M` is a valid index because Const<N> impl DimSub<U1, Output = Const<M>> so `N > 0`
+    // and `N - 1 = M`
     let leading_coefficient = unsafe { coefficients.get_unchecked(M).clone() };
-    if M > 0 && !leading_coefficient.is_zero() {
-        for i in 0..M {
-            // SAFETY: `i < M` i is a valid index for either dimension of companion
-            // SAFETY: `M < N` i is a valid index of coefficients
-            unsafe {
-                *companion.get_unchecked_mut(0).get_unchecked_mut(i) =
-                    -coefficients.get_unchecked(M - i).clone() / leading_coefficient.clone();
+    if 0 < M && !leading_coefficient.is_zero() {
+        unsafe {
+            for i in 0..M {
+                // SAFETY: `i < M` i is a valid index for either dimension of the companion
+                // SAFETY: `i < M < N` i is a valid index for either dimension of the companion
+                *companion.get_unchecked_mut(i).get_unchecked_mut(M - i) =
+                    coefficients.get_unchecked(i).clone() / leading_coefficient.clone();
             }
-        }
-        for i in 1..M {
-            // SAFETY: `0 < i < M` i is a valid index for either dimension of companion
-            unsafe {
+            for i in 1..M {
+                // SAFETY: `0 < i < M` i is a valid index for either dimension of companion
                 *companion.get_unchecked_mut(i).get_unchecked_mut(i - 1) = T::one();
             }
         }
     }
+    // if !leading_coefficient.is_zero() {
+    //     let mut companion_iter = companion.iter_mut();
+    //     if let Some(row) = companion_iter.next() {
+    //         for (companion_i, coefficient) in row.iter_mut().zip(coefficients.iter()) {
+    //             *companion_i = *coefficient / leading_coefficient;
+    //         }
+    //         for (i, row) in companion_iter.enumerate() {
+    //             row[i] = T::one();
+    //         }
+    //     }
+    // }
     companion
 }
 
@@ -250,17 +287,17 @@ where
                     coefficients.get_unchecked(0).neg() / *coefficients.get_unchecked(1);
             }
         } else if degree == 2 {
-            let a = unsafe { coefficients.get_unchecked(2).clone() };
-            let b = unsafe { coefficients.get_unchecked(1).clone() };
-            let c = unsafe { coefficients.get_unchecked(0).clone() };
-            let discriminant = -(0..4).fold(b * b, |acc, _| acc - (a.clone() * c.clone()));
-            if discriminant < T::zero() {
-                return Err(NoRoots);
-            } else {
-                // SAFETY: the array has a non-zero element at 2 so 2, 1 and 0 are valid indices
-                let root =
-                    b * discriminant.clone().sqrt() / (0..1).fold(a.clone(), |acc, _| acc + a);
-                unsafe {
+            // SAFETY: the degree is 2 so indices up to 2 are valid
+            unsafe {
+                let a = coefficients.get_unchecked(2).clone();
+                let b = coefficients.get_unchecked(1).clone();
+                let c = coefficients.get_unchecked(0).clone();
+                let discriminant = -(0..4).fold(b * b, |acc, _| acc - (a.clone() * c.clone()));
+                if discriminant < T::zero() {
+                    return Err(NoRoots);
+                } else {
+                    let root =
+                        b * discriminant.clone().sqrt() / (0..1).fold(a.clone(), |acc, _| acc + a);
                     roots.get_unchecked_mut(0).re = root.clone().neg();
                     roots.get_unchecked_mut(1).re = root;
                 }
@@ -279,54 +316,31 @@ where
 
 /// Adds two polynomials.
 ///
-/// This requires that the left-hand side has a larger or equal capacity.
-pub fn add_generic<T, const N: usize, const M: usize>(lhs: &[T; N], rhs: [T; M]) -> [T; N]
+/// # Safety
+/// * `lhs` must have at least `N` elements or this will cause UB
+pub unsafe fn add_generic<T: Copy, const N: usize>(lhs: &[T], rhs: &[T]) -> [T; N]
 where
-    T: Clone + AddAssign,
-    Const<N>: DimMax<Const<M>, Output = Const<N>>,
+    T: Clone + AddAssign + Zero,
 {
-    let mut result = lhs.clone();
-    add_assign_generic(&mut result, rhs);
-    result
-}
-
-/// Adds two polynomials storing the result in the left polynomial.
-///
-/// This requires that the left-hand side has a larger or equal capacity.
-pub fn add_assign_generic<T, const N: usize, const M: usize>(lhs: &mut [T; N], rhs: [T; M])
-where
-    T: Clone + AddAssign,
-    Const<N>: DimMax<Const<M>, Output = Const<N>>,
-{
-    for (a, b) in lhs.iter_mut().zip(rhs.iter()) {
+    let mut result: [T; N] = array_from_slice_copy(lhs);
+    for (a, b) in result.iter_mut().zip(rhs.iter()) {
         *a += b.clone();
     }
-}
-
-/// Subtracts two polynomials
-///
-/// This requires that the left-hand side has a larger or equal capacity.
-pub fn sub_generic<T, const N: usize, const M: usize>(lhs: &[T; N], rhs: [T; M]) -> [T; N]
-where
-    T: Clone + SubAssign,
-    Const<N>: DimMax<Const<M>, Output = Const<N>>,
-{
-    let mut result = lhs.clone();
-    sub_assign_generic(&mut result, rhs);
     result
 }
 
 /// Subtracts two polynomials
 ///
 /// This requires that the left-hand side has a larger or equal capacity.
-pub fn sub_assign_generic<T, const N: usize, const M: usize>(lhs: &mut [T; N], rhs: [T; M])
+pub unsafe fn sub_generic<T: Copy, const N: usize>(lhs: &[T], rhs: &[T]) -> [T; N]
 where
     T: Clone + SubAssign,
-    Const<N>: DimMax<Const<M>, Output = Const<N>>,
 {
-    for (a, b) in lhs.iter_mut().zip(rhs.iter()) {
+    let mut result: [T; N] = array_from_slice_copy(lhs);
+    for (a, b) in result.iter_mut().zip(rhs.iter()) {
         *a -= b.clone();
     }
+    result
 }
 
 /// Multiplies two polynomials.

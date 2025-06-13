@@ -68,13 +68,6 @@ where
 
     /// Adds two polynomials
     ///
-    /// The result is a polynomial with capacity `max(N, M)`. This function utilizes the
-    /// [Polynomial::addassign_polynomial_with_smaller_capacity] method to add the polynomials.
-    /// This implementation avoids the need for a zero-filled or [MaybeUninit] array
-    /// initialization. This should also allow for compile time branch optimizations because
-    /// the compiler can determine which branch to take at compile time (not sure if this is
-    /// true).
-    ///
     /// # Generic Arguments
     /// * `M` - Degree of the rhs polynomial.
     fn add(self, rhs: Polynomial<T, M>) -> Self::Output {

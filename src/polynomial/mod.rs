@@ -203,7 +203,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     where
         I: IntoIterator<Item = T>,
     {
-        Self::from_data(utils::initialize_array_from_iterator_with_default(
+        Self::from_data(utils::array_from_iterator_with_default(
             iterator,
             T::zero(),
         ))
@@ -559,12 +559,13 @@ impl<T: Clone + AddAssign + Zero + One, const N: usize> Polynomial<T, N> {
     ///     "Incorrect polynomial derivative"
     /// );
     /// ```
+    // TODO: Unit test
     #[inline]
     pub fn derivative<const M: usize>(&self) -> Polynomial<T, M>
     where
-        Const<N>: DimSub<U1, Output = Const<M>>,
+        Const<N>: DimSub<U1, Output = Const<M>> + nalgebra::ToTypenum,
     {
-        Polynomial::from_data(utils::differentiate::<T, N, M>(&self.coefficients))
+        Polynomial::from_data(utils::differentiate(&self.coefficients))
     }
 }
 
@@ -586,6 +587,7 @@ impl<T: Clone + Zero + One + AddAssign + Div<Output = T>, const N: usize> Polyno
     ///     "Incorrect polynomial integral"
     /// );
     /// ```
+    // TODO: Unit test
     #[inline]
     pub fn integral<const M: usize>(&self, constant: T) -> Polynomial<T, M>
     where
@@ -605,6 +607,7 @@ impl<T: Copy + Zero + One + Neg<Output = T> + Div<Output = T>, const N: usize> P
     /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]); // x^3 - 6x^2 + 11x - 6
     /// assert_eq!(p.companion(), [[6.0, -11.0, 6.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]], "incorrect companion");
     /// ```
+    // TODO: Unit test
     pub fn companion<const M: usize>(&self) -> [[T; M]; M]
     where
         Const<N>: DimSub<U1, Output = Const<M>>,
@@ -625,6 +628,7 @@ where
     /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]);
     /// let roots = p.roots();
     /// ```
+    // TODO: Unit test
     pub fn roots<const M: usize>(&self) -> Result<[Complex<T>; M], utils::NoRoots>
     where
         T: Copy
@@ -894,11 +898,7 @@ macro_rules! impl_base_case_left_scalar_arithmatic {
 impl_base_case_left_scalar_arithmatic!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
 
 // ===============================================================================================
-//      Empty Polynomial-Generic Polynomial Arithmatic
-//
-//  Assignment operators are not implemented because it would lead to unexpected behavior (i.e.
-// `p1 += p2` would have a different result than `p3 = p1 + p2`). Similarly, multiplication and
-// division with an empty polynomial is logically invalid.
+//      Generic Polynomial Arithmatic
 // ===============================================================================================
 
 /// # Polynomial<T, 0> + Polynomial<T, N>
