@@ -68,7 +68,9 @@ pub struct FrequencyResponse<T, const L: usize, const N: usize, const M: usize> 
     pub responses: [[Complex<T>; L]; M],
 }
 
-impl<T: Float + AddAssign, const L: usize, const N: usize, const M: usize> FrequencyResponse<T, L, N, M> {
+impl<T: Float + AddAssign, const L: usize, const N: usize, const M: usize>
+    FrequencyResponse<T, L, N, M>
+{
     /// Creates a new `FrequencyResponse` with specified frequency data and zeroed responses.
     ///
     /// # Arguments
@@ -192,7 +194,8 @@ impl<T: Float + RealField> FrequencyMargin<T> {
             // unwrap is safe because the crossover frequency exists, meaning there is a corresponding
             // index in the magnitude array
             // TODO: Fix this so there doesn't need to be an unwrap
-            let mag_at_crossover = first_crossover::<T>(&magnitudes, frequencies, wc, L).unwrap_or_else(|| T::zero());
+            let mag_at_crossover =
+                first_crossover::<T>(&magnitudes, frequencies, wc, L).unwrap_or_else(|| T::zero());
             // TODO: Make a constant for this or something to avoid unwrapping
             T::from(20).unwrap_or_else(|| T::zero()) * -ComplexField::log10(mag_at_crossover)
         });
@@ -200,7 +203,8 @@ impl<T: Float + RealField> FrequencyMargin<T> {
         let phase_margin = gain_crossover.map(|wc| {
             // unwrap is safe because the crossover frequency exists, meaning there is a corresponding
             // index in the phase array
-            let phase_at_crossover = first_crossover::<T>(&phases, frequencies, wc, L).unwrap_or_else(|| T::zero());
+            let phase_at_crossover =
+                first_crossover::<T>(&phases, frequencies, wc, L).unwrap_or_else(|| T::zero());
             (-T::pi() - phase_at_crossover).to_degrees()
         });
 
@@ -330,7 +334,7 @@ pub fn logspace<T: Float + AddAssign, const N: usize>(a: T, b: T) -> [T; N] {
     let mut result = [T::zero(); N];
     #[allow(clippy::unwrap_used)]
     let ten = T::from(10.0).unwrap();
-    
+
     // Edge case: one point
     if N == 1 {
         result[0] = ten.powf(a);

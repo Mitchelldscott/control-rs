@@ -20,7 +20,6 @@
 //! ***A lot of docs were written by throwing bullet points into ChatGPT, some hallucinations may have snuck in.
 //! Please report any you find.***
 #![no_std]
-
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 #![deny(clippy::nursery)]
@@ -29,7 +28,6 @@
 #![deny(clippy::panic)]
 #![deny(clippy::todo)]
 #![deny(clippy::unimplemented)]
-
 #![warn(rust_2018_idioms)]
 #![warn(missing_docs, unused)]
 

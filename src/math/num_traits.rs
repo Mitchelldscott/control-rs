@@ -10,10 +10,10 @@
 //!     * One requires implementing is_one()
 
 #[cfg(feature = "std")]
-use std::ops::{Add, Sub, Mul, Div, Rem};
+use std::ops::{Add, Div, Mul, Rem, Sub};
 
 #[cfg(not(feature = "std"))]
-use core::ops::{Add, Sub, Mul, Div, Rem};
+use core::ops::{Add, Div, Mul, Rem, Sub};
 
 /// Defines an additive identity element for `Self`.
 ///
@@ -35,7 +35,9 @@ pub trait Zero: Sized + Add<Self, Output = Self> {
     /// `static mut`s.
     // This cannot be an associated constant, because of bignums.
     #[inline]
-    fn zero() -> Self { Self::ZERO }
+    fn zero() -> Self {
+        Self::ZERO
+    }
 
     /// Sets `self` to the additive identity element of `Self`, `0`.
     #[inline]
@@ -98,7 +100,9 @@ pub trait One: Sized + Mul<Self, Output = Self> {
     /// external mutable state. For example, values stored in TLS or in
     /// `static mut`s.
     // This cannot be an associated constant, because of bignums.
-    fn one() -> Self { Self::ONE }
+    fn one() -> Self {
+        Self::ONE
+    }
 
     /// Returns `true` if `self` is equal to the multiplicative identity.
     ///
@@ -142,26 +146,19 @@ pub trait Arithmatic<Rhs = Self, Output = Self>:
     + Sub<Rhs, Output = Output>
     + Mul<Rhs, Output = Output>
     + Div<Rhs, Output = Output>
-    + Rem<Rhs, Output = Output> { }
+    + Rem<Rhs, Output = Output>
+{
+}
 
-impl<T> Arithmatic<T> for T
-where
+impl<T> Arithmatic<T> for T where
     T: Add<T, Output = T>
-    + Sub<T, Output = T>
-    + Mul<T, Output = T>
-    + Div<T, Output = T>
-    + Rem<T, Output = T>
+        + Sub<T, Output = T>
+        + Mul<T, Output = T>
+        + Div<T, Output = T>
+        + Rem<T, Output = T>
 {
 }
 
 pub trait Number: PartialEq + Zero + One + Arithmatic {}
 
-impl<T> Number for T
-where
-    T: PartialEq
-    + Zero
-    + One
-    + Arithmatic
-{
-}
-
+impl<T> Number for T where T: PartialEq + Zero + One + Arithmatic {}

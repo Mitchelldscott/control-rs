@@ -112,7 +112,9 @@ impl<T: Clone, const N: usize, const M: usize> TransferFunction<T, M, N> {
     }
 }
 
-impl<T: Float + RealField, const M: usize, const N: usize> FrequencyTools<T, 1, 1> for TransferFunction<T, M, N> {
+impl<T: Float + RealField, const M: usize, const N: usize> FrequencyTools<T, 1, 1>
+    for TransferFunction<T, M, N>
+{
     /// TODO: Doc + Unit Test + Example
     fn frequency_response<const L: usize>(&self, response: &mut FrequencyResponse<T, L, 1, 1>) {
         // Evaluate the transfer function at each frequency

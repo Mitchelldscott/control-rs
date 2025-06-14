@@ -4,7 +4,7 @@
 //! error handling. Users should call the provided [Polynomial] interface.
 
 use core::{
-    array, iter, fmt,
+    array, fmt, iter,
     mem::MaybeUninit,
     ops::{AddAssign, Div, Mul, Neg, Sub, SubAssign},
     ptr::copy_nonoverlapping,
@@ -171,11 +171,10 @@ where
 {
     let mut exponent = T::zero();
     array_from_iterator_with_default(
-        iter::once(constant)
-            .chain(coefficients.iter().map(|a_i| {
-                exponent += T::one();
-                a_i.clone() / exponent.clone()
-            })),
+        iter::once(constant).chain(coefficients.iter().map(|a_i| {
+            exponent += T::one();
+            a_i.clone() / exponent.clone()
+        })),
         T::zero(),
     )
 }
@@ -281,8 +280,8 @@ where
         } else if degree == 1 {
             // SAFETY: the array has a non-zero element at 1 so 1 and 0 are valid indices
             unsafe {
-                roots.get_unchecked_mut(0).re =
-                    coefficients.get_unchecked(0).clone().neg() / coefficients.get_unchecked(1).clone();
+                roots.get_unchecked_mut(0).re = coefficients.get_unchecked(0).clone().neg()
+                    / coefficients.get_unchecked(1).clone();
             }
         } else if degree == 2 {
             // SAFETY: the degree is 2 so indices up to 2 are valid
@@ -290,7 +289,9 @@ where
                 let a = coefficients.get_unchecked(2).clone();
                 let b = coefficients.get_unchecked(1).clone();
                 let c = coefficients.get_unchecked(0).clone();
-                let discriminant = -(0..4).fold(b.clone() * b.clone(), |acc, _| acc - (a.clone() * c.clone()));
+                let discriminant = -(0..4).fold(b.clone() * b.clone(), |acc, _| {
+                    acc - (a.clone() * c.clone())
+                });
                 if discriminant < T::zero() {
                     return Err(NoRoots);
                 }
@@ -301,7 +302,11 @@ where
             }
         } else {
             let matrix = SMatrix::from_data(ArrayStorage(companion::<T, N, M>(coefficients)));
-            for (eigenvalue, root) in matrix.complex_eigenvalues().into_iter().zip(roots.iter_mut()) {
+            for (eigenvalue, root) in matrix
+                .complex_eigenvalues()
+                .into_iter()
+                .zip(roots.iter_mut())
+            {
                 *root = eigenvalue.clone();
             }
         }

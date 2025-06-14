@@ -171,29 +171,35 @@ impl<T, const N: usize> Polynomial<T, N> {
     }
 
     /// Access the coefficients as a slice iter
-    fn iter(&self) -> slice::Iter<'_, T> { self.coefficients.iter() }
+    fn iter(&self) -> slice::Iter<'_, T> {
+        self.coefficients.iter()
+    }
 
     /// Access the coefficients as a mutable slice iter
-    pub fn iter_mut(&mut self) -> slice::IterMut<'_, T> { self.coefficients.iter_mut() }
+    pub fn iter_mut(&mut self) -> slice::IterMut<'_, T> {
+        self.coefficients.iter_mut()
+    }
 }
 
 impl<'a, T, const N: usize> IntoIterator for &'a Polynomial<T, N> {
     type Item = &'a T;
     type IntoIter = slice::Iter<'a, T>;
     /// Access the coefficients as a slice iter
-    fn  into_iter(self) -> Self::IntoIter { self.iter() }
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl<'a, T, const N: usize> IntoIterator for &'a mut Polynomial<T, N> {
     type Item = &'a T;
     type IntoIter = slice::Iter<'a, T>;
     /// Access the coefficients as a slice iter
-    fn  into_iter(self) -> Self::IntoIter { self.iter() }
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
-impl<T, const N: usize>  Polynomial<T, N> {
-
-}
+impl<T, const N: usize> Polynomial<T, N> {}
 
 impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// Creates a new polynomial from an [Iterator].
@@ -264,10 +270,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// ```
     #[inline]
     pub fn monomial(coefficient: T) -> Self {
-        Self::from_iterator(
-            core::iter::repeat_n(T::zero(), N - 1)
-                .chain([coefficient]),
-        )
+        Self::from_iterator(core::iter::repeat_n(T::zero(), N - 1).chain([coefficient]))
     }
 }
 
@@ -515,7 +518,8 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     #[must_use]
     pub fn leading_coefficient(&self) -> Option<&T> {
         // SAFETY: degree exists and so is a valid index
-        self.degree().map(|degree| unsafe { self.get_unchecked(degree) })
+        self.degree()
+            .map(|degree| unsafe { self.get_unchecked(degree) })
     }
 
     /// Returns the highest order term of the polynomial.
@@ -532,7 +536,8 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     #[must_use]
     pub fn leading_coefficient_mut(&mut self) -> Option<&mut T> {
         // SAFETY: degree exists and so is a valid index
-        self.degree().map(|degree| unsafe { self.get_unchecked_mut(degree) })
+        self.degree()
+            .map(|degree| unsafe { self.get_unchecked_mut(degree) })
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::{transfer_function::*, assert_f64_eq};
+use crate::{assert_f64_eq, transfer_function::*};
 
 const IMPROPER_TF: TransferFunction<f64, 4, 3> =
     TransferFunction::new([1.0, 2.0, 0.0, 1.0], [1.0, 1.0, 1.0]);
@@ -29,35 +29,38 @@ fn improper_tests() {
     assert_eq!(lhp(&IMPROPER_TF), true, "lhp for IMPROPER_TF");
     assert_eq!(
         as_monic(&IMPROPER_TF),
-        TransferFunction { numerator: [1.0, 2.0, 0.0, 1.0], denominator: [1.0, 1.0, 1.0] },
+        TransferFunction {
+            numerator: [1.0, 2.0, 0.0, 1.0],
+            denominator: [1.0, 1.0, 1.0]
+        },
         "as_monic for IMPROPER_TF"
     );
 }
 
 #[test]
 fn differentiator_tests() {
-    assert_f64_eq!(
-        dc_gain(&DIFFERENTIATOR_TF),
-        0.0
-    );
+    assert_f64_eq!(dc_gain(&DIFFERENTIATOR_TF), 0.0);
     // assert_eq!(lhp(&DIFFERENTIATOR_TF), false, "lhp for DIFFERENTIATOR_TF");
     assert_eq!(
         as_monic(&DIFFERENTIATOR_TF),
-        TransferFunction { numerator: [1.0, 0.0], denominator: [1.0] },
+        TransferFunction {
+            numerator: [1.0, 0.0],
+            denominator: [1.0]
+        },
         "as_monic for DIFFERENTIATOR_TF"
     );
 }
 
 #[test]
 fn integrator_tests() {
-    assert_f64_eq!(
-        dc_gain(&INTEGRATOR_TF),
-        f64::INFINITY
-    );
+    assert_f64_eq!(dc_gain(&INTEGRATOR_TF), f64::INFINITY);
     assert_eq!(lhp(&INTEGRATOR_TF), false, "lhp for INTEGRATOR_TF");
     assert_eq!(
         as_monic(&INTEGRATOR_TF),
-        TransferFunction { numerator: [1.0], denominator: [1.0, 0.0]},
+        TransferFunction {
+            numerator: [1.0],
+            denominator: [1.0, 0.0]
+        },
         "as_monic for INTEGRATOR_TF"
     );
 }
@@ -68,17 +71,17 @@ fn delay_tests() {
     assert_eq!(lhp(&DELAY_TF), true, "lhp for DELAY_TF");
     assert_eq!(
         as_monic(&DELAY_TF),
-        TransferFunction { numerator: [1.0, -1.0], denominator: [1.0, 1.0]},
+        TransferFunction {
+            numerator: [1.0, -1.0],
+            denominator: [1.0, 1.0]
+        },
         "as_monic for DELAY_TF"
     );
 }
 
 #[test]
 fn marginally_stable_tests() {
-    assert_f64_eq!(
-        dc_gain(&MARGINALLY_STABLE_TF),
-        1.0
-    );
+    assert_f64_eq!(dc_gain(&MARGINALLY_STABLE_TF), 1.0);
     assert_eq!(
         lhp(&MARGINALLY_STABLE_TF),
         false,
@@ -86,17 +89,17 @@ fn marginally_stable_tests() {
     );
     assert_eq!(
         as_monic(&MARGINALLY_STABLE_TF),
-        TransferFunction { numerator: [1.0], denominator: [1.0, 0.0, 1.0] },
+        TransferFunction {
+            numerator: [1.0],
+            denominator: [1.0, 0.0, 1.0]
+        },
         "as_monic for MARGINALLY_STABLE_TF"
     );
 }
 
 #[test]
 fn critically_damped_tests() {
-    assert_f64_eq!(
-        dc_gain(&CRITICALLY_DAMPED_TF),
-        1.0
-    );
+    assert_f64_eq!(dc_gain(&CRITICALLY_DAMPED_TF), 1.0);
     assert_eq!(
         lhp(&CRITICALLY_DAMPED_TF),
         true,
@@ -104,7 +107,10 @@ fn critically_damped_tests() {
     );
     assert_eq!(
         as_monic(&CRITICALLY_DAMPED_TF),
-        TransferFunction { numerator: [1.0], denominator: [1.0, 2.0, 1.0] },
+        TransferFunction {
+            numerator: [1.0],
+            denominator: [1.0, 2.0, 1.0]
+        },
         "as_monic for CRITICALLY_DAMPED_TF"
     );
 }
@@ -115,7 +121,10 @@ fn unstable_tests() {
     assert_eq!(lhp(&UNSTABLE_TF), false, "lhp for UNSTABLE_TF");
     assert_eq!(
         as_monic(&UNSTABLE_TF),
-        TransferFunction { numerator: [1.0], denominator: [1.0, -2.0, 1.0] },
+        TransferFunction {
+            numerator: [1.0],
+            denominator: [1.0, -2.0, 1.0]
+        },
         "as_monic for UNSTABLE_TF"
     );
 }
@@ -126,7 +135,10 @@ fn zp_cancel_tests() {
     assert_eq!(lhp(&ZP_CANCEL_TF), false, "lhp for ZP_CANCEL_TF");
     assert_eq!(
         as_monic(&ZP_CANCEL_TF),
-        TransferFunction { numerator: [1.0, -1.0], denominator: [1.0, -1.0] },
+        TransferFunction {
+            numerator: [1.0, -1.0],
+            denominator: [1.0, -1.0]
+        },
         "as_monic for ZP_CANCEL_TF"
     );
 }
@@ -137,7 +149,10 @@ fn high_order_tests() {
     assert_eq!(lhp(&HIGH_ORDER_TF), false, "lhp for HIGH_ORDER_TF");
     assert_eq!(
         as_monic(&HIGH_ORDER_TF),
-        TransferFunction { numerator: [1.0; 20], denominator: [1.0; 20] },
+        TransferFunction {
+            numerator: [1.0; 20],
+            denominator: [1.0; 20]
+        },
         "as_monic for HIGH_ORDER_TF"
     );
 }
@@ -148,7 +163,10 @@ fn poorly_damped_tests() {
     assert_eq!(lhp(&LOW_DAMPED_TF), true, "lhp for LOW_DAMPED_TF");
     assert_eq!(
         as_monic(&LOW_DAMPED_TF),
-        TransferFunction { numerator: [1.0], denominator: [1.0, 0.1, 1.0] },
+        TransferFunction {
+            numerator: [1.0],
+            denominator: [1.0, 0.1, 1.0]
+        },
         "as_monic for LOW_DAMPED_TF"
     );
 }

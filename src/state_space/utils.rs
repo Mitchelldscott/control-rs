@@ -1,13 +1,12 @@
 //! Utilities for creating, converting and analyzing SS models
 //!
 
-use core::ops::{Neg, Add, Mul, Div};
+use core::ops::{Add, Div, Mul, Neg};
 
-use num_traits::{Zero, One};
 use nalgebra::{SMatrix, Scalar};
+use num_traits::{One, Zero};
 
 use super::StateSpace;
-
 
 /// Create a new SISO state-space model from the numerator and denominator coefficients of
 /// a monic transfer function
@@ -69,7 +68,7 @@ where
             if i == N - 1 {
                 -a[L - j - 1]
             } else if i + 1 == j {
-                    T::one()
+                T::one()
             } else {
                 T::zero()
             }

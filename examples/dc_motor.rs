@@ -30,10 +30,7 @@
 ///
 /// ## Plant
 /// <pre> P(s) = Km / ((Js + b)(Ls + R) + Km^2) (rad/sec / V) </pre>
-use control_rs::{
-    integrators::runge_kutta4, transfer_function::*,
-    math::systems::DynamicalSystem,
-};
+use control_rs::{integrators::runge_kutta4, math::systems::DynamicalSystem, transfer_function::*};
 use nalgebra::{Vector1, Vector2};
 
 // Define motor parameters
