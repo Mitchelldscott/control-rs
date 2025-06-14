@@ -1,7 +1,7 @@
 //! Array-based univariate-polynomial
 //!
 //! This module contains a base implementation of a generic array polynomial. To guarantee safe and
-//! deterministic implementations of all arithmatic some implementations are only available for
+//! deterministic implementations of all arithmatic, some implementations are only available for
 //! certain specializations.
 //!
 //! # Examples
@@ -19,28 +19,36 @@
 //! ```
 //!
 // TODO:
-//     * algebra
-//         * `compose(f: Polynomial, g: Polynomial) -> Polynomial`
-//     * calculus
-//         * `evaluate<U>(x: U) -> U`
-//         * `derivative(p_src: &Polynomial<T, M>) -> Self`
-//         * `integral(p_src: &Polynomial<T, M>) -> Self`
-//         * `foil_roots(&mut self, roots: &[T]) -> Result<(), Polynomial>`
-//         * `foil_complex_roots(&mut self, roots: &[Complex<T>]) -> Result<(), Polynomial>`
-//         * `real_roots(p: Polynomial, roots: &mut [T]) -> Result<(), PolynomialError>`
-//         * `complex_roots(p: Polynomial, roots: &mut [Complex<T>]) -> Result<(), PolynomialError>`
-//     * formatting
-//         * Display precision option
-//         * Latex / symbolic formatter
+//  * calculus
+//      * `compose(f: Polynomial, g: Polynomial) -> Polynomial`
+//      * `from_roots(&mut self, roots: &[T]) -> Result<(), Polynomial>`
+//      * `from_complex_roots(&mut self, roots: &[Complex<T>]) -> Result<(), Polynomial>`
+//      * `roots(p: Polynomial, roots: &mut [T]) -> Result<(), PolynomialError>`
+//      * `complex_roots(p: Polynomial, roots: &mut [Complex<T>]) -> Result<(), PolynomialError>`
+//  * formatting
+//      * Display precision option
+//      * Latex / symbolic formatter
+//  * Move internal function to separate files (keep private) so other mods can use them without polynomial
+//      * roots
+//      * derivative/integral
+//      * from_array_initializers
 
 use core::{
     array, fmt,
-    mem::MaybeUninit,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign},
     slice,
 };
-use num_traits::{One, Zero, Num, Float};
-use nalgebra::{allocator::Allocator, Const, Complex, DefaultAllocator, DimDiff, DimName, DimSub, OMatrix, RealField, U1};
+use nalgebra::{
+    allocator::Allocator, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimSub, RealField, U1,
+};
+use num_traits::{Num, One, Zero};
+
+// ===============================================================================================
+//      Polynomial Submodules
+// ===============================================================================================
+
+pub mod utils;
+
 // ===============================================================================================
 //      Polynomial Specializations
 // ===============================================================================================
@@ -64,72 +72,6 @@ mod arithmatic_tests;
 //      Polynomial
 // ===============================================================================================
 
-/// Helper function to reverse arrays given to [Polynomial::new()]
-#[inline(always)]
-const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
-    let mut output = input;
-    let mut i = 0;
-    while i < N / 2 {
-        let tmp = output[i];
-        output[i] = output[N - 1 - i];
-        output[N - 1 - i] = tmp;
-        i += 1;
-    }
-
-    output
-}
-
-/// Initialize an array from an iterator.
-///
-/// # Arguments
-/// * `iterator` - An [Iterator] over a collection of `T`
-/// * `default` - the default value to use if the iterator is not long enough
-///
-/// # Returns
-/// * `initialized_array` - An array with all elements initialized
-///
-/// # Safety
-/// This function uses `MaybeUninit` and raw pointer casting to avoid requiring `T: Default + Copy`.
-/// The safety relies on:
-/// - Fully initializing all elements of the `[MaybeUninit<T>; N]` array before calling `read()`
-/// - Not reading from or dropping uninitialized memory
-fn initialize_array_from_iterator_with_default<I, T, const N: usize>(
-    iterator: I,
-    default: T,
-) -> [T; N]
-where
-    T: Clone,
-    I: IntoIterator<Item = T>,
-{
-    // SAFETY: `[MaybeUninit<T>; N]` is valid.
-    let mut uninit_array: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
-    let mut degree = 0;
-
-    // SAFETY: zip() will only iterate over `N.min(iter.len())` elements so no out-of-bounds access
-    // can occur.
-    for (c, d) in uninit_array.iter_mut().zip(iterator.into_iter()) {
-        *c = MaybeUninit::new(d);
-        degree += 1;
-    }
-
-    // SAFETY: `T: Clone`, and we are initializing all remaining uninitialized slots.
-    for c in uninit_array.iter_mut().skip(degree) {
-        *c = MaybeUninit::new(default.clone());
-    }
-
-    // SAFETY:
-    // - All `N` elements of `uninit_array` have now been initialized.
-    // - `MaybeUninit<T>` does not drop its content, so no double-drop will occur.
-    // - We can safely transmute it to `[T; N]` by reading the pointer.
-    unsafe {
-        // Get a pointer to the `uninit_array` array.
-        // Cast it to a pointer to an array of `T`.
-        // Then `read()` the value from that pointer.
-        // This is equivalent to transmute from `[MaybeUninit<T>; N]` to `[T; N]`.
-        (uninit_array.as_ptr() as *const [T; N]).read()
-    }
-}
-
 /// Statically sized univariate polynomial
 ///
 /// This struct stores the coefficients of a polynomial a(x):
@@ -142,8 +84,8 @@ where
 /// or constant term, index n is the highest degree term).
 ///
 /// # Generic Arguments
-/// * `T` - Type of the coefficients in the polynomial
-/// * `N` - Capacity of the underlying array
+/// * `T` - Type of the coefficients in the polynomial.
+/// * `N` - Capacity of the underlying array.
 ///
 /// # Example
 /// ```rust
@@ -163,10 +105,10 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///
     /// # Arguments
     /// * `coefficients` - An array of coefficients `[a_0, a_1 ... a_n]`,
-    /// where `a_0` is the constant and `a_n` the nth degree term
+    ///   where `a_0` is the constant and `a_n` the nth degree term.
     ///
     /// # Returns
-    /// * `polynomial` - A polynomial with the given coefficients
+    /// * `polynomial` - A polynomial with the given coefficients.
     ///
     /// # Example
     /// ```
@@ -184,14 +126,14 @@ impl<T, const N: usize> Polynomial<T, N> {
 
     /// Creates a new polynomial from a function closure.
     ///
-    /// This is a wrapper for [array::from_fn].
+    /// This is a wrapper for [`array::from_fn`].
     ///
     /// # Arguments
     /// * `cb` - The generator function, which takes the degree as input and returns the
-    /// coefficient for that degree
+    ///   coefficient for that degree.
     ///
     /// # Returns
-    /// * `polynomial` - A new instance with the generated coefficients
+    /// * `polynomial` - A new instance with the generated coefficients.
     ///
     /// # Example
     /// ```
@@ -212,7 +154,7 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// Checks if the capacity is zero
     ///
     /// # Returns
-    /// * `bool` - true if the capacity is zero
+    /// * `bool` - true if the capacity is zero.
     ///
     /// # Example
     ///
@@ -221,34 +163,55 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// let p = Polynomial::new([]);
     /// assert_eq!(p.is_empty(), true);
     /// ```
-    #[inline]
+    #[allow(clippy::inline_always)]
+    #[inline(always)]
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         N == 0
     }
 
     /// Access the coefficients as a slice iter
-    pub fn iter(&self) -> slice::Iter<T> {
+    fn iter(&self) -> slice::Iter<'_, T> {
         self.coefficients.iter()
     }
 
     /// Access the coefficients as a mutable slice iter
-    pub fn iter_mut(&mut self) -> slice::IterMut<T> {
+    pub fn iter_mut(&mut self) -> slice::IterMut<'_, T> {
         self.coefficients.iter_mut()
     }
 }
+
+impl<'a, T, const N: usize> IntoIterator for &'a Polynomial<T, N> {
+    type Item = &'a T;
+    type IntoIter = slice::Iter<'a, T>;
+    /// Access the coefficients as a slice iter
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, T, const N: usize> IntoIterator for &'a mut Polynomial<T, N> {
+    type Item = &'a T;
+    type IntoIter = slice::Iter<'a, T>;
+    /// Access the coefficients as a slice iter
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<T, const N: usize> Polynomial<T, N> {}
 
 impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// Creates a new polynomial from an [Iterator].
     ///
     /// If the iterator has more than N items, the trailing items will be ignored. If the iterator
-    /// has less than N items, the remaining indices will be filled with zeros.
+    /// has fewer than N items, the remaining indices will be filled with zeros.
     ///
     /// # Arguments
     /// * `iterator` - [Iterator] over items of `T`
     ///
     /// # Returns
-    /// * `polynomial` - A zero-padded polynomial with the given coefficients
+    /// * `polynomial` - A zero-padded polynomial with the given coefficients.
     ///
     /// ```
     /// use control_rs::Polynomial;
@@ -261,23 +224,20 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     where
         I: IntoIterator<Item = T>,
     {
-        Self::from_data(initialize_array_from_iterator_with_default(
-            iterator,
-            T::zero(),
-        ))
+        Self::from_data(utils::array_from_iterator_with_default(iterator, T::zero()))
     }
 
     /// Create a polynomial from another polynomial with a different capacity.
     ///
     /// * Shrinking the capacity will drop higher order terms.
-    /// * Extending the capacity will pad the end of the array with T::zero().
+    /// * Extending the capacity will pad the end of the array with `T::zero()`.
     /// * Calling this on same sized polynomials will copy one into the other.
     ///
     /// # Arguments
-    /// * `other` - the polynomial to resize
+    /// * `other` - the polynomial to resize.
     ///
     /// # Returns
-    /// * `resized_polynomial` - a polynomial with capacity `N`
+    /// * `resized_polynomial` - a polynomial with capacity `N`.
     ///
     /// # Example
     /// ```
@@ -300,7 +260,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// given constant.
     ///
     /// # Returns
-    /// * `Polynomial` - a polynomial with a single non-zero element
+    /// * `Polynomial` - a polynomial with a single non-zero element.
     ///
     /// # Example
     /// ```
@@ -308,15 +268,9 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// let quadratic = Polynomial::<f32, 3>::monomial(1.0);
     /// assert_eq!(*quadratic.coefficient(2).unwrap(), 1.0);
     /// ```
-    ///
-    /// TODO: Cleanup
     #[inline]
     pub fn monomial(coefficient: T) -> Self {
-        let mut polynomial = Self::from_fn(|_| T::zero());
-        if let Some(a_n) = polynomial.leading_coefficient_mut() {
-            *a_n = coefficient
-        }
-        polynomial
+        Self::from_iterator(core::iter::repeat_n(T::zero(), N - 1).chain([coefficient]))
     }
 }
 
@@ -324,10 +278,10 @@ impl<T: Copy, const N: usize> Polynomial<T, N> {
     /// Creates a new polynomial with all coefficients set to the same element
     ///
     /// # Arguments
-    /// * `element` - The value to be copied into the coefficient array
+    /// * `element` - The value to be copied into the coefficient array.
     ///
     /// # Returns
-    /// * `polynomial` - polynomial with all coefficients set to `element`
+    /// * `polynomial` - polynomial with all coefficients set to `element`.
     ///
     /// # Example
     /// ```
@@ -341,14 +295,14 @@ impl<T: Copy, const N: usize> Polynomial<T, N> {
 
     /// Creates a new polynomial from an array.
     ///
-    /// Provides a more readable interface than [Polynomial::from_data] to initialize polynomials with
-    /// a degree-major array.
+    /// Provides a more readable interface than [`Polynomial::from_data()`] to initialize
+    /// polynomials with a degree-major array.
     ///
     /// # Arguments
-    /// * `coefficients` - An array of coefficients in degree-major order `[a_n, ... a_1, a_0]`
+    /// * `coefficients` - An array of coefficients in degree-major order `[a_n, ... a_1, a_0]`.
     ///
     /// # Returns
-    /// * `polynomial` - polynomial with the given coefficients
+    /// * `polynomial` - polynomial with the given coefficients.
     ///
     /// # Example
     /// ```
@@ -361,7 +315,7 @@ impl<T: Copy, const N: usize> Polynomial<T, N> {
     /// TODO: Unit Test
     #[inline]
     pub const fn new(coefficients: [T; N]) -> Self {
-        Self::from_data(reverse_array(coefficients))
+        Self::from_data(utils::reverse_array(coefficients))
     }
 }
 
@@ -385,12 +339,7 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     ///     * `None` - if the length is zero or all coefficients are zero
     #[inline]
     pub fn degree(&self) -> Option<usize> {
-        for (i, a_i) in self.coefficients.iter().enumerate().rev() {
-            if !a_i.is_zero() {
-                return Some(i);
-            }
-        }
-        None
+        utils::largest_nonzero_index(&self.coefficients)
     }
 }
 impl<T: Clone, const N: usize> Polynomial<T, N> {
@@ -408,12 +357,12 @@ impl<T: Clone, const N: usize> Polynomial<T, N> {
     /// use control_rs::polynomial::Polynomial;
     ///
     /// let p = Polynomial::new([1, 2, 3]);
-    /// let result = p.evaluate(2);
+    /// let result = p.evaluate(&2);
     /// ```
     ///
     /// TODO: Unit Test
     #[inline]
-    pub fn evaluate<U>(&self, value: U) -> U
+    pub fn evaluate<U>(&self, value: &U) -> U
     where
         U: Clone + Zero + Add<T, Output = U> + Mul<U, Output = U>,
     {
@@ -422,19 +371,15 @@ impl<T: Clone, const N: usize> Polynomial<T, N> {
             .rfold(U::zero(), |acc, a_i| acc * value.clone() + a_i.clone())
     }
 }
-impl<T: PartialEq + One, const N: usize> Polynomial<T, N> {
+
+impl<T: PartialEq + One + Zero, const N: usize> Polynomial<T, N> {
     /// Checks if a polynomial is monic
     ///
     /// # Returns
     /// * `bool` - true if the leading coefficient is one, false otherwise
     #[inline]
     pub fn is_monic(&self) -> bool {
-        if self.is_empty() {
-            false
-        } else {
-            // SAFETY: N > 0 so N-1 is valid
-            unsafe { self.get_unchecked(N - 1).is_one() }
-        }
+        self.leading_coefficient().is_some_and(T::is_one)
     }
 }
 
@@ -453,11 +398,11 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///
     /// # Safety
     /// * `index` must be valid. That is, `0 <= index < N`. Failing to meet this condition will
-    /// result in dereferencing an out-of-bounds or otherwise invalid memory address, leading to
-    /// undefined behavior.
+    ///   result in dereferencing an out-of-bounds or otherwise invalid memory address, leading to
+    ///   undefined behavior.
     /// * The memory backing `self.coefficients` must remain valid and unchanged for the lifetime
-    /// of the returned reference.
-    #[inline(always)]
+    ///   of the returned reference.
+    #[inline]
     #[must_use]
     unsafe fn get_unchecked(&self, index: usize) -> &T {
         // TODO: Setup benchmarks to compare performance of ptr vs slice access
@@ -475,11 +420,11 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///
     /// # Safety
     /// * `index` must be valid. That is, `0 <= index < N`. Failing to meet this condition will
-    /// result in dereferencing an out-of-bounds or otherwise invalid memory address, leading to
-    /// undefined behavior.
+    ///   result in dereferencing an out-of-bounds or otherwise invalid memory address, leading to
+    ///   undefined behavior.
     /// * The memory backing `self.coefficients` must remain valid and unchanged for the lifetime
-    /// of the returned reference.
-    #[inline(always)]
+    ///   of the returned reference.
+    #[inline]
     #[must_use]
     unsafe fn get_unchecked_mut(&mut self, index: usize) -> &mut T {
         // TODO: Setup benchmarks to compare performance of ptr vs slice access
@@ -521,27 +466,6 @@ impl<T, const N: usize> Polynomial<T, N> {
         self.coefficient(0)
     }
 
-    /// Returns the highest order term of the polynomial
-    ///
-    /// # Returns
-    /// * `Option<&T>`
-    ///     * `Some(leading_coefficient)` - when N > 0
-    ///     * `None` - when N == 0
-    ///
-    /// TODO: Unit Test
-    #[inline]
-    #[must_use]
-    pub fn leading_coefficient(&self) -> Option<&T> {
-        // this can't directly call self.coefficient(N - 1) because that
-        // will fail if N is 0
-        if self.is_empty() {
-            None
-        } else {
-            // SAFETY: N > 0 so N-1 is valid
-            unsafe { Some(self.get_unchecked(N - 1)) }
-        }
-    }
-
     /// Returns a coefficient of the polynomial
     ///
     /// # Arguments
@@ -577,8 +501,30 @@ impl<T, const N: usize> Polynomial<T, N> {
     pub fn constant_mut(&mut self) -> Option<&mut T> {
         self.coefficient_mut(0)
     }
+}
 
-    /// Returns the highest order term of the polynomial
+impl<T: Zero, const N: usize> Polynomial<T, N> {
+    /// Returns the highest order term of the polynomial.
+    ///
+    /// Leading zeros will be ignored, this is equivalent to `polynomial.coefficient(degree)`.
+    ///
+    /// # Returns
+    /// * `Option<&T>`
+    ///     * `Some(leading_coefficient)` - when N > 0
+    ///     * `None` - when N == 0
+    ///
+    /// TODO: Unit Test
+    #[inline]
+    #[must_use]
+    pub fn leading_coefficient(&self) -> Option<&T> {
+        // SAFETY: degree exists and so is a valid index
+        self.degree()
+            .map(|degree| unsafe { self.get_unchecked(degree) })
+    }
+
+    /// Returns the highest order term of the polynomial.
+    ///
+    /// Leading zeros will be ignored, this is equivalent to `polynomial.coefficient_mut(degree)`.
     ///
     /// # Returns
     /// * `Option<&mut T>`
@@ -589,152 +535,130 @@ impl<T, const N: usize> Polynomial<T, N> {
     #[inline]
     #[must_use]
     pub fn leading_coefficient_mut(&mut self) -> Option<&mut T> {
-        if self.is_empty() {
-            None
-        } else {
-            // SAFETY: N > 0 so N-1 is valid
-            unsafe { Some(self.get_unchecked_mut(N - 1)) }
-        }
+        // SAFETY: degree exists and so is a valid index
+        self.degree()
+            .map(|degree| unsafe { self.get_unchecked_mut(degree) })
     }
 }
+
 // ===============================================================================================
 //      Calculus
 // ===============================================================================================
 
-impl<T, const N: usize> Polynomial<T, N>
-where
-    T: 'static + Clone + Num + Neg<Output = T> + fmt::Debug,
-    Const<N>: DimSub<U1>,
-    DimDiff<Const<N>, U1>: DimName,
-    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>,
-{
-    /// Constructs the companion matrix of the polynomial.
+impl<T: Clone + AddAssign + Zero + One, const N: usize> Polynomial<T, N> {
+    /// Computes the derivative of a polynomial.
     ///
-    /// The companion matrix is a square matrix whose eigenvalues are the roots of the polynomial.
-    /// It is constructed from an identity matrix, a zero column and a row of the polynomial's
-    /// coefficients scaled by the highest term.
-    ///
-    /// <pre>
-    /// |  a[0...n-1] / a_n  |
-    /// |     I      0     |
-    /// </pre>
-    /// <pre>
-    /// |  -a_(n-1)/a_n  -a_(n-2)/a_n  -a_(n-3)/a_n  ...  -a_1/a_0  -a_0/a_n  |
-    /// |     1         0         0      ...       0            0         |
-    /// |     0         1         0      ...       0            0         |
-    /// |     0         0         1      ...       0            0         |
-    /// |    ...       ...       ...     ...      ...          ...        |
-    /// |     0         0         0      ...       1            0         |
-    /// </pre>
+    /// See [`utils::polynomial_derivative()`] for more.
     ///
     /// # Returns
-    /// * `OMatrix<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>` - The companion matrix
-    /// representation of the polynomial.
+    /// * `Polynomial` - a polynomial with capacity `N - 1`
     ///
-    /// # Example
-    /// ```rust
-    /// use control_rs::polynomial::Polynomial;
-    ///
-    /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]);
-    /// let companion_matrix = p.companion();
+    /// # Examples
     /// ```
-    pub fn companion(&self) -> OMatrix<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>> {
-        // return companion;
-        if let Some(leading_coefficient) = self.leading_coefficient() {
-            OMatrix::<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>::from_fn(|i, j| {
-                if i == 0 {
-                    // SAFETY: the index j is less than N
-                    unsafe { -self.get_unchecked(N - j - 1).clone() / leading_coefficient.clone() }
-                } else {
-                    if i == j + 1 {
-                        T::one()
-                    } else {
-                        T::zero()
-                    }
-                }
-            })
-        } else {
-            OMatrix::<T, DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>::zeros()
-        }
+    /// use control_rs::polynomial::Polynomial;
+    /// let p1 = Polynomial::new([1_i32, 2_i32, 3_i32]); // Represents 3x^2 + 2x + 1
+    /// assert_eq!(
+    ///     p1.derivative(),
+    ///     Polynomial::from_data([2_i32, 6_i32]), // 6x + 2
+    ///     "Incorrect polynomial derivative"
+    /// );
+    /// ```
+    // TODO: Unit test
+    #[inline]
+    pub fn derivative<const M: usize>(&self) -> Polynomial<T, M>
+    where
+        Const<N>: DimSub<U1, Output = Const<M>> + nalgebra::ToTypenum,
+    {
+        Polynomial::from_data(utils::differentiate(&self.coefficients))
     }
 }
-impl<T, const N: usize> Polynomial<T, N>
-where
-    T: 'static + Clone + Num + Neg<Output = T> + fmt::Debug + RealField + Float,
-    Const<N>: DimSub<U1>,
-    DimDiff<Const<N>, U1>: DimName + DimSub<U1>,
-    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>
-        + Allocator<DimDiff<Const<N>, U1>, DimDiff<DimDiff<Const<N>, U1>, U1>>
-        + Allocator<DimDiff<DimDiff<Const<N>, U1>, U1>>
-        + Allocator<DimDiff<Const<N>, U1>>,
-{
-    /// Computes the roots of the polynomial.
+
+impl<T: Clone + Zero + One + AddAssign + Div<Output = T>, const N: usize> Polynomial<T, N> {
+    /// Computes the indefinite integral of a polynomial.
     ///
-    /// Edge cases:
-    /// - if the leading coefficient is zero, this should reduce the order and recurse, having
-    /// issues with trait bounds (currently returns NaN)
-    /// - all coefficients are zero: all roots are infinite
-    /// - if there are two coefficients and the lead is non-zero: the root is
-    /// `-coefficient[1]/coefficient[0]`
-    /// - if all but the first coefficient are zero: all roots are zero
-    ///
-    /// For very high-order polynomials this may be inefficient, especially for degenerate cases.
+    /// See [`utils::polynomial_integral()`] for more.
     ///
     /// # Returns
-    /// * `OMatrix<Complex<T>, Const<D>, U1>` - A column vector containing the computed roots.
+    /// * `Polynomial` - a polynomial with capacity `N + 1`
+    ///
+    /// # Examples
+    /// ```
+    /// use control_rs::polynomial::Polynomial;
+    /// let p1 = Polynomial::new([2_i32, 6_i32]); // 6x + 2
+    /// assert_eq!(
+    ///     p1.integral(1i32),
+    ///     Polynomial::from_data([1_i32, 2_i32, 3_i32]), // 3x^2 + 2x + 1
+    ///     "Incorrect polynomial integral"
+    /// );
+    /// ```
+    // TODO: Unit test
+    #[inline]
+    pub fn integral<const M: usize>(&self, constant: T) -> Polynomial<T, M>
+    where
+        Const<N>: DimAdd<U1, Output = Const<M>>,
+    {
+        Polynomial::from_data(utils::integrate::<T, N, M>(&self.coefficients, constant))
+    }
+}
+
+impl<T: Copy + Zero + One + Neg<Output = T> + Div<Output = T>, const N: usize> Polynomial<T, N> {
+    /// Computes the Frobenius companion matrix of a polynomial.
     ///
     /// # Example
     /// ```rust
     /// use control_rs::polynomial::Polynomial;
     ///
+    /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]); // x^3 - 6x^2 + 11x - 6
+    /// assert_eq!(p.companion(), [[6.0, -11.0, 6.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]], "incorrect companion");
+    /// ```
+    // TODO: Unit test
+    pub fn companion<const M: usize>(&self) -> [[T; M]; M]
+    where
+        Const<N>: DimSub<U1, Output = Const<M>>,
+    {
+        utils::companion::<T, N, M>(&self.coefficients)
+    }
+}
+
+impl<T, const N: usize> Polynomial<T, N>
+where
+    T: Clone + Num + Neg<Output = T> + RealField,
+{
+    /// Computes the roots of the polynomial
+    ///
+    /// # Example
+    /// ```
+    /// use control_rs::polynomial::Polynomial;
     /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]);
     /// let roots = p.roots();
     /// ```
-    pub fn roots(&self) -> OMatrix<Complex<T>, DimDiff<Const<N>, U1>, U1> {
-        if !self.coefficients[0].is_zero() {
-            if N == 2 {
-                OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
-                    -self.coefficients[1].clone() / self.coefficients[0].clone(),
-                    T::zero(),
-                ))
-            } else {
-                let num_zeros = (0..N).fold(0, |acc, i| match self.coefficients[i] == T::zero() {
-                    true => acc + 1,
-                    false => acc,
-                });
-
-                if num_zeros == N {
-                    // zero/degenerate polynomial, all infinite roots
-                    OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
-                        T::infinity(),
-                        T::infinity(),
-                    ))
-                } else if num_zeros == N - 1 {
-                    // unit case, all zero roots
-                    OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
-                        T::zero(),
-                        T::zero(),
-                    ))
-                } else {
-                    // need to know more specifics about what matrices work with complex_eigenvalues,
-                    // the current cases fixed an infinite loop in the test, but certainly not a guaranteed solution
-                    self.companion().complex_eigenvalues()
-                }
-            }
-        } else {
-            // should be able to reduce order and keep trying, but having issues with recursive trait bounds
-            OMatrix::<Complex<T>, DimDiff<Const<N>, U1>, U1>::from_element(Complex::new(
-                T::nan(),
-                T::nan(),
-            ))
-        }
+    /// # Errors
+    /// * `NoRoots` - the polynomial has no roots, or the function could not compute them
+    // TODO: Unit test
+    pub fn roots<const M: usize>(&self) -> Result<[Complex<T>; M], utils::NoRoots>
+    where
+        T: Copy
+            + Zero
+            + One
+            + Neg<Output = T>
+            + Sub<Output = T>
+            + Div<Output = T>
+            + PartialOrd
+            + fmt::Debug
+            + RealField,
+        Const<N>: DimSub<U1, Output = Const<M>>,
+        Const<M>: DimSub<U1>,
+        DefaultAllocator:
+            Allocator<Const<M>, DimDiff<Const<M>, U1>> + Allocator<DimDiff<Const<M>, U1>>,
+    {
+        utils::roots::<T, N, M>(&self.coefficients)
     }
 }
 
 // ===============================================================================================
 //      Generic Polynomial-Scalar Arithmatic
 //
-//  The following operations are provided for all polynomials:
+//  The following operations are provided for polynomials of any capacity:
 //      * Neg
 //      * Mul<T> & Mul<Polynomial<T,N>> for T
 //      * MulAssign<T>
@@ -801,7 +725,7 @@ impl<T: Clone + Mul<Output = T>, const N: usize> Mul<T> for Polynomial<T, N> {
 /// ```
 impl<T: Clone + MulAssign, const N: usize> MulAssign<T> for Polynomial<T, N> {
     fn mul_assign(&mut self, rhs: T) {
-        for a_i in self.coefficients.iter_mut() {
+        for a_i in self.iter_mut() {
             *a_i *= rhs.clone();
         }
     }
@@ -840,7 +764,7 @@ impl<T: Clone + Div<Output = T>, const N: usize> Div<T> for Polynomial<T, N> {
 /// ```
 impl<T: Clone + DivAssign, const N: usize> DivAssign<T> for Polynomial<T, N> {
     fn div_assign(&mut self, rhs: T) {
-        for a_i in self.coefficients.iter_mut() {
+        for a_i in self.iter_mut() {
             *a_i /= rhs.clone();
         }
     }
@@ -880,7 +804,7 @@ impl<T: Clone + Rem<Output = T>, const N: usize> Rem<T> for Polynomial<T, N> {
 /// TODO: Unit Test
 impl<T: Clone + RemAssign, const N: usize> RemAssign<T> for Polynomial<T, N> {
     fn rem_assign(&mut self, rhs: T) {
-        for a_i in self.coefficients.iter_mut() {
+        for a_i in self.iter_mut() {
             *a_i %= rhs.clone();
         }
     }
@@ -980,11 +904,7 @@ macro_rules! impl_base_case_left_scalar_arithmatic {
 impl_base_case_left_scalar_arithmatic!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
 
 // ===============================================================================================
-//      Empty Polynomial-Generic Polynomial Arithmatic
-//
-//  Assignment operators are not implemented because it would lead to unexpected behavior (i.e.
-// `p1 += p2` would have a different result than `p3 = p1 + p2`). Similarly, multiplying and
-// dividing with an empty polynomial is logically invalid.
+//      Generic Polynomial Arithmatic
 // ===============================================================================================
 
 /// # Polynomial<T, 0> + Polynomial<T, N>
@@ -1002,7 +922,7 @@ impl<T: Clone, const N: usize> Add<Polynomial<T, N>> for Polynomial<T, 0> {
     type Output = Polynomial<T, N>;
 
     fn add(self, rhs: Polynomial<T, N>) -> Self::Output {
-        rhs.clone()
+        rhs
     }
 }
 
@@ -1021,7 +941,7 @@ impl<T: Clone + Neg<Output = T>, const N: usize> Sub<Polynomial<T, N>> for Polyn
     type Output = Polynomial<T, N>;
 
     fn sub(self, rhs: Polynomial<T, N>) -> Self::Output {
-        rhs.clone().neg()
+        rhs.neg()
     }
 }
 
@@ -1034,35 +954,33 @@ where
     T: Clone + Zero + One + PartialOrd + Neg<Output = T> + fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let precision = f.precision().unwrap_or(crate::math::DEFAULT_PRECISION);
+        let mut n = N;
         for (i, a_i) in self.iter().enumerate().rev() {
             if a_i.is_zero() {
+                n = n.saturating_sub(1);
                 continue;
             }
-
-            if i > 0 {
+            if n > 1 && n > i + 1 {
                 write!(f, " {} ", if *a_i >= T::zero() { "+" } else { "-" })?;
             } else if *a_i < T::zero() {
                 write!(f, "-")?;
             }
-
             let abs_a_i = if *a_i < T::zero() {
                 a_i.clone().neg()
             } else {
                 a_i.clone()
             };
-
-            if abs_a_i != T::one() || i == 0 {
-                write!(f, "{}", abs_a_i)?;
+            if !abs_a_i.is_one() || i == 0 {
+                write!(f, "{abs_a_i:.precision$}")?;
             }
-
             if i > 0 {
                 write!(f, "x")?;
                 if i > 1 {
-                    write!(f, "^{}", i)?;
+                    write!(f, "^{i}")?;
                 }
             }
         }
-
         Ok(())
     }
 }

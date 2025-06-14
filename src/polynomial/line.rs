@@ -1,6 +1,6 @@
 //! Type alias of polynomial that implements a constant.
 
-use std::ops::{Add, AddAssign, Mul, Neg, Sub, SubAssign};
+use core::ops::{Add, AddAssign, Mul, Neg, Sub, SubAssign};
 
 use crate::Polynomial;
 
@@ -22,14 +22,16 @@ pub type Line<T> = Polynomial<T, 2>;
 /// assert_eq!(*p2.leading_coefficient().unwrap(), 1);
 /// ```
 impl<T: Clone + Add<Output = T>> Add<T> for Line<T> {
-    type Output = Line<T>;
-
+    type Output = Self;
+    #[inline]
     fn add(self, rhs: T) -> Self::Output {
-        Self::from_data([
-            // SAFETY: `N` is 2, so the indices are always valid
-            unsafe { self.get_unchecked(0).clone() + rhs },
-            unsafe { self.get_unchecked(1).clone() },
-        ])
+        // SAFETY: `N` is 2, so the indices are valid
+        unsafe {
+            Self::from_data([
+                self.get_unchecked(0).clone() + rhs,
+                self.get_unchecked(1).clone(),
+            ])
+        }
     }
 }
 
@@ -44,8 +46,9 @@ impl<T: Clone + Add<Output = T>> Add<T> for Line<T> {
 /// assert_eq!(*p1.leading_coefficient().unwrap(), 1);
 /// ```
 impl<T: AddAssign> AddAssign<T> for Line<T> {
+    #[inline]
     fn add_assign(&mut self, rhs: T) {
-        // SAFETY: `N` is 2, so the index is always valid
+        // SAFETY: `N` is 2, so the index is valid
         unsafe {
             *self.get_unchecked_mut(0) += rhs;
         }
@@ -63,13 +66,15 @@ impl<T: AddAssign> AddAssign<T> for Line<T> {
 /// ```
 impl<T: Clone + Sub<Output = T>> Sub<T> for Line<T> {
     type Output = Self;
-
+    #[inline]
     fn sub(self, rhs: T) -> Self::Output {
-        Self::from_data([
-            // SAFETY: `N` is 2, so the indices are always valid
-            unsafe { self.get_unchecked(0).clone() - rhs },
-            unsafe { self.get_unchecked(1).clone() },
-        ])
+        // SAFETY: `N` is 2, so the indices are valid
+        unsafe {
+            Self::from_data([
+                self.get_unchecked(0).clone() - rhs,
+                self.get_unchecked(1).clone(),
+            ])
+        }
     }
 }
 
@@ -83,8 +88,9 @@ impl<T: Clone + Sub<Output = T>> Sub<T> for Line<T> {
 /// assert_eq!(*p1.constant().unwrap(), -1);
 /// ```
 impl<T: SubAssign> SubAssign<T> for Line<T> {
+    #[inline]
     fn sub_assign(&mut self, rhs: T) {
-        // SAFETY: `N` is 2, so the index is always valid
+        // SAFETY: `N` is 2, so the index is valid
         unsafe {
             *self.get_unchecked_mut(0) -= rhs;
         }
@@ -96,13 +102,15 @@ macro_rules! impl_line_left_scalar_ops {
         $(
             impl Add<Line<$scalar>> for $scalar {
                 type Output = Line<$scalar>;
-
+                #[inline(always)]
                 fn add(self, rhs: Line<$scalar>) -> Self::Output {
-                    Self::Output::from_data([
-                        // SAFETY: `N` is 2, so the indices are always valid
-                        unsafe { self - rhs.get_unchecked(0).clone() },
-                        unsafe { rhs.get_unchecked(1).clone() },
-                    ])
+                    // SAFETY: `N` is 2, so the indices are valid
+                    unsafe {
+                        Self::Output::from_data([
+                            self + rhs.get_unchecked(0).clone(),
+                            rhs.get_unchecked(1).clone(),
+                        ])
+                    }
                 }
             }
         )*
@@ -114,13 +122,15 @@ macro_rules! impl_line_left_scalar_sub {
         $(
             impl Sub<Line<$scalar>> for $scalar {
                 type Output = Line<$scalar>;
-
+                #[inline(always)]
                 fn sub(self, rhs: Line<$scalar>) -> Self::Output {
-                    Self::Output::from_data([
-                        // SAFETY: `N` is 2, so the indices are always valid
-                        unsafe { self - rhs.get_unchecked(0).clone() },
-                        unsafe { rhs.get_unchecked(1).clone().neg() },
-                    ])
+                    // SAFETY: `N` is 2, so the indices are valid
+                    unsafe {
+                        Self::Output::from_data([
+                            self - rhs.get_unchecked(0).clone(),
+                            rhs.get_unchecked(1).clone().neg(),
+                        ])
+                    }
                 }
             }
 
@@ -135,7 +145,6 @@ impl_line_left_scalar_sub!(i8, i16, i32, isize, f32, f64);
 //      Line-Empty Polynomial Arithmatic
 // ===============================================================================================
 
-
 /// # Polynomial<T, 2> + Polynomial<T, 0>
 ///
 /// # Example
@@ -147,12 +156,11 @@ impl_line_left_scalar_sub!(i8, i16, i32, isize, f32, f64);
 /// assert_eq!(*p3.constant().unwrap(), 0);
 /// assert_eq!(*p3.leading_coefficient().unwrap(), 1);
 /// ```
-/// TODO: Unit Test
 impl<T: Clone> Add<Polynomial<T, 0>> for Line<T> {
     type Output = Self;
-
+    #[inline]
     fn add(self, _rhs: Polynomial<T, 0>) -> Self::Output {
-        self.clone()
+        self
     }
 }
 
@@ -169,8 +177,8 @@ impl<T: Clone> Add<Polynomial<T, 0>> for Line<T> {
 /// assert_eq!(*p1.constant().unwrap(), 0);
 /// assert_eq!(*p1.leading_coefficient().unwrap(), 1);
 /// ```
-/// TODO: Unit Test
 impl<T> AddAssign<Polynomial<T, 0>> for Line<T> {
+    #[inline(always)]
     fn add_assign(&mut self, _rhs: Polynomial<T, 0>) {}
 }
 
@@ -185,12 +193,11 @@ impl<T> AddAssign<Polynomial<T, 0>> for Line<T> {
 /// assert_eq!(*p3.constant().unwrap(), 0);
 /// assert_eq!(*p3.leading_coefficient().unwrap(), 1);
 /// ```
-/// TODO: Unit Test
 impl<T: Clone> Sub<Polynomial<T, 0>> for Line<T> {
     type Output = Self;
-
+    #[inline]
     fn sub(self, _rhs: Polynomial<T, 0>) -> Self::Output {
-        self.clone()
+        self
     }
 }
 
@@ -207,17 +214,12 @@ impl<T: Clone> Sub<Polynomial<T, 0>> for Line<T> {
 /// assert_eq!(*p1.constant().unwrap(), 0);
 /// assert_eq!(*p1.leading_coefficient().unwrap(), 1);
 /// ```
-/// TODO: Unit Test
 impl<T> SubAssign<Polynomial<T, 0>> for Line<T> {
     fn sub_assign(&mut self, _rhs: Polynomial<T, 0>) {}
 }
 
 // ===============================================================================================
 //      Line-Constant Arithmatic
-// ===============================================================================================
-
-// ===============================================================================================
-//      Constant-Line Arithmatic
 // ===============================================================================================
 
 // ===============================================================================================
@@ -235,7 +237,6 @@ impl<T> SubAssign<Polynomial<T, 0>> for Line<T> {
 /// assert_eq!(*p3.constant().unwrap(), 1);
 /// assert_eq!(*p3.leading_coefficient().unwrap(), 1);
 /// ```
-/// TODO: Unit Test
 impl<T: Clone + Add<Output = T>> Add for Line<T> {
     type Output = Self;
 
@@ -259,7 +260,6 @@ impl<T: Clone + Add<Output = T>> Add for Line<T> {
 /// assert_eq!(*p1.constant().unwrap(), 1);
 /// assert_eq!(*p1.leading_coefficient().unwrap(), 1);
 /// ```
-/// TODO: Unit Test
 impl<T: Clone + AddAssign> AddAssign for Line<T> {
     fn add_assign(&mut self, rhs: Self) {
         for (a_i, b_i) in self.iter_mut().zip(rhs.iter()) {
@@ -278,7 +278,6 @@ impl<T: Clone + AddAssign> AddAssign for Line<T> {
 /// let p3 = p1 - p2;
 /// assert_eq!(*p3.constant().unwrap(), -1);
 /// ```
-/// TODO: Unit Test
 impl<T: Clone + Sub<Output = T>> Sub for Line<T> {
     type Output = Self;
 
@@ -329,9 +328,11 @@ impl<T: Clone + Add<Output = T> + Mul<Output = T>> Mul for Line<T> {
         Polynomial::<T, 3>::from_data([
             // SAFETY: `N` is 2, so the index is always valid
             unsafe { self.get_unchecked(0).clone() * rhs.get_unchecked(0).clone() },
-            unsafe { self.get_unchecked(0).clone() * rhs.get_unchecked(1).clone()
-                + self.get_unchecked(1).clone() * rhs.get_unchecked(0).clone() },
-            unsafe { self.get_unchecked(1).clone() * rhs.get_unchecked(1).clone() }
+            unsafe {
+                self.get_unchecked(0).clone() * rhs.get_unchecked(1).clone()
+                    + self.get_unchecked(1).clone() * rhs.get_unchecked(0).clone()
+            },
+            unsafe { self.get_unchecked(1).clone() * rhs.get_unchecked(1).clone() },
         ])
     }
 }

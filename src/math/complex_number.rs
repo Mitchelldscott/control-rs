@@ -30,7 +30,7 @@ pub struct Complex<T> {
 impl<T> Complex<T> {
     /// Create a new complex number
     #[inline]
-    pub fn new(real: T, imaginary: T) -> Self {
+    pub const fn new(real: T, imaginary: T) -> Self {
         Self { real, imaginary }
     }
 }

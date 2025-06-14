@@ -14,26 +14,35 @@
 //! > [MathWorks](https://www.mathworks.com/discovery/transfer-function.html)
 //!
 
-// #[cfg(feature = "std")]
-// use std::fmt;
-//
-// #[cfg(not(feature = "std"))]
-// use core::fmt;
-
-use nalgebra::{Complex, RealField};
-use num_traits::Float;
-
-use crate::{
-    frequency_tools::{FrequencyResponse, FrequencyTools},
-    polynomial::Polynomial,
+use core::{
+    fmt,
+    ops::{Add, Div, Mul, Neg},
 };
+use nalgebra::{Complex, RealField};
+use num_traits::{Float, One, Zero};
+
+use crate::frequency_tools::{FrequencyResponse, FrequencyTools};
 
 // ===============================================================================================
-//      Polynomial Sub-Modules
+//      TransferFunction Tests
+// ===============================================================================================
+
+#[cfg(test)]
+mod edge_case_test;
+
+#[cfg(test)]
+mod tf_frequency_tests;
+
+// ===============================================================================================
+//      TransferFunction Sub-modules
 // ===============================================================================================
 
 pub mod linear_tools;
 pub use linear_tools::*;
+
+// ===============================================================================================
+//      TransferFunction Tests
+// ===============================================================================================
 
 /// # Transfer Function
 ///
@@ -52,16 +61,17 @@ pub use linear_tools::*;
 ///
 /// ## References
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 3.1
+///
 /// TODO: Example + Integration Test
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct TransferFunction<T, const M: usize, const N: usize> {
     /// coefficients of the numerator `[b_0, b_1, ... b_m]`
-    pub numerator: Polynomial<T, M>,
+    pub numerator: [T; M],
     /// coefficients of the denominator `[a_0, a_1, ... a_n]`
-    pub denominator: Polynomial<T, N>,
+    pub denominator: [T; N],
 }
 
-impl<T: Copy, const M: usize, const N: usize> TransferFunction<T, M, N> {
+impl<T, const M: usize, const N: usize> TransferFunction<T, M, N> {
     /// Create a new transfer function from arrays of coefficients
     ///
     /// # Arguments
@@ -69,30 +79,41 @@ impl<T: Copy, const M: usize, const N: usize> TransferFunction<T, M, N> {
     /// * `denominator` - coefficients of the denominator `[a_n, ... a_1, a_0]`
     ///
     /// # Returns
-    /// * `TransferFunction` - static TransferFunction
+    /// * `TransferFunction` - static Transfer Function
     ///
     /// # Example
     ///
     /// ```
     /// use control_rs::TransferFunction;
-    ///
-    /// fn main() {
-    ///     let tf = TransferFunction::new([1.0, 1.0], [1.0, 1.0, 1.0]);
-    ///     println!("{tf}");
-    /// }
+    /// let tf = TransferFunction::new([1.0, 1.0], [1.0, 1.0, 1.0]);
+    /// println!("{tf}");
     /// ```
     /// TODO: Unit Test
     pub const fn new(numerator: [T; M], denominator: [T; N]) -> Self {
-        TransferFunction {
-            numerator: Polynomial::new(numerator),
-            denominator: Polynomial::new(denominator),
+        Self {
+            numerator,
+            denominator,
         }
     }
 }
+impl<T: Clone, const N: usize, const M: usize> TransferFunction<T, M, N> {
+    /// TODO: Doc + Unit Test + Example
+    pub fn evaluate<U>(&self, value: &U) -> U
+    where
+        U: Clone + Zero + Add<T, Output = U> + Mul<U, Output = U> + Div<Output = U>,
+    {
+        self.numerator
+            .iter()
+            .fold(U::zero(), |acc, a_i| acc * value.clone() + a_i.clone())
+            / self
+                .denominator
+                .iter()
+                .fold(U::zero(), |acc, a_i| acc * value.clone() + a_i.clone())
+    }
+}
 
-impl<T, const M: usize, const N: usize> FrequencyTools<T, 1, 1> for TransferFunction<T, M, N>
-where
-    T: Float + RealField + From<i16>,
+impl<T: Float + RealField, const M: usize, const N: usize> FrequencyTools<T, 1, 1>
+    for TransferFunction<T, M, N>
 {
     /// TODO: Doc + Unit Test + Example
     fn frequency_response<const L: usize>(&self, response: &mut FrequencyResponse<T, L, 1, 1>) {
@@ -101,134 +122,98 @@ where
             .iter()
             .enumerate()
             .for_each(|(i, frequency)| {
-                let s = Complex::new(T::zero(), *frequency); // s = jω
-                response.responses[0][i] =
-                    self.numerator.evaluate(s) / self.denominator.evaluate(s);
-            })
+                // s = jω
+                response.responses[0][i] = self.evaluate(&Complex::new(T::zero(), *frequency));
+            });
     }
 }
-// struct FmtLengthCounter {
-//     length: usize,
-// }
-//
-// impl fmt::Write for FmtLengthCounter {
-//     fn write_str(&mut self, s: &str) -> fmt::Result {
-//         self.length += s.len();
-//         Ok(())
-//     }
-// }
+struct FmtLengthCounter {
+    length: usize,
+}
 
-// fn formatted_length<T: fmt::Display>(value: &T) -> usize {
-//     use fmt::Write;
-//     let mut counter = FmtLengthCounter { length: 0 };
-//     write!(&mut counter, "{}", value).unwrap();
-//     counter.length
-// }
+impl fmt::Write for FmtLengthCounter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.length += s.len();
+        Ok(())
+    }
+}
+
+fn formatted_length<T: fmt::Display>(value: &T) -> usize {
+    use fmt::Write;
+    let mut counter = FmtLengthCounter { length: 0 };
+    write!(&mut counter, "{value}").unwrap();
+    counter.length
+}
 
 /// TODO: Fix formating
-// impl<T, const M: usize, const N: usize> fmt::Display for TransferFunction<T, M, N>
-// where
-//     T: Copy + Num + PartialOrd + Neg<Output = T> + fmt::Display,
-// {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         let num_len = formatted_length(&self.numerator);
-//         let den_len = formatted_length(&self.denominator);
-//
-//         let (n_align, d_align, bar_len) = if den_len > num_len {
-//             ((den_len - num_len) / 2, 0, den_len)
-//         } else {
-//             (0, (num_len - den_len) / 2, num_len)
-//         };
-//
-//         write!(f, "Transfer Function:\n")?;
-//
-//         // Write numerator with padding
-//         for _ in 0. .n_align {
-//             write!(f, " ")?;
-//         }
-//         write!(f, "{:?}\n", self.numerator)?;
-//
-//         // Write division bar
-//         for _ in 0. .bar_len {
-//             write!(f, "-")?;
-//         }
-//         write!(f, "\n")?;
-//
-//         // Write denominator with padding
-//         for _ in 0. .d_align {
-//             write!(f, " ")?;
-//         }
-//         write!(f, "{:?}\n", self.denominator)?;
-//
-//         Ok(())
-//     }
-// }
+impl<T, const M: usize, const N: usize> fmt::Display for TransferFunction<T, M, N>
+where
+    T: Copy + Zero + One + Neg<Output = T> + PartialOrd + fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let num_len = formatted_length(&crate::Polynomial::new(self.numerator));
+        let den_len = formatted_length(&crate::Polynomial::new(self.denominator));
+
+        let (n_align, d_align, bar_len) = if den_len > num_len {
+            ((den_len - num_len) / 2, 0, den_len)
+        } else {
+            (0, (num_len - den_len) / 2, num_len)
+        };
+
+        writeln!(f, "Transfer Function:")?;
+
+        // Write numerator with padding
+        for _ in 0..n_align {
+            write!(f, " ")?;
+        }
+        writeln!(f, "{}", crate::Polynomial::new(self.numerator))?;
+
+        // Write division bar
+        for _ in 0..bar_len {
+            write!(f, "-")?;
+        }
+        writeln!(f, " ")?;
+
+        // Write denominator with padding
+        for _ in 0..d_align {
+            write!(f, " ")?;
+        }
+        writeln!(f, "{}", crate::Polynomial::new(self.denominator))?;
+
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod basic_tf_tests {
-    //! Basic test cases to make sure the TransferFunction is usable
-    use super::*;
+    //! Basic test cases to make sure the Transfer Function is usable
+    use crate::{assert_f64_eq, transfer_function::*};
 
     #[test]
     fn initialize_integrator() {
         let tf = TransferFunction::new([1.0], [1.0, 0.0]);
-        assert_eq!(
-            tf.numerator,
-            Polynomial::new([1.0]),
-            "TF numerator incorrect"
-        );
-        assert_eq!(
-            tf.denominator,
-            Polynomial::new([1.0, 0.0]),
-            "TF denominator incorrect"
-        );
+        assert_f64_eq!(tf.numerator[0], 1.0);
+        assert_f64_eq!(tf.denominator[0], 1.0);
+        assert_f64_eq!(tf.denominator[1], 0.0);
     }
 
     #[test]
     fn tf_as_monic() {
         let tf = TransferFunction::new([2.0], [2.0, 0.0]);
         let monic_tf = as_monic(&tf);
-        assert_eq!(
-            monic_tf.numerator.coefficient(0),
-            Some(&1.0),
-            "TF numerator incorrect"
-        );
-        assert_eq!(
-            monic_tf.denominator.coefficient(0),
-            Some(&0.0),
-            "TF denominator incorrect"
-        );
-        assert_eq!(
-            monic_tf.denominator.coefficient(1),
-            Some(&1.0),
-            "TF denominator incorrect"
-        );
+        assert_f64_eq!(monic_tf.numerator[0], 1.0);
+        assert_f64_eq!(monic_tf.denominator[0], 1.0);
+        assert_f64_eq!(monic_tf.denominator[1], 0.0);
     }
 
     #[test]
     fn monic_tf_as_monic() {
         let tf = TransferFunction::new([1.0, 1.0], [1.0, 0.0]);
         let monic_tf = as_monic(&tf);
-        assert_eq!(
-            monic_tf.numerator.coefficient(0),
-            Some(&1.0),
-            "TF numerator incorrect"
-        );
-        assert_eq!(
-            monic_tf.numerator.coefficient(1),
-            Some(&1.0),
-            "TF numerator incorrect"
-        );
-        assert_eq!(
-            monic_tf.denominator.coefficient(0),
-            Some(&0.0),
-            "TF denominator incorrect"
-        );
-        assert_eq!(
-            monic_tf.denominator.coefficient(1),
-            Some(&1.0),
-            "TF denominator incorrect"
-        );
+        assert_f64_eq!(monic_tf.numerator[0], 1.0);
+        assert_f64_eq!(monic_tf.numerator[1], 1.0);
+        assert_f64_eq!(monic_tf.denominator[0], 1.0);
+        assert_f64_eq!(monic_tf.denominator[1], 0.0);
     }
 
     #[test]

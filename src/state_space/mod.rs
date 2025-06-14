@@ -1,20 +1,18 @@
 //! # State-Space
 //!
 //! "The idea of **state-space** comes from the state-variable method of describing differential
-//! equations. In this method, the differential equations describing the a dynamic system are
-//! organized as a set of first order differential equations in the the vector-valued state of
-//! the system, and the solution is visualized as a trajectory of this state vector in space.
+//! equations. In this method, the differential equations describing a dynamic system are
+//! organized as a set of first order differential equations in the vector-valued state of
+//! the system. The solution is visualized as a trajectory of this state vector in space.
 //! **state-space control design** is the technique in which the control engineer designs a
 //! dynamic compensation by working directly with the state-variable description of the system"
 //! - 'Feedback Control of Dynamic Systems' by Gene F. Franklin, J. David Powell and Abbas
-//! Emami-Naeini (ch 7.1)
+//!   Emami-Naeini (ch 7.1)
 //!
-use nalgebra::{SMatrix, Scalar};
-use num_traits::{One, Zero};
 
 use core::{
     fmt,
-    ops::{Add, Div, Mul, Neg},
+    ops::{Add, Mul},
 };
 
 use crate::math::systems::DynamicalSystem;
@@ -61,25 +59,21 @@ pub mod utils;
 /// ```
 /// use nalgebra::{Matrix2, Matrix2x1, Matrix1x2, Matrix1};
 /// use control_rs::StateSpace;
+/// // Define the state-space matrices
+/// let a = Matrix2::new(0.0, 1.0, -1.0, -0.1);
+/// let b = Matrix2x1::new(0.0, 1.0);
+/// let c = Matrix1x2::new(1.0, 0.0);
+/// let d = Matrix1::new(0.0);
 ///
-/// fn main() {
-///     // Define the state-space matrices
-///     let a = Matrix2::new(0.0, 1.0,
-///                          -1.0, -0.1);
-///     let b = Matrix2x1::new(0.0, 1.0);
-///     let c = Matrix1x2::new(1.0, 0.0);
-///     let d = Matrix1::new(0.0);
+/// // Create the StateSpace model
+/// let ss = StateSpace {
+///     a,
+///     b,
+///     c,
+///     d,
+/// };
 ///
-///     // Create the StateSpace model
-///     let ss = StateSpace {
-///         a,
-///         b,
-///         c,
-///         d,
-///     };
-///
-///     println!("{ss}");
-/// }
+/// println!("{ss}");
 /// ```
 pub struct StateSpace<A, B, C, D> {
     /// system matrix `A` (N x N), representing the relationship between state derivatives and current states
@@ -110,26 +104,16 @@ impl<A, B, C, D> StateSpace<A, B, C, D> {
     /// use nalgebra::{Matrix2, Matrix2x1, Matrix1x2};
     /// use control_rs::{TransferFunction, StateSpace};
     ///
-    /// fn main() {
-    ///     let ss = StateSpace::new(
-    ///         [
-    ///             [0.0, 1.0],
-    ///             [0.0, -0.1]
-    ///         ],
-    ///         [
-    ///             [0.0],
-    ///             [1.0]
-    ///         ],
-    ///         [
-    ///             [1.0, 0.0]
-    ///         ],
-    ///         [[0.0]]
-    ///     );
-    ///     println!("{ss}");
-    /// }
+    /// let ss = StateSpace::new(
+    ///      [[0.0, 1.0], [0.0, -0.1]],
+    ///      [[0.0], [1.0]],
+    ///      [[1.0, 0.0]],
+    ///      [[0.0]]
+    ///  );
+    ///  println!("{ss}");
     /// ```
-    pub fn new(a: A, b: B, c: C, d: D) -> Self {
-        StateSpace { a, b, c, d }
+    pub const fn new(a: A, b: B, c: C, d: D) -> Self {
+        Self { a, b, c, d }
     }
 }
 
@@ -168,7 +152,7 @@ where
     C: fmt::Display,
     D: fmt::Display,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "StateSpace:\nA{:}B{:}C{:}D{:}",
@@ -224,27 +208,27 @@ mod basic_ss_tests {
             nalgebra::Matrix1::new(0.0),
         );
 
-        let ssd = zoh(&ss, 0.1 as f32);
+        let ssd = zoh(&ss, 0.1_f32);
 
         assert_eq!(
             ssd.a,
-            nalgebra::Matrix2::new(1.0, 0.09950166, 0.0, 0.99004984),
+            nalgebra::Matrix2::new(1.0, 0.099_501_66, 0.0, 0.990_049_84),
             "Discrete System matrix incorrect"
         );
 
         // check if the eigen values are marginally stable
         match ssd.a.eigenvalues() {
-            Some(eigens) => {
+            Some(eigenvalues) => {
                 assert!(
-                    eigens[0].abs() <= 1.0,
+                    eigenvalues[0].abs() <= 1.0,
                     "unstable eigen value ({}) in F {:}",
-                    eigens[0],
+                    eigenvalues[0],
                     ssd.a
                 );
                 assert!(
-                    eigens[1].abs() < 1.0,
+                    eigenvalues[1].abs() < 1.0,
                     "unstable eigen value ({}) in F {:}",
-                    eigens[0],
+                    eigenvalues[0],
                     ssd.a
                 );
             }
