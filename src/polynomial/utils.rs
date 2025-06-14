@@ -208,36 +208,37 @@ where
     T: Clone + Zero + One + Neg<Output = T> + Div<Output = T>,
     Const<N>: DimSub<U1, Output = Const<M>>,
 {
+    // assert!(coefficients.len() == M+1, "M is not a valid index to coefficients");
     let mut companion = array::from_fn(|_| array::from_fn(|_| T::zero()));
 
     // SAFETY: `M` is a valid index because Const<N> impl DimSub<U1, Output = Const<M>> so `N > 0`
     // and `N - 1 = M`
     let leading_coefficient = unsafe { coefficients.get_unchecked(M).clone() };
-    if 0 < M && !leading_coefficient.is_zero() {
-        unsafe {
-            for i in 0..M {
-                // SAFETY: `i < M` i is a valid index for either dimension of the companion
-                // SAFETY: `i < M < N` i is a valid index for either dimension of the companion
-                *companion.get_unchecked_mut(i).get_unchecked_mut(M - i) =
-                    coefficients.get_unchecked(i).clone() / leading_coefficient.clone();
-            }
-            for i in 1..M {
-                // SAFETY: `0 < i < M` i is a valid index for either dimension of companion
-                *companion.get_unchecked_mut(i).get_unchecked_mut(i - 1) = T::one();
-            }
-        }
-    }
-    // if !leading_coefficient.is_zero() {
-    //     let mut companion_iter = companion.iter_mut();
-    //     if let Some(row) = companion_iter.next() {
-    //         for (companion_i, coefficient) in row.iter_mut().zip(coefficients.iter()) {
-    //             *companion_i = *coefficient / leading_coefficient;
+    // if 0 < M && !leading_coefficient.is_zero() {
+    //     unsafe {
+    //         for i in 0..M {
+    //             // SAFETY: `i < M` i is a valid index for either dimension of the companion
+    //             // SAFETY: `i < M < N` i is a valid index for either dimension of the companion
+    //             *companion.get_unchecked_mut(i).get_unchecked_mut(M - i) =
+    //                 coefficients.get_unchecked(i).clone() / leading_coefficient.clone();
     //         }
-    //         for (i, row) in companion_iter.enumerate() {
-    //             row[i] = T::one();
+    //         for i in 1..M {
+    //             // SAFETY: `0 < i < M` i is a valid index for either dimension of companion
+    //             *companion.get_unchecked_mut(i).get_unchecked_mut(i - 1) = T::one();
     //         }
     //     }
     // }
+    if !leading_coefficient.is_zero() {
+        let mut companion_iter = companion.iter_mut();
+        if let Some(row) = companion_iter.next() {
+            for (companion_i, coefficient) in row.iter_mut().zip(coefficients.iter()) {
+                *companion_i = coefficient.clone() / leading_coefficient.clone();
+            }
+            for (i, row) in companion_iter.enumerate() {
+                row[i] = T::one();
+            }
+        }
+    }
     companion
 }
 
@@ -255,7 +256,7 @@ pub struct NoRoots;
 /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]); // x^3 - 6x^2 + 11x - 6
 /// // assert_eq!(p.roots(), Ok([1.0, 1.0, 1.0]), "Incorrect polynomial roots");
 /// ```
-/// TODO: Docs + Unit Tests + better return object + remove unsafe blocks
+/// TODO: Docs + Unit Tests + better return object + use recursion for leading zero cases
 pub fn roots<T, const N: usize, const M: usize>(
     coefficients: &[T; N],
 ) -> Result<[Complex<T>; M], NoRoots>
@@ -278,27 +279,35 @@ where
         if degree == 0 {
             return Err(NoRoots);
         } else if degree == 1 {
-            // SAFETY: the array has a non-zero element at 1 so 1 and 0 are valid indices
-            unsafe {
-                roots.get_unchecked_mut(0).re = coefficients.get_unchecked(0).clone().neg()
-                    / coefficients.get_unchecked(1).clone();
+            if coefficients[1].is_zero() {
+                return Err(NoRoots);
             }
+            roots[0].re = coefficients[0].clone().neg()
+                / coefficients[1].clone();
         } else if degree == 2 {
-            // SAFETY: the degree is 2 so indices up to 2 are valid
-            unsafe {
-                let a = coefficients.get_unchecked(2).clone();
-                let b = coefficients.get_unchecked(1).clone();
-                let c = coefficients.get_unchecked(0).clone();
-                let discriminant = -(0..4).fold(b.clone() * b.clone(), |acc, _| {
-                    acc - (a.clone() * c.clone())
-                });
-                if discriminant < T::zero() {
+            let a = coefficients[2].clone();
+            if a.is_zero() {
+                if coefficients[1].is_zero() {
                     return Err(NoRoots);
                 }
-                let root =
-                    b * discriminant.sqrt() / (0..1).fold(a.clone(), |acc, _| acc + a.clone());
-                roots.get_unchecked_mut(0).re = root.clone().neg();
-                roots.get_unchecked_mut(1).re = root;
+                roots[0].re = coefficients[0].clone().neg()
+                    / coefficients[1].clone();
+            }
+            let b = coefficients[1].clone();
+            let ac = coefficients[0].clone() * a.clone();
+            let discriminant = b.clone().powi(2) - (ac.clone() + ac.clone() + ac.clone() + ac);
+            let two_a = a.clone() + a;
+            let b_neg = b.neg();
+            if discriminant < T::zero() {
+                let real_part = b_neg / two_a.clone();
+                let imag_part = (-discriminant).sqrt() / two_a;
+                roots[0] = Complex { re: real_part.clone(), im: imag_part.clone() };
+                roots[1] = Complex { re: real_part, im: imag_part.neg() };
+            }
+            else {
+                let discriminant_sqrt = discriminant.sqrt();
+                roots[0].re = (b_neg.clone() + discriminant_sqrt.clone()) / two_a.clone();
+                roots[1].re = (b_neg - discriminant_sqrt) / two_a;
             }
         } else {
             let matrix = SMatrix::from_data(ArrayStorage(companion::<T, N, M>(coefficients)));

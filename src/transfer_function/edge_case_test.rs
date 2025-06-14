@@ -26,7 +26,7 @@ const LOW_DAMPED_TF: TransferFunction<f64, 1, 3> = TransferFunction::new([1.0], 
 #[test]
 fn improper_tests() {
     assert_f64_eq!(dc_gain(&IMPROPER_TF), 1.0);
-    assert_eq!(lhp(&IMPROPER_TF), true, "lhp for IMPROPER_TF");
+    assert!(lhp(&IMPROPER_TF), "lhp for IMPROPER_TF");
     assert_eq!(
         as_monic(&IMPROPER_TF),
         TransferFunction {
@@ -54,7 +54,7 @@ fn differentiator_tests() {
 #[test]
 fn integrator_tests() {
     assert_f64_eq!(dc_gain(&INTEGRATOR_TF), f64::INFINITY);
-    assert_eq!(lhp(&INTEGRATOR_TF), false, "lhp for INTEGRATOR_TF");
+    assert!(!lhp(&INTEGRATOR_TF), "lhp for INTEGRATOR_TF");
     assert_eq!(
         as_monic(&INTEGRATOR_TF),
         TransferFunction {
@@ -68,7 +68,7 @@ fn integrator_tests() {
 #[test]
 fn delay_tests() {
     assert_f64_eq!(dc_gain(&DELAY_TF), -1.0);
-    assert_eq!(lhp(&DELAY_TF), true, "lhp for DELAY_TF");
+    assert!(lhp(&DELAY_TF), "lhp for DELAY_TF");
     assert_eq!(
         as_monic(&DELAY_TF),
         TransferFunction {
@@ -82,9 +82,8 @@ fn delay_tests() {
 #[test]
 fn marginally_stable_tests() {
     assert_f64_eq!(dc_gain(&MARGINALLY_STABLE_TF), 1.0);
-    assert_eq!(
-        lhp(&MARGINALLY_STABLE_TF),
-        false,
+    assert!(
+        !lhp(&MARGINALLY_STABLE_TF),
         "lhp for MARGINALLY_STABLE_TF"
     );
     assert_eq!(
@@ -100,9 +99,8 @@ fn marginally_stable_tests() {
 #[test]
 fn critically_damped_tests() {
     assert_f64_eq!(dc_gain(&CRITICALLY_DAMPED_TF), 1.0);
-    assert_eq!(
+    assert!(
         lhp(&CRITICALLY_DAMPED_TF),
-        true,
         "lhp for CRITICALLY_DAMPED_TF"
     );
     assert_eq!(
@@ -118,7 +116,7 @@ fn critically_damped_tests() {
 #[test]
 fn unstable_tests() {
     assert_f64_eq!(dc_gain(&UNSTABLE_TF), 1.0);
-    assert_eq!(lhp(&UNSTABLE_TF), false, "lhp for UNSTABLE_TF");
+    assert!(!lhp(&UNSTABLE_TF), "lhp for UNSTABLE_TF");
     assert_eq!(
         as_monic(&UNSTABLE_TF),
         TransferFunction {
@@ -132,7 +130,7 @@ fn unstable_tests() {
 #[test]
 fn zp_cancel_tests() {
     assert_f64_eq!(dc_gain(&ZP_CANCEL_TF), 1.0);
-    assert_eq!(lhp(&ZP_CANCEL_TF), false, "lhp for ZP_CANCEL_TF");
+    assert!(!lhp(&ZP_CANCEL_TF), "lhp for ZP_CANCEL_TF");
     assert_eq!(
         as_monic(&ZP_CANCEL_TF),
         TransferFunction {
@@ -146,7 +144,7 @@ fn zp_cancel_tests() {
 #[test]
 fn high_order_tests() {
     assert_f64_eq!(dc_gain(&HIGH_ORDER_TF), 1.0);
-    assert_eq!(lhp(&HIGH_ORDER_TF), false, "lhp for HIGH_ORDER_TF");
+    assert!(!lhp(&HIGH_ORDER_TF), "lhp for HIGH_ORDER_TF");
     assert_eq!(
         as_monic(&HIGH_ORDER_TF),
         TransferFunction {
@@ -160,7 +158,7 @@ fn high_order_tests() {
 #[test]
 fn poorly_damped_tests() {
     assert_f64_eq!(dc_gain(&LOW_DAMPED_TF), 1.0);
-    assert_eq!(lhp(&LOW_DAMPED_TF), true, "lhp for LOW_DAMPED_TF");
+    assert!(lhp(&LOW_DAMPED_TF), "lhp for LOW_DAMPED_TF");
     assert_eq!(
         as_monic(&LOW_DAMPED_TF),
         TransferFunction {

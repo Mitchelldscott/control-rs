@@ -189,7 +189,7 @@ impl<T: Float + RealField> FrequencyMargin<T> {
         let gain_crossover = first_crossover::<T>(frequencies, &magnitudes, T::one(), L);
         let phase_crossover = first_crossover::<T>(frequencies, &phases, -T::pi(), L);
 
-        let gain_margin = gain_crossover.map(|wc| {
+        let gain_margin = phase_crossover.map(|wc| {
             // should be using frequencies.iter().position(|hz| hz == threshold, or change first_crossover to return the index)
             // unwrap is safe because the crossover frequency exists, meaning there is a corresponding
             // index in the magnitude array

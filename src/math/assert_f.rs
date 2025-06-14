@@ -16,7 +16,7 @@ macro_rules! assert_f64_eq {
         let is_equal = if a == b {
             // Handles infinities and exact equality.
             true
-        } else if a == 0.0 || b == 0.0 || (a - b).abs() < f64::MIN_POSITIVE {
+        } else if a == 0.0_f64 || b == 0.0_f64 || (a - b).abs() < f64::MIN_POSITIVE {
             // One of a or b is zero (or both are extremely close to it).
             // Use a scaled absolute error check.
             (a - b).abs() < (epsilon * f64::MIN_POSITIVE)

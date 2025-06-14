@@ -134,8 +134,8 @@ mod tf_frequency_tool_tests {
             gain_margin: Some(gain_margin),
         } = margins.0[0][0]
         {
-            assert_f64_eq!(phase_crossover, 0.0, 0.1);
-            assert_f64_eq!(gain_crossover, 8.66, 0.1);
+            assert_f64_eq!(phase_crossover, 0.0_f64, 0.1_f64);
+            assert_f64_eq!(gain_crossover, 8.66_f64, 0.1_f64);
             assert_f64_eq!(phase_margin, 60.0, 2.5); // wide error range because crossover is imprecise with so few points.
             assert_f64_eq!(gain_margin, -6.02, 0.01);
         } else {

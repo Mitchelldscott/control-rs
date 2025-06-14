@@ -21,7 +21,7 @@ use crate::{state_space::utils::control_canonical, StateSpace, TransferFunction}
 /// DC Gain = b_m / a_n
 /// </pre>
 ///
-/// Where \(b_m\) is the constant term of the numerator, and \(a_n\) is the constant term
+/// Where `b_m` is the constant term of the numerator, and `a_n` is the constant term
 /// of the denominator.
 ///
 /// # Arguments
@@ -29,7 +29,7 @@ use crate::{state_space::utils::control_canonical, StateSpace, TransferFunction}
 ///
 /// # Returns
 /// * `Option<T>` - The DC gain if both numerator and denominator have a non-zero constant term;
-///                 `None` otherwise
+///   `None` otherwise
 ///
 /// # Generic Arguments
 /// * `T` - Scalar type for the coefficients (e.g., `f32`, `f64`)
@@ -40,13 +40,10 @@ use crate::{state_space::utils::control_canonical, StateSpace, TransferFunction}
 ///
 /// ```rust
 /// use control_rs::transfer_function::{TransferFunction, dc_gain};
-///
-/// fn main() {
-///     // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
-///     let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
-///     let gain = dc_gain(&tf);
-///     println!("DC Gain: {gain:.2}");
-/// }
+/// // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
+/// let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
+/// let gain = dc_gain(&tf);
+/// println!("DC Gain: {gain:.2}");
 /// ```
 pub fn dc_gain<T: Float, const M: usize, const N: usize>(tf: &TransferFunction<T, M, N>) -> T {
     if N > 0 {
@@ -76,13 +73,12 @@ pub fn dc_gain<T: Float, const M: usize, const N: usize>(tf: &TransferFunction<T
 ///
 /// ```rust
 /// use control_rs::transfer_function::{TransferFunction, poles};
-///
-/// fn main() {
-///     // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
-///     let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
-///     let poles = poles(&tf); // contains 1 more element than it should
-/// }
+/// // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
+/// let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
+/// let poles = poles(&tf); // contains 1 more element than it should
 /// ```
+/// # Errors
+/// * `NoRoots` - the function was not able to find any roots for the denominator
 ///
 /// ## References
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
@@ -103,7 +99,7 @@ where
     Const<L>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
 {
-    crate::polynomial::utils::roots::<T, N, L>(&tf.denominator)
+    crate::polynomial::utils::roots::<T, N, L>(&crate::polynomial::utils::reverse_array(tf.denominator))
 }
 
 /// Check if the system's poles lie on the left-half plane (LHP), a condition for stability.
@@ -120,14 +116,12 @@ where
 /// # Example
 /// ```
 /// use control_rs::transfer_function::{TransferFunction, lhp};
-/// fn main() {
-///     // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
-///     let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
-///     if lhp(&tf) {
-///         println!("{tf} has stable poles");
-///     } else {
-///         println!("{tf} has unstable poles");
-///     }
+/// // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
+/// let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
+/// if lhp(&tf) {
+///     println!("{tf} has stable poles");
+/// } else {
+///     println!("{tf} has unstable poles");
 /// }
 /// ```
 ///
@@ -151,13 +145,9 @@ where
     Const<L>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
 {
-    if let Ok(roots) = poles::<T, M, N, L>(&tf) {
-        roots
-            .iter()
-            .all(|&pole| !pole.re.is_nan() && pole.re < T::zero())
-    } else {
-        false
-    }
+    poles::<T, M, N, L>(tf).is_ok_and(|roots| roots
+        .iter()
+        .all(|&pole| !pole.re.is_nan() && pole.re < T::zero()))
 }
 
 /// Helper function to create a state space model from a transfer function
@@ -174,30 +164,28 @@ where
 /// # Example
 ///
 /// ```
-/// use control_rs::transfer_function::{TransferFunction, as_monic};
-///
-/// fn main() {
-///     let tf = TransferFunction::new([1.0, 1.0], [1.0, 1.0, 1.0]);
-///     let monic_tf = as_monic(&tf);
-///     let (num, den) = (monic_tf.numerator, monic_tf.denominator);
-/// }
+/// use control_rs::{assert_f64_eq, transfer_function::{TransferFunction, as_monic}};
+/// let tf = TransferFunction::new([2.0, 1.0], [3.0, 1.0, 1.0]);
+/// let monic_tf = as_monic(&tf);
+/// assert_f64_eq!(monic_tf.numerator[0], 2.0 / 3.0);
 /// ```
 pub fn as_monic<T, const M: usize, const N: usize>(
     tf: &TransferFunction<T, M, N>,
 ) -> TransferFunction<T, M, N>
 where
-    T: Copy + Zero + Float,
+    T: Clone + Zero + Float,
 {
-    let mut numerator = tf.numerator.clone();
-    let mut denominator = tf.denominator.clone();
+    let mut numerator = tf.numerator;
+    let mut denominator = tf.denominator;
 
-    if let Some(&denominator_leading_coefficient) = tf.denominator.get(0) {
+    if N > 0 && !denominator[0].is_zero() {
+        let leading_denominator = denominator[0];
         numerator
             .iter_mut()
-            .for_each(|b_i| *b_i = b_i.clone() / denominator_leading_coefficient);
+            .for_each(|b_i| *b_i = *b_i / leading_denominator);
         denominator
             .iter_mut()
-            .for_each(|a_i| *a_i = a_i.clone() / denominator_leading_coefficient);
+            .for_each(|a_i| *a_i = *a_i / leading_denominator);
     }
 
     TransferFunction {

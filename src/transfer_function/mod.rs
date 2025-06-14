@@ -186,61 +186,34 @@ where
 
 #[cfg(test)]
 mod basic_tf_tests {
-    //! Basic test cases to make sure the TransferFunction is usable
-    use super::*;
+    //! Basic test cases to make sure the Transfer Function is usable
+    use crate::{assert_f64_eq, transfer_function::*};
 
     #[test]
     fn initialize_integrator() {
         let tf = TransferFunction::new([1.0], [1.0, 0.0]);
-        assert_eq!(tf.numerator, [1.0], "TF numerator incorrect");
-        assert_eq!(tf.denominator, [1.0, 0.0], "TF denominator incorrect");
+        assert_f64_eq!(tf.numerator[0], 1.0);
+        assert_f64_eq!(tf.denominator[0], 1.0);
+        assert_f64_eq!(tf.denominator[1], 0.0);
     }
 
     #[test]
     fn tf_as_monic() {
         let tf = TransferFunction::new([2.0], [2.0, 0.0]);
         let monic_tf = as_monic(&tf);
-        assert_eq!(
-            monic_tf.numerator.get(0),
-            Some(&1.0),
-            "TF numerator incorrect"
-        );
-        assert_eq!(
-            monic_tf.denominator.get(0),
-            Some(&1.0),
-            "TF denominator incorrect"
-        );
-        assert_eq!(
-            monic_tf.denominator.get(1),
-            Some(&0.0),
-            "TF denominator incorrect"
-        );
+        assert_f64_eq!(monic_tf.numerator[0], 1.0);
+        assert_f64_eq!(monic_tf.denominator[0], 1.0);
+        assert_f64_eq!(monic_tf.denominator[1], 0.0);
     }
 
     #[test]
     fn monic_tf_as_monic() {
         let tf = TransferFunction::new([1.0, 1.0], [1.0, 0.0]);
         let monic_tf = as_monic(&tf);
-        assert_eq!(
-            monic_tf.numerator.get(0),
-            Some(&1.0),
-            "TF numerator incorrect"
-        );
-        assert_eq!(
-            monic_tf.numerator.get(1),
-            Some(&1.0),
-            "TF numerator incorrect"
-        );
-        assert_eq!(
-            monic_tf.denominator.get(0),
-            Some(&1.0),
-            "TF denominator incorrect"
-        );
-        assert_eq!(
-            monic_tf.denominator.get(1),
-            Some(&0.0),
-            "TF denominator incorrect"
-        );
+        assert_f64_eq!(monic_tf.numerator[0], 1.0);
+        assert_f64_eq!(monic_tf.numerator[1], 1.0);
+        assert_f64_eq!(monic_tf.denominator[0], 1.0);
+        assert_f64_eq!(monic_tf.denominator[1], 0.0);
     }
 
     #[test]
