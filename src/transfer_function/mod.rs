@@ -24,11 +24,25 @@ use num_traits::{Float, One, Zero};
 use crate::frequency_tools::{FrequencyResponse, FrequencyTools};
 
 // ===============================================================================================
-//      Polynomial Sub-Modules
+//      TransferFunction Tests
+// ===============================================================================================
+
+#[cfg(test)]
+mod edge_case_test;
+
+#[cfg(test)]
+mod tf_frequency_tests;
+
+// ===============================================================================================
+//      TransferFunction Sub-modules
 // ===============================================================================================
 
 pub mod linear_tools;
 pub use linear_tools::*;
+
+// ===============================================================================================
+//      TransferFunction Tests
+// ===============================================================================================
 
 /// # Transfer Function
 ///
@@ -47,8 +61,9 @@ pub use linear_tools::*;
 ///
 /// ## References
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 3.1
+///
 /// TODO: Example + Integration Test
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct TransferFunction<T, const M: usize, const N: usize> {
     /// coefficients of the numerator `[b_0, b_1, ... b_m]`
     pub numerator: [T; M],
@@ -64,21 +79,18 @@ impl<T, const M: usize, const N: usize> TransferFunction<T, M, N> {
     /// * `denominator` - coefficients of the denominator `[a_n, ... a_1, a_0]`
     ///
     /// # Returns
-    /// * `TransferFunction` - static TransferFunction
+    /// * `TransferFunction` - static Transfer Function
     ///
     /// # Example
     ///
     /// ```
     /// use control_rs::TransferFunction;
-    ///
-    /// fn main() {
-    ///     let tf = TransferFunction::new([1.0, 1.0], [1.0, 1.0, 1.0]);
-    ///     println!("{tf}");
-    /// }
+    /// let tf = TransferFunction::new([1.0, 1.0], [1.0, 1.0, 1.0]);
+    /// println!("{tf}");
     /// ```
     /// TODO: Unit Test
     pub const fn new(numerator: [T; M], denominator: [T; N]) -> Self {
-        TransferFunction {
+        Self {
             numerator,
             denominator,
         }
@@ -86,7 +98,7 @@ impl<T, const M: usize, const N: usize> TransferFunction<T, M, N> {
 }
 impl<T: Clone, const N: usize, const M: usize> TransferFunction<T, M, N> {
     /// TODO: Doc + Unit Test + Example
-    pub fn evaluate<U>(&self, value: U) -> U
+    pub fn evaluate<U>(&self, value: &U) -> U
     where
         U: Clone + Zero + Add<T, Output = U> + Mul<U, Output = U> + Div<Output = U>,
     {
@@ -100,10 +112,7 @@ impl<T: Clone, const N: usize, const M: usize> TransferFunction<T, M, N> {
     }
 }
 
-impl<T, const M: usize, const N: usize> FrequencyTools<T, 1, 1> for TransferFunction<T, M, N>
-where
-    T: Float + RealField + From<i16>,
-{
+impl<T: Float + RealField, const M: usize, const N: usize> FrequencyTools<T, 1, 1> for TransferFunction<T, M, N> {
     /// TODO: Doc + Unit Test + Example
     fn frequency_response<const L: usize>(&self, response: &mut FrequencyResponse<T, L, 1, 1>) {
         // Evaluate the transfer function at each frequency
@@ -112,8 +121,8 @@ where
             .enumerate()
             .for_each(|(i, frequency)| {
                 // s = jω
-                response.responses[0][i] = self.evaluate(Complex::new(T::zero(), *frequency));
-            })
+                response.responses[0][i] = self.evaluate(&Complex::new(T::zero(), *frequency));
+            });
     }
 }
 struct FmtLengthCounter {
@@ -130,7 +139,7 @@ impl fmt::Write for FmtLengthCounter {
 fn formatted_length<T: fmt::Display>(value: &T) -> usize {
     use fmt::Write;
     let mut counter = FmtLengthCounter { length: 0 };
-    write!(&mut counter, "{}", value).unwrap();
+    write!(&mut counter, "{value}").unwrap();
     counter.length
 }
 
@@ -139,9 +148,9 @@ impl<T, const M: usize, const N: usize> fmt::Display for TransferFunction<T, M, 
 where
     T: Copy + Zero + One + Neg<Output = T> + PartialOrd + fmt::Display,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let num_len = formatted_length(&crate::Polynomial::new(self.numerator.clone()));
-        let den_len = formatted_length(&crate::Polynomial::new(self.denominator.clone()));
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let num_len = formatted_length(&crate::Polynomial::new(self.numerator));
+        let den_len = formatted_length(&crate::Polynomial::new(self.denominator));
 
         let (n_align, d_align, bar_len) = if den_len > num_len {
             ((den_len - num_len) / 2, 0, den_len)
@@ -149,25 +158,25 @@ where
             (0, (num_len - den_len) / 2, num_len)
         };
 
-        write!(f, "Transfer Function:\n")?;
+        writeln!(f, "Transfer Function:")?;
 
         // Write numerator with padding
         for _ in 0..n_align {
             write!(f, " ")?;
         }
-        write!(f, "{}\n", crate::Polynomial::new(self.numerator.clone()))?;
+        writeln!(f, "{}", crate::Polynomial::new(self.numerator))?;
 
         // Write division bar
         for _ in 0..bar_len {
             write!(f, "-")?;
         }
-        write!(f, "\n")?;
+        writeln!(f, " ")?;
 
         // Write denominator with padding
         for _ in 0..d_align {
             write!(f, " ")?;
         }
-        write!(f, "{}\n", crate::Polynomial::new(self.denominator.clone()))?;
+        writeln!(f, "{}", crate::Polynomial::new(self.denominator))?;
 
         Ok(())
     }

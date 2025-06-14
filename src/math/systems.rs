@@ -70,11 +70,11 @@ where
     T: Copy + Clone + Zero + One,
 {
     fn zero() -> Self {
-        Polynomial::from_element(T::zero())
+        Self::from_element(T::zero())
     }
 
     fn identity() -> Self {
-        Polynomial::from_iterator([T::one()])
+        Self::from_iterator([T::one()])
     }
 }
 

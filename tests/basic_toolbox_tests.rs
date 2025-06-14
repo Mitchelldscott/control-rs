@@ -112,7 +112,7 @@ mod basic_model_tests {
 
 #[cfg(test)]
 mod tf_frequency_tool_tests {
-    use control_rs::{assert_f64, frequency_tools::*, transfer_function::TransferFunction};
+    use control_rs::{assert_f64_eq, frequency_tools::*, transfer_function::TransferFunction};
 
     /// Test gain and phase margins.
     #[test]
@@ -122,7 +122,7 @@ mod tf_frequency_tool_tests {
         let frequencies = [0.0, 0.1, 1.0, 10.0];
 
         // Call the bode function
-        let mut response = FrequencyResponse::default([frequencies]);
+        let mut response = FrequencyResponse::new([frequencies]);
         tf.frequency_response(&mut response);
 
         let margins = Margin::new(&response);
@@ -134,10 +134,10 @@ mod tf_frequency_tool_tests {
             gain_margin: Some(gain_margin),
         } = margins.0[0][0]
         {
-            assert_f64!(eq, phase_crossover, 0.0, 0.1);
-            assert_f64!(eq, gain_crossover, 8.66, 0.1);
-            assert_f64!(eq, phase_margin, 60.0, 2.5); // wide error range because crossover is imprecise with so few points.
-            assert_f64!(eq, gain_margin, -6.02, 0.01);
+            assert_f64_eq!(phase_crossover, 0.0, 0.1);
+            assert_f64_eq!(gain_crossover, 8.66, 0.1);
+            assert_f64_eq!(phase_margin, 60.0, 2.5); // wide error range because crossover is imprecise with so few points.
+            assert_f64_eq!(gain_margin, -6.02, 0.01);
         } else {
             panic!(
                 "Failed to compute gain and phase margins {:?}",

@@ -22,8 +22,8 @@ pub type Line<T> = Polynomial<T, 2>;
 /// assert_eq!(*p2.leading_coefficient().unwrap(), 1);
 /// ```
 impl<T: Clone + Add<Output = T>> Add<T> for Line<T> {
-    type Output = Line<T>;
-    #[inline(always)]
+    type Output = Self;
+    #[inline]
     fn add(self, rhs: T) -> Self::Output {
         // SAFETY: `N` is 2, so the indices are valid
         unsafe {
@@ -46,7 +46,7 @@ impl<T: Clone + Add<Output = T>> Add<T> for Line<T> {
 /// assert_eq!(*p1.leading_coefficient().unwrap(), 1);
 /// ```
 impl<T: AddAssign> AddAssign<T> for Line<T> {
-    #[inline(always)]
+    #[inline]
     fn add_assign(&mut self, rhs: T) {
         // SAFETY: `N` is 2, so the index is valid
         unsafe {
@@ -66,7 +66,7 @@ impl<T: AddAssign> AddAssign<T> for Line<T> {
 /// ```
 impl<T: Clone + Sub<Output = T>> Sub<T> for Line<T> {
     type Output = Self;
-    #[inline(always)]
+    #[inline]
     fn sub(self, rhs: T) -> Self::Output {
         // SAFETY: `N` is 2, so the indices are valid
         unsafe {
@@ -88,7 +88,7 @@ impl<T: Clone + Sub<Output = T>> Sub<T> for Line<T> {
 /// assert_eq!(*p1.constant().unwrap(), -1);
 /// ```
 impl<T: SubAssign> SubAssign<T> for Line<T> {
-    #[inline(always)]
+    #[inline]
     fn sub_assign(&mut self, rhs: T) {
         // SAFETY: `N` is 2, so the index is valid
         unsafe {
@@ -158,9 +158,9 @@ impl_line_left_scalar_sub!(i8, i16, i32, isize, f32, f64);
 /// ```
 impl<T: Clone> Add<Polynomial<T, 0>> for Line<T> {
     type Output = Self;
-    #[inline(always)]
+    #[inline]
     fn add(self, _rhs: Polynomial<T, 0>) -> Self::Output {
-        self.clone()
+        self
     }
 }
 
@@ -195,9 +195,9 @@ impl<T> AddAssign<Polynomial<T, 0>> for Line<T> {
 /// ```
 impl<T: Clone> Sub<Polynomial<T, 0>> for Line<T> {
     type Output = Self;
-    #[inline(always)]
+    #[inline]
     fn sub(self, _rhs: Polynomial<T, 0>) -> Self::Output {
-        self.clone()
+        self
     }
 }
 

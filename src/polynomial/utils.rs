@@ -1,10 +1,10 @@
 //! Provides core logic of a [Polynomial] without edge case handling and explicit return types.
 //!
-//! This is used by other parts of [control_rs] that perform their own specialized edge cases and
+//! This is used by other parts of `control_rs` that perform their own specialized edge cases and
 //! error handling. Users should call the provided [Polynomial] interface.
 
 use core::{
-    array, fmt,
+    array, iter, fmt,
     mem::MaybeUninit,
     ops::{AddAssign, Div, Mul, Neg, Sub, SubAssign},
     ptr::copy_nonoverlapping,
@@ -15,8 +15,8 @@ use nalgebra::{
 };
 use num_traits::{One, Zero};
 
-/// Helper function to reverse arrays given to [Polynomial::new()]
-#[inline(always)]
+/// Helper function to reverse arrays given to [`Polynomial::new()`]
+#[inline]
 pub const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
     let mut output = input;
     let mut i = 0;
@@ -76,20 +76,20 @@ where
         // Cast it to a pointer to an array of `T`.
         // Then `read()` the value from that pointer.
         // This is equivalent to transmute from `[MaybeUninit<T>; N]` to `[T; N]`.
-        (uninit_array.as_ptr() as *const [T; N]).read()
+        uninit_array.as_ptr().cast::<[T; N]>().read()
     }
 }
 
 /// # Safety
 ///
 /// This function performs a raw memory copy of `N` elements from the input slice `src`
-/// into a newly constructed `[T; N]` array using [copy_nonoverlapping].
+/// into a newly constructed `[T; N]` array using [`copy_nonoverlapping`].
 ///
 /// ## Preconditions
 /// To avoid undefined behavior, the caller **must** ensure the following:
 /// * `src.len() >= N`: The slice must contain **at least** `N` valid elements.
 /// * `src.as_ptr()` must be properly aligned for type `T` (This is guaranteed for slices of `T`,
-/// unless manually constructed unsafely).
+///   unless manually constructed unsafely).
 #[inline]
 const unsafe fn array_from_slice_copy<T: Copy, const N: usize>(src: &[T]) -> [T; N] {
     let mut dst: MaybeUninit<[T; N]> = MaybeUninit::uninit();
@@ -97,7 +97,7 @@ const unsafe fn array_from_slice_copy<T: Copy, const N: usize>(src: &[T]) -> [T;
     // * `src` must be [valid] for reads of `count * size_of::<T>()` bytes.
     // * `dst` must be [valid] for writes of `count * size_of::<T>()` bytes.
     // * Both `src` and `dst` must be properly aligned.
-    copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr() as *mut T, N);
+    copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr().cast::<T>(), N);
     // SAFETY: All elements are initialized
     dst.assume_init()
 }
@@ -171,9 +171,8 @@ where
 {
     let mut exponent = T::zero();
     array_from_iterator_with_default(
-        [constant]
-            .into_iter()
-            .chain(coefficients.iter().enumerate().map(|(_, a_i)| {
+        iter::once(constant)
+            .chain(coefficients.iter().map(|a_i| {
                 exponent += T::one();
                 a_i.clone() / exponent.clone()
             })),
@@ -248,17 +247,21 @@ where
 pub struct NoRoots;
 
 /// Computes the roots of the polynomial.
+/// # Errors
+/// * `NoRoots` - the function was not able to compute roots for the given polynomial
+///
 /// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]); // x^3 - 6x^2 + 11x - 6
 /// // assert_eq!(p.roots(), Ok([1.0, 1.0, 1.0]), "Incorrect polynomial roots");
 /// ```
+/// TODO: Docs + Unit Tests + better return object + remove unsafe blocks
 pub fn roots<T, const N: usize, const M: usize>(
     coefficients: &[T; N],
 ) -> Result<[Complex<T>; M], NoRoots>
 where
-    T: Copy
+    T: Clone
         + Zero
         + One
         + Neg<Output = T>
@@ -272,14 +275,14 @@ where
     DefaultAllocator: Allocator<Const<M>, DimDiff<Const<M>, U1>> + Allocator<DimDiff<Const<M>, U1>>,
 {
     if let Some(degree) = largest_nonzero_index(coefficients) {
-        let mut roots = [Complex::zero(); M];
+        let mut roots = array::from_fn(|_| Complex::zero());
         if degree == 0 {
             return Err(NoRoots);
         } else if degree == 1 {
             // SAFETY: the array has a non-zero element at 1 so 1 and 0 are valid indices
             unsafe {
                 roots.get_unchecked_mut(0).re =
-                    coefficients.get_unchecked(0).neg() / *coefficients.get_unchecked(1);
+                    coefficients.get_unchecked(0).clone().neg() / coefficients.get_unchecked(1).clone();
             }
         } else if degree == 2 {
             // SAFETY: the degree is 2 so indices up to 2 are valid
@@ -287,20 +290,19 @@ where
                 let a = coefficients.get_unchecked(2).clone();
                 let b = coefficients.get_unchecked(1).clone();
                 let c = coefficients.get_unchecked(0).clone();
-                let discriminant = -(0..4).fold(b * b, |acc, _| acc - (a.clone() * c.clone()));
+                let discriminant = -(0..4).fold(b.clone() * b.clone(), |acc, _| acc - (a.clone() * c.clone()));
                 if discriminant < T::zero() {
                     return Err(NoRoots);
-                } else {
-                    let root =
-                        b * discriminant.clone().sqrt() / (0..1).fold(a.clone(), |acc, _| acc + a);
-                    roots.get_unchecked_mut(0).re = root.clone().neg();
-                    roots.get_unchecked_mut(1).re = root;
                 }
+                let root =
+                    b * discriminant.sqrt() / (0..1).fold(a.clone(), |acc, _| acc + a.clone());
+                roots.get_unchecked_mut(0).re = root.clone().neg();
+                roots.get_unchecked_mut(1).re = root;
             }
         } else {
             let matrix = SMatrix::from_data(ArrayStorage(companion::<T, N, M>(coefficients)));
-            for (eigenvalue, root) in matrix.complex_eigenvalues().iter().zip(roots.iter_mut()) {
-                *root = *eigenvalue;
+            for (eigenvalue, root) in matrix.complex_eigenvalues().into_iter().zip(roots.iter_mut()) {
+                *root = eigenvalue.clone();
             }
         }
         Ok(roots)
@@ -313,13 +315,13 @@ where
 ///
 /// # Safety
 /// * `lhs` must have at least `N` elements or this will cause UB
-pub unsafe fn add_generic<T: Copy, const N: usize>(lhs: &[T], rhs: &[T]) -> [T; N]
+pub unsafe fn add_generic<T, const N: usize>(lhs: &[T], rhs: &[T]) -> [T; N]
 where
-    T: Clone + AddAssign + Zero,
+    T: Copy + AddAssign + Zero,
 {
     let mut result: [T; N] = array_from_slice_copy(lhs);
     for (a, b) in result.iter_mut().zip(rhs.iter()) {
-        *a += b.clone();
+        *a += *b;
     }
     result
 }
@@ -327,13 +329,16 @@ where
 /// Subtracts two polynomials
 ///
 /// This requires that the left-hand side has a larger or equal capacity.
-pub unsafe fn sub_generic<T: Copy, const N: usize>(lhs: &[T], rhs: &[T]) -> [T; N]
+///
+/// # Safety
+/// * `lhs` - must have at least `N` elements or this will cause UB
+pub unsafe fn sub_generic<T, const N: usize>(lhs: &[T], rhs: &[T]) -> [T; N]
 where
-    T: Clone + SubAssign,
+    T: Copy + SubAssign,
 {
     let mut result: [T; N] = array_from_slice_copy(lhs);
     for (a, b) in result.iter_mut().zip(rhs.iter()) {
-        *a -= b.clone();
+        *a -= *b;
     }
     result
 }
@@ -353,13 +358,13 @@ where
 /// let p1 = [1i32; 2];
 /// let p2 = [1i32; 2];
 /// let mut p3 = [0i32; 3];
-/// mul_generic(&mut p3, &p1, p2);
+/// mul_generic(&mut p3, &p1, &p2);
 /// assert_eq!(p3, [1i32, 1i32, 1i32], "wrong multiplication result");
 /// ```
 pub fn mul_generic<T, const N: usize, const M: usize, const L: usize>(
     result: &mut [T; L],
     lhs: &[T; N],
-    rhs: [T; M],
+    rhs: &[T; M],
 ) where
     T: Clone + Zero + AddAssign + Mul<Output = T>,
     Const<N>: DimAdd<Const<M>>,
@@ -381,7 +386,7 @@ pub fn mul_generic<T, const N: usize, const M: usize, const L: usize>(
 /// Divides two polynomials.
 ///
 /// The result is a polynomial with capacity `N`. This may be larger than the degree of the result,
-/// in which case the higher order terms will be [T::zero()].
+/// in which case the higher order terms will be [`T::zero()`].
 ///
 /// # Example
 /// ```rust

@@ -105,7 +105,7 @@ pub trait StaticStorage<T, const N: usize>: Sized {
     ///
     /// # Safety
     /// The caller must ensure that the storage outlives the pointer and that
-    /// any access through this pointer is valid (e.g., within bounds `0..N`).
+    /// any access through this pointer is valid (e.g., within bounds `0: N`).
     /// Dereferencing the pointer is only safe if `N > 0`.
     fn ptr(&self) -> *const T;
 }
@@ -152,7 +152,7 @@ pub trait StaticStorageMut<T, const N: usize>: StaticStorage<T, N> {
         &mut *self.get_address_unchecked_linear_mut(i)
     }
 
-    /// Retrieves a mutable reference to the element at `(irow, icol)` without bound-checking.
+    /// Retrieves a mutable reference to the element at `index` without bound-checking.
     ///
     /// # Safety
     /// If the index is out of bounds, the method will cause undefined behavior.

@@ -1,13 +1,19 @@
 //! Utilities for creating, converting and analyzing SS models
 //!
 
-use super::*;
+use core::ops::{Neg, Add, Mul, Div};
 
-/// create a new SISO state-space model from the numerator and denomenator coefficients of
+use num_traits::{Zero, One};
+use nalgebra::{SMatrix, Scalar};
+
+use super::StateSpace;
+
+
+/// Create a new SISO state-space model from the numerator and denominator coefficients of
 /// a monic transfer function
 ///
 /// The transfer function should be proper and its denominator must be monic. The function still
-/// runs if this criteria is not met but the results will likely be incorrect.
+/// runs if this criterion is not met, but the results will be incorrect.
 ///
 /// <pre>
 /// G(s) = b(s) / a(s)
@@ -20,8 +26,8 @@ use super::*;
 ///     [ -a_1 -a_2 -a_3... -a_n ]
 ///  
 /// - the final row of A is the denominator coefficients
-/// where j = 0 is the constant and j = N - 1 is the second highest order coefficient
-/// - the derivitive of each state variable i is the state variable i + 1
+///   where j = 0 is the constant and j = N - 1 is the second-highest order coefficient
+/// - the derivative of each state variable i is the state variable `i + 1`
 ///
 /// B = [ 0 ]
 ///     [...]
@@ -47,12 +53,10 @@ use super::*;
 ///
 /// ```
 /// use control_rs::state_space::{StateSpace, utils::control_canonical};
-///
-/// fn main() {
-///     let ss = control_canonical([1.0], [0.1, 0.0]);
-///     println!("{ss}");
-/// }
+/// let ss = control_canonical([1.0], [0.1, 0.0]);
+/// println!("{ss}");
 /// ```
+/// # TODO: repair docs
 pub fn control_canonical<T, const N: usize, const M: usize, const L: usize>(
     b: [T; M],
     a: [T; L],
@@ -64,12 +68,10 @@ where
         a: SMatrix::from_fn(|i, j| {
             if i == N - 1 {
                 -a[L - j - 1]
-            } else {
-                if i + 1 == j {
+            } else if i + 1 == j {
                     T::one()
-                } else {
-                    T::zero()
-                }
+            } else {
+                T::zero()
             }
         }),
         b: SMatrix::from_fn(|i, _| if i == N - 1 { T::one() } else { T::zero() }),
@@ -78,7 +80,7 @@ where
     }
 }
 
-/// Discretizes the given StateSpace model
+/// Discretizes the given `StateSpace` model
 ///
 /// This discretization applies a zero-order-hold (zoh) to the continuous state space matrices.
 /// zoh relies on the matrix exponent operation e^At which is approximated using a tenth order
@@ -108,34 +110,31 @@ where
 /// # Example
 ///
 /// ```
-/// use control_rs::state_space::{StateSpace, zoh};
+/// use control_rs::state_space::{StateSpace, utils::zoh};
+/// let ss = StateSpace::new(
+///   [
+///     [0.0, 1.0],
+///     [0.0, -0.1]
+///   ],
+///   [
+///     [0.0],
+///     [1.0]
+///   ],
+///   [
+///     [1.0, 0.0]
+///   ],
+///   [[0.0]]
+/// );
 ///
-/// fn main() {
-///     let ss = StateSpace::new(
-///         [
-///             [0.0, 1.0],
-///             [0.0, -0.1]
-///         ],
-///         [
-///             [0.0],
-///             [1.0]
-///         ],
-///         [
-///             [1.0, 0.0]
-///         ],
-///         [[0.0]]
-///     );
-///
-///     let ssd = zoh(&ss, 0.1 as f32);
-///     println!("{ssd}");
-/// }
+/// let ssd = zoh(&ss, 0.1_f32);
+/// println!("{ssd}");
 /// ```
 ///
 /// ## TODO:
-/// - [ ] compare with [nalgebra::Matrix::exp]
+/// - [ ] compare with [`nalgebra::Matrix::exp`]
 pub fn zoh<T, A, B, C, D>(ss: &StateSpace<A, B, C, D>, ts: T) -> StateSpace<A, B, C, D>
 where
-    T: Copy + Scalar + Zero + One + From<u8>,
+    T: Clone + Scalar + Zero + One + From<u8>,
     A: Clone
         + One
         + Add<Output = A>
@@ -151,10 +150,10 @@ where
     let k: u8 = 10;
     let identity = A::one();
     let psi = (0..k - 1).fold(identity.clone(), |psi, i| {
-        identity.clone() + ss.a.clone() * ts * psi.clone() / T::from(k - i)
+        identity.clone() + ss.a.clone() * ts.clone() * psi / T::from(k - i)
     });
     StateSpace {
-        a: identity + ss.a.clone() * ts * psi.clone(),
+        a: identity + ss.a.clone() * ts.clone() * psi.clone(),
         b: psi * ss.b.clone() * ts,
         c: ss.c.clone(),
         d: ss.d.clone(),

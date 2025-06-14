@@ -49,12 +49,10 @@ pub fn dc_gain<T: Float, const M: usize, const N: usize>(tf: &TransferFunction<T
     if N > 0 {
         if tf.denominator[N - 1].is_zero() {
             T::infinity()
+        } else if M > 0 {
+            tf.numerator[M - 1] / tf.denominator[N - 1]
         } else {
-            if M > 0 {
-                tf.numerator[M - 1] / tf.denominator[N - 1]
-            } else {
-                T::nan()
-            }
+            T::nan()
         }
     } else {
         T::nan()
@@ -187,19 +185,18 @@ pub fn as_monic<T, const M: usize, const N: usize>(
 where
     T: Copy + Zero + Float,
 {
-    let scale = if let Some(&denominator_leading_coefficient) = tf.denominator.get(0) {
-        denominator_leading_coefficient
-    } else {
-        T::one()
-    };
     let mut numerator = tf.numerator.clone();
     let mut denominator = tf.denominator.clone();
-    numerator
-        .iter_mut()
-        .for_each(|b_i| *b_i = b_i.clone() / scale);
-    denominator
-        .iter_mut()
-        .for_each(|a_i| *a_i = a_i.clone() / scale);
+
+    if let Some(&denominator_leading_coefficient) = tf.denominator.get(0) {
+        numerator
+            .iter_mut()
+            .for_each(|b_i| *b_i = b_i.clone() / denominator_leading_coefficient);
+        denominator
+            .iter_mut()
+            .for_each(|a_i| *a_i = a_i.clone() / denominator_leading_coefficient);
+    }
+
     TransferFunction {
         numerator,
         denominator,

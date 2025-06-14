@@ -1,11 +1,10 @@
 //! Tests for constructors and accessors of the basic polynomial type.
 //!
-//! This file provides basic usage testing, initialization, accessors and setters, for
+//! This file provides basic usage testing, initialization, accessors and setters for
 //! specialized polynomial types.
 //!
 //! The tests currently cover u8, i8, u16, i16, u32, i32, f32, f64.(neg tests do not cover
-//! unsigned integers). u64, i64, u128, i128, and other big nums are not covered untill they
-//! have their own features.
+//! unsigned integers). 64-bit and up: u64, i64, u128, i128, and other big_nums are not covered.
 
 use crate::polynomial::{Constant, Line, Polynomial};
 

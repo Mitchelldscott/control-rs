@@ -105,7 +105,7 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///
     /// # Arguments
     /// * `coefficients` - An array of coefficients `[a_0, a_1 ... a_n]`,
-    /// where `a_0` is the constant and `a_n` the nth degree term.
+    ///   where `a_0` is the constant and `a_n` the nth degree term.
     ///
     /// # Returns
     /// * `polynomial` - A polynomial with the given coefficients.
@@ -126,11 +126,11 @@ impl<T, const N: usize> Polynomial<T, N> {
 
     /// Creates a new polynomial from a function closure.
     ///
-    /// This is a wrapper for [array::from_fn].
+    /// This is a wrapper for [`array::from_fn`].
     ///
     /// # Arguments
     /// * `cb` - The generator function, which takes the degree as input and returns the
-    /// coefficient for that degree.
+    ///   coefficient for that degree.
     ///
     /// # Returns
     /// * `polynomial` - A new instance with the generated coefficients.
@@ -163,6 +163,7 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// let p = Polynomial::new([]);
     /// assert_eq!(p.is_empty(), true);
     /// ```
+    #[allow(clippy::inline_always)]
     #[inline(always)]
     #[must_use]
     pub const fn is_empty(&self) -> bool {
@@ -170,14 +171,28 @@ impl<T, const N: usize> Polynomial<T, N> {
     }
 
     /// Access the coefficients as a slice iter
-    pub fn iter(&self) -> slice::Iter<T> {
-        self.coefficients.iter()
-    }
+    fn iter(&self) -> slice::Iter<'_, T> { self.coefficients.iter() }
 
     /// Access the coefficients as a mutable slice iter
-    pub fn iter_mut(&mut self) -> slice::IterMut<T> {
-        self.coefficients.iter_mut()
-    }
+    pub fn iter_mut(&mut self) -> slice::IterMut<'_, T> { self.coefficients.iter_mut() }
+}
+
+impl<'a, T, const N: usize> IntoIterator for &'a Polynomial<T, N> {
+    type Item = &'a T;
+    type IntoIter = slice::Iter<'a, T>;
+    /// Access the coefficients as a slice iter
+    fn  into_iter(self) -> Self::IntoIter { self.iter() }
+}
+
+impl<'a, T, const N: usize> IntoIterator for &'a mut Polynomial<T, N> {
+    type Item = &'a T;
+    type IntoIter = slice::Iter<'a, T>;
+    /// Access the coefficients as a slice iter
+    fn  into_iter(self) -> Self::IntoIter { self.iter() }
+}
+
+impl<T, const N: usize>  Polynomial<T, N> {
+
 }
 
 impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
@@ -209,7 +224,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// Create a polynomial from another polynomial with a different capacity.
     ///
     /// * Shrinking the capacity will drop higher order terms.
-    /// * Extending the capacity will pad the end of the array with T::zero().
+    /// * Extending the capacity will pad the end of the array with `T::zero()`.
     /// * Calling this on same sized polynomials will copy one into the other.
     ///
     /// # Arguments
@@ -250,8 +265,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     #[inline]
     pub fn monomial(coefficient: T) -> Self {
         Self::from_iterator(
-            core::iter::repeat(T::zero())
-                .take(N - 1)
+            core::iter::repeat_n(T::zero(), N - 1)
                 .chain([coefficient]),
         )
     }
@@ -278,8 +292,8 @@ impl<T: Copy, const N: usize> Polynomial<T, N> {
 
     /// Creates a new polynomial from an array.
     ///
-    /// Provides a more readable interface than [Polynomial::from_data] to initialize polynomials with
-    /// a degree-major array.
+    /// Provides a more readable interface than [`Polynomial::from_data()`] to initialize
+    /// polynomials with a degree-major array.
     ///
     /// # Arguments
     /// * `coefficients` - An array of coefficients in degree-major order `[a_n, ... a_1, a_0]`.
@@ -340,12 +354,12 @@ impl<T: Clone, const N: usize> Polynomial<T, N> {
     /// use control_rs::polynomial::Polynomial;
     ///
     /// let p = Polynomial::new([1, 2, 3]);
-    /// let result = p.evaluate(2);
+    /// let result = p.evaluate(&2);
     /// ```
     ///
     /// TODO: Unit Test
     #[inline]
-    pub fn evaluate<U>(&self, value: U) -> U
+    pub fn evaluate<U>(&self, value: &U) -> U
     where
         U: Clone + Zero + Add<T, Output = U> + Mul<U, Output = U>,
     {
@@ -362,11 +376,7 @@ impl<T: PartialEq + One + Zero, const N: usize> Polynomial<T, N> {
     /// * `bool` - true if the leading coefficient is one, false otherwise
     #[inline]
     pub fn is_monic(&self) -> bool {
-        if let Some(coefficient) = self.leading_coefficient() {
-            coefficient.is_one()
-        } else {
-            false
-        }
+        self.leading_coefficient().is_some_and(T::is_one)
     }
 }
 
@@ -385,11 +395,11 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///
     /// # Safety
     /// * `index` must be valid. That is, `0 <= index < N`. Failing to meet this condition will
-    /// result in dereferencing an out-of-bounds or otherwise invalid memory address, leading to
-    /// undefined behavior.
+    ///   result in dereferencing an out-of-bounds or otherwise invalid memory address, leading to
+    ///   undefined behavior.
     /// * The memory backing `self.coefficients` must remain valid and unchanged for the lifetime
-    /// of the returned reference.
-    #[inline(always)]
+    ///   of the returned reference.
+    #[inline]
     #[must_use]
     unsafe fn get_unchecked(&self, index: usize) -> &T {
         // TODO: Setup benchmarks to compare performance of ptr vs slice access
@@ -407,11 +417,11 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///
     /// # Safety
     /// * `index` must be valid. That is, `0 <= index < N`. Failing to meet this condition will
-    /// result in dereferencing an out-of-bounds or otherwise invalid memory address, leading to
-    /// undefined behavior.
+    ///   result in dereferencing an out-of-bounds or otherwise invalid memory address, leading to
+    ///   undefined behavior.
     /// * The memory backing `self.coefficients` must remain valid and unchanged for the lifetime
-    /// of the returned reference.
-    #[inline(always)]
+    ///   of the returned reference.
+    #[inline]
     #[must_use]
     unsafe fn get_unchecked_mut(&mut self, index: usize) -> &mut T {
         // TODO: Setup benchmarks to compare performance of ptr vs slice access
@@ -504,12 +514,8 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     #[inline]
     #[must_use]
     pub fn leading_coefficient(&self) -> Option<&T> {
-        if let Some(degree) = self.degree() {
-            // SAFETY: degree < N so degree is valid
-            unsafe { Some(self.get_unchecked(degree)) }
-        } else {
-            None
-        }
+        // SAFETY: degree exists and so is a valid index
+        self.degree().map(|degree| unsafe { self.get_unchecked(degree) })
     }
 
     /// Returns the highest order term of the polynomial.
@@ -525,12 +531,8 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     #[inline]
     #[must_use]
     pub fn leading_coefficient_mut(&mut self) -> Option<&mut T> {
-        if let Some(degree) = self.degree() {
-            // SAFETY: degree < N so degree is valid
-            unsafe { Some(self.get_unchecked_mut(degree)) }
-        } else {
-            None
-        }
+        // SAFETY: degree exists and so is a valid index
+        self.degree().map(|degree| unsafe { self.get_unchecked_mut(degree) })
     }
 }
 
@@ -541,7 +543,7 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
 impl<T: Clone + AddAssign + Zero + One, const N: usize> Polynomial<T, N> {
     /// Computes the derivative of a polynomial.
     ///
-    /// See [utils::polynomial_derivative] for more.
+    /// See [`utils::polynomial_derivative()`] for more.
     ///
     /// # Returns
     /// * `Polynomial` - a polynomial with capacity `N - 1`
@@ -569,7 +571,7 @@ impl<T: Clone + AddAssign + Zero + One, const N: usize> Polynomial<T, N> {
 impl<T: Clone + Zero + One + AddAssign + Div<Output = T>, const N: usize> Polynomial<T, N> {
     /// Computes the indefinite integral of a polynomial.
     ///
-    /// See [utils::polynomial_integral] for more.
+    /// See [`utils::polynomial_integral()`] for more.
     ///
     /// # Returns
     /// * `Polynomial` - a polynomial with capacity `N + 1`
@@ -625,6 +627,8 @@ where
     /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]);
     /// let roots = p.roots();
     /// ```
+    /// # Errors
+    /// * `NoRoots` - the polynomial has no roots, or the function could not compute them
     // TODO: Unit test
     pub fn roots<const M: usize>(&self) -> Result<[Complex<T>; M], utils::NoRoots>
     where
@@ -716,7 +720,7 @@ impl<T: Clone + Mul<Output = T>, const N: usize> Mul<T> for Polynomial<T, N> {
 /// ```
 impl<T: Clone + MulAssign, const N: usize> MulAssign<T> for Polynomial<T, N> {
     fn mul_assign(&mut self, rhs: T) {
-        for a_i in self.coefficients.iter_mut() {
+        for a_i in self.iter_mut() {
             *a_i *= rhs.clone();
         }
     }
@@ -755,7 +759,7 @@ impl<T: Clone + Div<Output = T>, const N: usize> Div<T> for Polynomial<T, N> {
 /// ```
 impl<T: Clone + DivAssign, const N: usize> DivAssign<T> for Polynomial<T, N> {
     fn div_assign(&mut self, rhs: T) {
-        for a_i in self.coefficients.iter_mut() {
+        for a_i in self.iter_mut() {
             *a_i /= rhs.clone();
         }
     }
@@ -795,7 +799,7 @@ impl<T: Clone + Rem<Output = T>, const N: usize> Rem<T> for Polynomial<T, N> {
 /// TODO: Unit Test
 impl<T: Clone + RemAssign, const N: usize> RemAssign<T> for Polynomial<T, N> {
     fn rem_assign(&mut self, rhs: T) {
-        for a_i in self.coefficients.iter_mut() {
+        for a_i in self.iter_mut() {
             *a_i %= rhs.clone();
         }
     }
@@ -913,7 +917,7 @@ impl<T: Clone, const N: usize> Add<Polynomial<T, N>> for Polynomial<T, 0> {
     type Output = Polynomial<T, N>;
 
     fn add(self, rhs: Polynomial<T, N>) -> Self::Output {
-        rhs.clone()
+        rhs
     }
 }
 
@@ -932,7 +936,7 @@ impl<T: Clone + Neg<Output = T>, const N: usize> Sub<Polynomial<T, N>> for Polyn
     type Output = Polynomial<T, N>;
 
     fn sub(self, rhs: Polynomial<T, N>) -> Self::Output {
-        rhs.clone().neg()
+        rhs.neg()
     }
 }
 
@@ -963,12 +967,12 @@ where
                 a_i.clone()
             };
             if !abs_a_i.is_one() || i == 0 {
-                write!(f, "{:.precision$}", abs_a_i)?;
+                write!(f, "{abs_a_i:.precision$}")?;
             }
             if i > 0 {
                 write!(f, "x")?;
                 if i > 1 {
-                    write!(f, "^{}", i)?;
+                    write!(f, "^{i}")?;
                 }
             }
         }
