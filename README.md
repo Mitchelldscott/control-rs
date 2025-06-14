@@ -1,15 +1,16 @@
 # Control-rs
 
-Control-rs is a numerical modeling and control system library designed for embedded applications. Inspired by MATLAB’s 
-control systems toolbox, this crate provides a structured approach to system modeling, analysis, and numerical design 
-while maintaining a lightweight footprint suitable for real-time and resource-constrained environments. 
+`control-rs` is a numerical modeling and control synthesis library tailored for embedded systems. Inspired by MATLAB’s 
+Control System Toolbox, it offers a structured framework for system modeling, analysis, and controller design. 
+Leveraging Rust’s ownership model and static type system, Control-rs ensures memory safety, concurrency guarantees, and 
+deterministic behavior—making it well-suited for real-time, resource-constrained applications.
 
 ## Features
 
 * **Modeling**: Support for Polynomial, Transfer Function, State-Space, and other nonlinear representations
 * **Analysis**: Tools for classical, modern and robust system analysis
 * **Synthesis**: Direct and data-driven methods to create models
-* **Simulation**: Easy model integration and data vizualization
+* **Simulation**: Easy model integration and data visualization
 
 ## Installation (Not Supported... haven't published the crate yet, clone this repo instead)
 
@@ -40,26 +41,30 @@ fn main() {
 ```
 
 ```rust
-use control_rs::{StateSpace, TransferFunction, transfer_function::as_monic};
+use control_rs::{TransferFunction, transferfunction::linear_tools::tf2ss};
 
 fn main() {
     let tf = TransferFunction::new([2.0, 4.0], [1.0, 1.0, 4.0, 0.0, 0.0]);
-    let (num, den) = as_monic(&tf);
-
-    assert_eq!(
-        den[0], 1.0,
-        "Transfer Function denominator is not monic\n{tf}"
-    );
-
-    let ss: StateSpace<_, 4, 1, 1> = control_canonical(num, den);
+    let ss = tf2ss(tf);
 }
 ```
 
 ## Examples
 
-Examples are either based on a textbook problem or demo a practical application. Future work includes providing (a) cargo template(s) for hardware-integrated examples (with specific sensors and mcu's).
+Examples are either based on a textbook problem or demo a practical application. This list covers a few examples that
+are in the works:
+- [ ] DC Motor lead-lag compensator
+- [ ] BLDC ESC (FOC)
+- [ ] LiPo Battery model adaptive estimator
+- [ ] Orbit Determination
+- [ ] Visual-Inertial Odometry
 
 ## Testing
+
+### Doc Tests
+
+To keep unit tests purposeful and concise, the doc-tests should provide a majority of the code coverage. These will
+double as useful examples and a basic functionality check.
 
 ### Unit Tests
 
@@ -68,13 +73,13 @@ Examples are either based on a textbook problem or demo a practical application.
 * Each test case should be:
   * Short
   * Independent
-  * Clearly descriptive of the test objective
+  * Clearly descriptive of the test
 
 ### Integration Tests
 
-* Located in the tests/ directory.
-* Designed to verify high-level functionality of the tools.
-* Example: Confirm that a simple model maintains consistency across different model formats.
+* Located in the `tests/` directory.
+* Designed to verify high-level functionality across the tools.
+  * Example: Confirm that a simple model maintains consistency across different model formats.
 
 ## Documentation
 
@@ -86,7 +91,9 @@ The documentation provides theoretical references and specific user guidance. Ea
 
 ## Book
 
-In the future it would be great to have a book that walks through a series of smaller projects to accomplish a larger one. For example designing analytical models for a few sensors and actuators and integrating them to design an estimator and controller.
+In the future, it would be great to have a book that walks through a series of smaller projects that lead to a larger 
+one. For example, designing analytical models for a few sensors and actuators and integrating them to design an 
+estimator and controller for an RC car or Quadcopter.
 
 ## Contributing
 
@@ -96,4 +103,4 @@ We welcome contributions!
 
 This project should have a license, but vscode kept complaining. I'll bring it back soon.
 
-Thank you for using Control-rs!
+Thank you for using `control-rs`!

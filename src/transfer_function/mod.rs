@@ -196,12 +196,12 @@ mod basic_tf_tests {
         );
         assert_eq!(
             monic_tf.denominator.get(0),
-            Some(&0.0),
+            Some(&1.0),
             "TF denominator incorrect"
         );
         assert_eq!(
             monic_tf.denominator.get(1),
-            Some(&1.0),
+            Some(&0.0),
             "TF denominator incorrect"
         );
     }
@@ -222,12 +222,12 @@ mod basic_tf_tests {
         );
         assert_eq!(
             monic_tf.denominator.get(0),
-            Some(&0.0),
+            Some(&1.0),
             "TF denominator incorrect"
         );
         assert_eq!(
             monic_tf.denominator.get(1),
-            Some(&1.0),
+            Some(&0.0),
             "TF denominator incorrect"
         );
     }

@@ -96,7 +96,7 @@ fn plot(sim: SimData) {
 fn main() {
     // Numerator: [Km]
     // Denominator: JLs^2 + (JR + bL)s + bR + Km^2
-    let motor_tf = TransferFunction::new([Km], [J * L, (J * R + L * b), (R * b) + (Km * Km)]);
+    let motor_tf = TransferFunction::new([Km], [J * L, J * R + L * b, (R * b) + (Km * Km)]);
 
     println!("DC Motor {motor_tf}");
     println!("DC Gain: {:?}", dc_gain(&motor_tf));
@@ -113,7 +113,7 @@ fn main() {
     // of the input voltage. An additional gain can scale the output value to an appropriate speed.
     let compensated_motor_tf = TransferFunction::new(
         [Km / dc_gain(&motor_tf)],
-        [J * L, (J * R + L * b), (R * b) + (Km * Km)],
+        [J * L, J * R + L * b, (R * b) + (Km * Km)],
     );
 
     let compensated_motor_ss = tf2ss(compensated_motor_tf);
