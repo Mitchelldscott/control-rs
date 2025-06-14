@@ -46,10 +46,10 @@ use super::*;
 /// # Example
 ///
 /// ```
-/// use control_rs::state_space::{StateSpace, control_canonical};
+/// use control_rs::state_space::{StateSpace, utils::control_canonical};
 ///
 /// fn main() {
-///     let ss: StateSpace::<_,2,1,1> = control_canonical([1.0], [0.1, 0.0]);
+///     let ss = control_canonical([1.0], [0.1, 0.0]);
 ///     println!("{ss}");
 /// }
 /// ```

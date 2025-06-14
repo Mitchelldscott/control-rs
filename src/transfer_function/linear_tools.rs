@@ -5,12 +5,10 @@ use core::{
     ops::{Div, Neg, Sub},
 };
 
-use nalgebra::{
-    allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimSub, RealField, U1,
-};
+use nalgebra::{allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimSub, RealField, SMatrix, Scalar, U1};
 use num_traits::{Float, One, Zero};
 
-use crate::TransferFunction;
+use crate::{StateSpace, TransferFunction, state_space::utils::control_canonical};
 
 /// Computes the DC gain of a continuous transfer function.
 ///
@@ -206,4 +204,16 @@ where
         numerator,
         denominator,
     }
+}
+
+/// Converts the transfer function to a state space model.
+///
+///
+pub fn tf2ss<T, const N: usize, const M: usize, const L: usize>(tf: TransferFunction<T, M, L>)
+    -> StateSpace<SMatrix<T, N, N>, SMatrix<T, N, 1>, SMatrix<T, 1, N>, SMatrix<T, 1, 1>>
+where
+    T: Float + Scalar,
+{
+    let tf_as_monic = as_monic(&tf);
+    control_canonical(tf_as_monic.numerator, tf_as_monic.denominator)
 }

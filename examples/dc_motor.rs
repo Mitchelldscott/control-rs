@@ -31,8 +31,8 @@
 /// ## Plant
 /// <pre> P(s) = Km / ((Js + b)(Ls + R) + Km^2) (rad/sec / V) </pre>
 use control_rs::{
-    integrators::runge_kutta4, state_space::utils::control_canonical, transfer_function::*,
-    DynamicModel,
+    integrators::runge_kutta4, transfer_function::*,
+    math::systems::DynamicalSystem,
 };
 use nalgebra::{Vector1, Vector2};
 
@@ -49,16 +49,16 @@ type MotorInput = f64;
 type MotorState = Vector2<f64>;
 type MotorOutput = Vector1<f64>;
 
-const SIMSTEPS: usize = 100;
-type SimData = [(f64, f64, f64, f64); SIMSTEPS];
+const SIM_STEPS: usize = 100;
+type SimData = [(f64, f64, f64, f64); SIM_STEPS];
 
-fn sim<M: DynamicModel<MotorInput, MotorState, MotorOutput>>(
+fn sim<M: DynamicalSystem<MotorInput, MotorState, MotorOutput>>(
     model: M,
     dt: f64,
     mut x: MotorState,
 ) -> SimData {
-    let mut sim = [(0.0, x[0], x[1], model.output(x, 1.0)[(0, 0)]); SIMSTEPS];
-    for i in 1..SIMSTEPS {
+    let mut sim = [(0.0, x[0], x[1], model.output(x, 1.0)[(0, 0)]); SIM_STEPS];
+    for i in 1..SIM_STEPS {
         x = runge_kutta4(&model, x, 1.0, 0.0, 0.1, 0.01);
         sim[i] = (i as f64 * dt, x[0], x[1], model.output(x, 1.0)[(0, 0)]);
     }
@@ -100,36 +100,30 @@ fn main() {
 
     println!("DC Motor {motor_tf}");
     println!("DC Gain: {:?}", dc_gain(&motor_tf));
-    println!("System Poles: {:?}", poles(&motor_tf));
+    println!("System Poles: {:?}", poles(&motor_tf).ok());
 
     // simulate for 100 steps
-    let sim_data = sim(motor_ss, 0.1, MotorState::new(0.0, 0.0));
+    let _sim_data = sim(tf2ss(motor_tf), 0.1, MotorState::new(0.0, 0.0));
 
     #[cfg(feature = "std")]
     plot(sim_data);
 
-    // simulates adding a simple feedforward controller that scales the input by the inverse of the dc_gain
-    // for this simple model that will make the dc_gain = 1.
-    // In reality this drives the motor state to the value of the input voltage, additional gain can
-    // scale a the output value to an appropriate speed.
+    // Simulates adding a simple feedforward controller that scales the input by the inverse of the
+    // dc_gain, resulting in a new dc_gain = 1. In reality, this drives the motor state to the value
+    // of the input voltage. An additional gain can scale the output value to an appropriate speed.
     let compensated_motor_tf = TransferFunction::new(
         [Km / dc_gain(&motor_tf)],
         [J * L, (J * R + L * b), (R * b) + (Km * Km)],
     );
 
-    let monic_tf = as_monic(&compensated_motor_tf);
-    let compensated_motor_ss = control_canonical(
-        monic_tf.numerator.coefficients.0[0],
-        monic_tf.denominator.coefficients.0[0],
-    );
-
+    let compensated_motor_ss = tf2ss(compensated_motor_tf);
     println!("DC Motor with gain compensation {compensated_motor_ss}");
 
     // simulate for 100 steps
-    let compensated_sim_data = sim(compensated_motor_ss, 0.1, MotorState::new(0.0, 0.0));
+    let _compensated_sim_data = sim(compensated_motor_ss, 0.1, MotorState::new(0.0, 0.0));
 
     #[cfg(feature = "std")]
-    plot(compensated_sim_data);
+    plot(_compensated_sim_data);
 
     // let combined_tf = feedback(motor_tf, 1.0);
 
