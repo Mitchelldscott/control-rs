@@ -1,10 +1,14 @@
 //! Miscellaneous tools to help work with transfer functions
 //!
-use nalgebra::{
-    allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimName, DimSub, OMatrix,
-    RealField, U1,
+use core::{
+    fmt,
+    ops::{Div, Neg, Sub},
 };
-use num_traits::{Float, Zero};
+
+use nalgebra::{
+    allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimSub, RealField, U1,
+};
+use num_traits::{Float, One, Zero};
 
 use crate::TransferFunction;
 
@@ -44,12 +48,12 @@ use crate::TransferFunction;
 /// }
 /// ```
 pub fn dc_gain<T: Float, const M: usize, const N: usize>(tf: &TransferFunction<T, M, N>) -> T {
-    if let Some(&denominator_constant) = tf.denominator.constant() {
-        if denominator_constant.is_zero() {
+    if N > 0 {
+        if tf.denominator[N - 1].is_zero() {
             T::infinity()
         } else {
-            if let Some(&numerator_constant) = tf.numerator.constant() {
-                numerator_constant / denominator_constant
+            if M > 0 {
+                tf.numerator[M - 1] / tf.denominator[N - 1]
             } else {
                 T::nan()
             }
@@ -83,28 +87,30 @@ pub fn dc_gain<T: Float, const M: usize, const N: usize>(tf: &TransferFunction<T
 ///
 /// ## References
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
-pub fn poles<T, const M: usize, const N: usize>(
-    _tf: &TransferFunction<T, M, N>,
-) -> OMatrix<Complex<T>, DimDiff<Const<N>, U1>, U1>
+pub fn poles<T, const M: usize, const N: usize, const L: usize>(
+    tf: &TransferFunction<T, M, N>,
+) -> Result<[Complex<T>; L], crate::polynomial::utils::NoRoots>
 where
-    T: Copy + Zero + Float + RealField,
-    Const<N>: DimSub<U1>,
-    DimDiff<Const<N>, U1>: DimName + DimSub<U1>,
-    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>
-        + Allocator<DimDiff<Const<N>, U1>, DimDiff<DimDiff<Const<N>, U1>, U1>>
-        + Allocator<DimDiff<DimDiff<Const<N>, U1>, U1>>
-        + Allocator<DimDiff<Const<N>, U1>>,
+    T: Copy
+        + Zero
+        + One
+        + Neg<Output = T>
+        + Sub<Output = T>
+        + Div<Output = T>
+        + PartialOrd
+        + fmt::Debug
+        + RealField,
+    Const<N>: DimSub<U1, Output = Const<L>>,
+    Const<L>: DimSub<U1>,
+    DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
 {
-    // tf.denominator.roots()
-    todo!("unimplemented")
+    crate::polynomial::utils::roots::<T, N, L>(&tf.denominator)
 }
 
-/// Check if the system's poles lie on the left-half plane (LHP), a condition for stability
+/// Check if the system's poles lie on the left-half plane (LHP), a condition for stability.
 ///
-/// Calculates the eigen values of the companion matrix of the transfer function's denominator.
-/// The eigen values of the companion matrix are the roots of the characteristic equation (tf
-/// denominator). If all roots of the characteristic equation lie on the left half-plane (real
-/// part <= 0), then the transfer function is stable.
+/// Calculates the roots of the transfer function's denominator. If all roots of the characteristic
+/// equation lie on the left half-plane (real part <= 0), then the transfer function is stable.
 ///
 /// # Arguments
 ///  * `tf` - the transfer function to check the poles of
@@ -113,14 +119,11 @@ where
 ///  * `bool` - if the transfer functions poles are all <= 0
 ///
 /// # Example
-///
-/// ```rust
+/// ```
 /// use control_rs::transfer_function::{TransferFunction, lhp};
-///
 /// fn main() {
 ///     // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
 ///     let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
-///
 ///     if lhp(&tf) {
 ///         println!("{tf} has stable poles");
 ///     } else {
@@ -131,19 +134,31 @@ where
 ///
 /// ## References
 /// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
-pub fn lhp<T, const M: usize, const N: usize>(tf: &TransferFunction<T, M, N>) -> bool
+pub fn lhp<T, const M: usize, const N: usize, const L: usize>(
+    tf: &TransferFunction<T, M, N>,
+) -> bool
 where
-    T: Copy + Zero + Float + RealField,
-    Const<N>: DimSub<U1>,
-    DimDiff<Const<N>, U1>: DimName + DimSub<U1>,
-    DefaultAllocator: Allocator<DimDiff<Const<N>, U1>, DimDiff<Const<N>, U1>>
-        + Allocator<DimDiff<Const<N>, U1>, DimDiff<DimDiff<Const<N>, U1>, U1>>
-        + Allocator<DimDiff<DimDiff<Const<N>, U1>, U1>>
-        + Allocator<DimDiff<Const<N>, U1>>,
+    T: Copy
+        + Zero
+        + One
+        + Neg<Output = T>
+        + Sub<Output = T>
+        + Div<Output = T>
+        + PartialOrd
+        + fmt::Debug
+        + Float
+        + RealField,
+    Const<N>: DimSub<U1, Output = Const<L>>,
+    Const<L>: DimSub<U1>,
+    DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
 {
-    poles(&tf)
-        .iter()
-        .all(|&pole| !pole.re.is_nan() && pole.re < T::zero())
+    if let Ok(roots) = poles::<T, M, N, L>(&tf) {
+        roots
+            .iter()
+            .all(|&pole| !pole.re.is_nan() && pole.re < T::zero())
+    } else {
+        false
+    }
 }
 
 /// Helper function to create a state space model from a transfer function
@@ -155,7 +170,7 @@ where
 /// * `tf` - the transfer function that will be converted to monic arrays
 ///
 /// # Returns
-/// * `TransferFunction` - transferfunction scaled by `self.denominator[0]`
+/// * `TransferFunction` - transfer function scaled by `self.denominator[0]`
 ///
 /// # Example
 ///
@@ -174,14 +189,21 @@ pub fn as_monic<T, const M: usize, const N: usize>(
 where
     T: Copy + Zero + Float,
 {
-    let scale = if let Some(&denominator_leading_coefficient) = tf.denominator.leading_coefficient()
-    {
+    let scale = if let Some(&denominator_leading_coefficient) = tf.denominator.get(0) {
         denominator_leading_coefficient
     } else {
         T::one()
     };
+    let mut numerator = tf.numerator.clone();
+    let mut denominator = tf.denominator.clone();
+    numerator
+        .iter_mut()
+        .for_each(|b_i| *b_i = b_i.clone() / scale);
+    denominator
+        .iter_mut()
+        .for_each(|a_i| *a_i = a_i.clone() / scale);
     TransferFunction {
-        numerator: tf.numerator / scale,
-        denominator: tf.denominator / scale,
+        numerator,
+        denominator,
     }
 }

@@ -203,10 +203,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     where
         I: IntoIterator<Item = T>,
     {
-        Self::from_data(utils::array_from_iterator_with_default(
-            iterator,
-            T::zero(),
-        ))
+        Self::from_data(utils::array_from_iterator_with_default(iterator, T::zero()))
     }
 
     /// Create a polynomial from another polynomial with a different capacity.

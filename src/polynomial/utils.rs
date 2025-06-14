@@ -1,14 +1,13 @@
 //! Provides core logic of a [Polynomial] without edge case handling and explicit return types.
-//! 
+//!
 //! This is used by other parts of [control_rs] that perform their own specialized edge cases and
 //! error handling. Users should call the provided [Polynomial] interface.
 
 use core::{
-    fmt,
-    ptr::copy_nonoverlapping,
-    array,
+    array, fmt,
     mem::MaybeUninit,
     ops::{AddAssign, Div, Mul, Neg, Sub, SubAssign},
+    ptr::copy_nonoverlapping,
 };
 use nalgebra::{
     allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax,
@@ -98,11 +97,7 @@ const unsafe fn array_from_slice_copy<T: Copy, const N: usize>(src: &[T]) -> [T;
     // * `src` must be [valid] for reads of `count * size_of::<T>()` bytes.
     // * `dst` must be [valid] for writes of `count * size_of::<T>()` bytes.
     // * Both `src` and `dst` must be properly aligned.
-    copy_nonoverlapping(
-        src.as_ptr(),
-        dst.as_mut_ptr() as *mut T,
-        N,
-    );
+    copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr() as *mut T, N);
     // SAFETY: All elements are initialized
     dst.assume_init()
 }
