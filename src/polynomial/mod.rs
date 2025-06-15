@@ -1,7 +1,7 @@
 //! Array-based univariate-polynomial
 //!
 //! This module contains a base implementation of a generic array polynomial. To guarantee safe and
-//! deterministic implementations of all arithmatic, some implementations are only available for
+//! deterministic implementations of all arithmetic, some implementations are only available for
 //! certain specializations.
 //!
 //! # Examples
@@ -65,7 +65,7 @@ pub use aliases::{Constant, Line, Quadratic, Cubic, Quartic, Quintic};
 mod basic_tests;
 
 #[cfg(test)]
-mod arithmatic_tests;
+mod arithmetic_tests;
 // ===============================================================================================
 //      Polynomial
 // ===============================================================================================
@@ -346,7 +346,7 @@ impl<T: Clone, const N: usize> Polynomial<T, N> {
     /// Evaluate the polynomial using Horner's method.
     ///
     /// # Arguments
-    /// * `value` - A variable that supports arithmatic with the polynomials coefficients.
+    /// * `value` - A variable that supports arithmetic with the polynomials coefficients.
     ///
     /// # Returns
     /// * `T` - The value of the polynomial at the given value.
@@ -653,7 +653,7 @@ where
 }
 
 // ===============================================================================================
-//      Polynomial-Scalar Arithmatic
+//      Polynomial-Scalar Arithmetic
 // ===============================================================================================
 
 /// # -Polynomial<T, N>
@@ -971,7 +971,7 @@ macro_rules! impl_left_scalar_ops {
 impl_left_scalar_ops!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
 
 // ===============================================================================================
-//      Polynomial-Polynomial Arithmatic
+//      Polynomial-Polynomial Arithmetic
 // ===============================================================================================
 
 /// # Polynomial<T, N> + Polynomial<T, M>
