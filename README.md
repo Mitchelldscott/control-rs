@@ -1,10 +1,14 @@
 # Control-rs
 
-`control-rs` is a numerical modeling and analysis library made for embedded systems. The crate is inspired by 
-MATLAB’s Control System Toolbox to provide a familiar programming interface, while leveraging Rust's static type 
-system and ownership model to ensure determinism, safety and blazing fast implementations. The vision for this crate 
-is to provide an open source foundation to develop high performance embedded systems like electronic speed controllers, 
-battery management systems and even flight controllers.
+`control-rs` is a Rust library for control system modeling and design, built for real-time embedded applications. It 
+offers a familiar interface, inspired by MATLAB’s Control System Toolbox, while embracing Rust’s compile-time safety 
+guarantees and memory model. All data structures are statically sized, with dimensionality and type constraints 
+enforced at compile time—eliminating the need for heap allocation and enabling deterministic behavior. 
+
+The crate is `no_std` compatible and supports both fixed-point and floating-point numeric types, making it suitable 
+for deployment on a wide range of microcontrollers. In the future `control-rs` hopes to provide template projects for 
+components like motor controllers, battery management systems, and autonomous navigation logic. The goal is to provide 
+a reliable and high performance, open-source foundation for embedded control software in robotics and aerospace.
 
 ## Features
 
