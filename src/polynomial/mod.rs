@@ -213,7 +213,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     ///
     /// ```
     /// use control_rs::Polynomial;
-    /// let p = Polynomial::from_iterator((1..6));
+    /// let p = Polynomial::from_iterator(1..6);
     /// assert_eq!(p, Polynomial::from_data([1,2,3,4,5]));
     /// ```
     #[inline]

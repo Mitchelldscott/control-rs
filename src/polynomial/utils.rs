@@ -79,28 +79,6 @@ where
     }
 }
 
-// /// # Safety
-// ///
-// /// This function performs a raw memory copy of `N` elements from the input slice `src`
-// /// into a newly constructed `[T; N]` array using [`copy_nonoverlapping`].
-// ///
-// /// ## Preconditions
-// /// To avoid undefined behavior, the caller **must** ensure the following:
-// /// * `src.len() >= N`: The slice must contain **at least** `N` valid elements.
-// /// * `src.as_ptr()` must be properly aligned for type `T` (This is guaranteed for slices of `T`,
-// ///   unless manually constructed unsafely).
-// #[inline]
-// const unsafe fn array_from_slice_copy<T: Copy, const N: usize>(src: &[T]) -> [T; N] {
-//     let mut dst: MaybeUninit<[T; N]> = MaybeUninit::uninit();
-//     // Behavior is undefined if any of the following conditions are violated:
-//     // * `src` must be [valid] for reads of `count * size_of::<T>()` bytes.
-//     // * `dst` must be [valid] for writes of `count * size_of::<T>()` bytes.
-//     // * Both `src` and `dst` must be properly aligned.
-//     copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr().cast::<T>(), N);
-//     // SAFETY: All elements are initialized
-//     dst.assume_init()
-// }
-
 /// Finds the **last** non-zero value in an array.
 ///
 /// # Returns
