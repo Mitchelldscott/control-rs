@@ -202,6 +202,7 @@ pub fn tf2ss<T, const N: usize, const M: usize, const L: usize>(
 ) -> StateSpace<SMatrix<T, N, N>, SMatrix<T, N, 1>, SMatrix<T, 1, N>, SMatrix<T, 1, 1>>
 where
     T: Float + Scalar,
+    Const<L>: DimSub<U1, Output = Const<N>>,
 {
     let tf_as_monic = as_monic(&tf);
     control_canonical(tf_as_monic.numerator, tf_as_monic.denominator)

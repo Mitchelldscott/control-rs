@@ -108,6 +108,15 @@ const unsafe fn array_from_slice_copy<T: Copy, const N: usize>(src: &[T]) -> [T;
 /// * `Option<usize>`
 ///     * `Some(index)` - largets non-zero index
 ///     * `None` - if the length is zero or all elements are zero
+///
+/// # Example
+/// ```
+/// use control_rs::polynomial::utils::largest_nonzero_index;
+/// assert_eq!(largest_nonzero_index::<u8>(&[]), None);
+/// assert_eq!(largest_nonzero_index(&[1]), Some(0));
+/// assert_eq!(largest_nonzero_index(&[0, 1]), Some(1));
+/// assert_eq!(largest_nonzero_index(&[1, 0]), Some(0));
+/// ```
 #[inline]
 pub fn largest_nonzero_index<T: Zero>(coefficients: &[T]) -> Option<usize> {
     for (i, element) in coefficients.iter().enumerate().rev() {
@@ -128,8 +137,9 @@ pub fn largest_nonzero_index<T: Zero>(coefficients: &[T]) -> Option<usize> {
 /// # Examples
 /// ```
 /// use control_rs::polynomial::utils::differentiate;
-/// // d/dt(x^2 + x + 1) = 2x + 1
-/// assert_eq!(differentiate(&[1, 1, 1]), [1, 2]);
+/// assert_eq!(differentiate(&[0]), []); // d/dt(1) = 0 base case is an empty array
+/// assert_eq!(differentiate(&[1, 2]), [2]); // d/dt(2x + 1) = 2
+/// assert_eq!(differentiate(&[1, 1, 1]), [1, 2]); // d/dt(x^2 + x + 1) = 2x + 1
 /// ```
 #[inline]
 pub fn differentiate<T, const N: usize, const M: usize>(coefficients: &[T; N]) -> [T; M]
@@ -160,8 +170,9 @@ where
 /// # Example
 /// ```
 /// use control_rs::polynomial::utils::integrate;
-/// // d/dx(x^2 + x + 1) = 2x + 1
-/// assert_eq!(integrate(&[1, 2], 1), [1, 1, 1]);
+/// assert_eq!(integrate(&[], 0), [0]); // d/dt(1) = 0 base case is an empty array
+/// assert_eq!(integrate(&[2], 1), [1, 2]); // d/dt(2x + 1) = 2
+/// assert_eq!(integrate(&[1, 2], 1), [1, 1, 1]); // d/dt(x^2 + x + 1) = 2x + 1
 /// ```
 #[inline]
 pub fn integrate<T, const N: usize, const M: usize>(coefficients: &[T; N], constant: T) -> [T; M]
@@ -231,7 +242,7 @@ where
     if !leading_coefficient.is_zero() {
         let mut companion_iter = companion.iter_mut();
         if let Some(row) = companion_iter.next() {
-            for (companion_i, coefficient) in row.iter_mut().zip(coefficients.iter()) {
+            for (companion_i, coefficient) in row.iter_mut().rev().zip(coefficients.iter()) {
                 *companion_i = coefficient.clone() / leading_coefficient.clone();
             }
             for (i, row) in companion_iter.enumerate() {
@@ -373,7 +384,7 @@ where
 /// let p2 = [1i32; 2];
 /// let mut p3 = [0i32; 3];
 /// mul_generic(&mut p3, &p1, &p2);
-/// assert_eq!(p3, [1i32, 1i32, 1i32], "wrong multiplication result");
+/// assert_eq!(p3, [1i32, 2i32, 1i32], "wrong multiplication result");
 /// ```
 pub fn mul_generic<T, const N: usize, const M: usize, const L: usize>(
     result: &mut [T; L],
@@ -409,7 +420,7 @@ pub fn mul_generic<T, const N: usize, const M: usize, const L: usize>(
 /// let p2 = [1i32; 2];
 /// let mut p3 = [0i32; 2];
 /// div_generic(&mut p3, &p1, &p2);
-/// assert_eq!(p3, [1i32, 1i32], "wrong division result");
+/// assert_eq!(p3, [1i32, 0i32], "wrong division result");
 /// ```
 ///
 /// # Algorithm

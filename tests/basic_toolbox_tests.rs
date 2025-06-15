@@ -54,7 +54,7 @@ mod basic_model_tests {
             SMatrix<ScalarType, 1, 2>,
             SMatrix<ScalarType, 1, 1>,
         > {
-            control_canonical([1.0], [0.1, 0.0])
+            control_canonical([1.0, 0.0], [0.1, 0.0, 1.0])
         }
     }
 

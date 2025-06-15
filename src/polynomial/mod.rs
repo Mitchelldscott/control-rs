@@ -160,7 +160,7 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///
     /// ```
     /// use control_rs::Polynomial;
-    /// let p = Polynomial::new([]);
+    /// let p = Polynomial::<f32, 0>::new([]);
     /// assert_eq!(p.is_empty(), true);
     /// ```
     #[allow(clippy::inline_always)]
@@ -215,9 +215,8 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     ///
     /// ```
     /// use control_rs::Polynomial;
-    /// let p = Polynomial::from_iterator([1, 2, 3, 4, 5]);
-    /// assert_eq!(p.degree(), Some(4));
-    /// assert_eq!(p.constant(), Some(&1));
+    /// let p = Polynomial::from_iterator((1..6));
+    /// assert_eq!(p, Polynomial::from_data([1,2,3,4,5]));
     /// ```
     #[inline]
     pub fn from_iterator<I>(iterator: I) -> Self
@@ -244,8 +243,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// use control_rs::Polynomial;
     /// let quadratic = Polynomial::new([1, 0, 0]);
     /// let extended_quadratic = quadratic.resize::<4>();
-    /// assert_eq!(*extended_quadratic.degree().unwrap(), 2);
-    /// assert_eq!(*extended_quadratic.leading_coefficient().unwrap(), 0);
+    /// assert_eq!(extended_quadratic, Polynomial::from_data([0, 0, 1, 0]));
     /// ```
     /// TODO: Unit Test
     #[inline]
@@ -307,11 +305,10 @@ impl<T: Copy, const N: usize> Polynomial<T, N> {
     /// # Example
     /// ```
     /// use control_rs::Polynomial;
-    /// let p = Polynomial::new([1, 0, 0]);
-    /// assert_eq!(p.degree(), Some(2));
-    /// assert_eq!(p.leading_coefficient(), Some(&1));
+    /// assert_eq!(Polynomial::<i8, 0>::new([]), Polynomial::from_iterator([])); // degenerate
+    /// assert_eq!(Polynomial::new([1, 2, 3]), Polynomial::from_data([3, 2, 1])); // x^2 + 2x + 3
+    /// assert_eq!(Polynomial::new([0.0, 1.0, 2.0]), Polynomial::from_iterator([2.0, 1.0])); // x + 2
     /// ```
-    ///
     /// TODO: Unit Test
     #[inline]
     pub const fn new(coefficients: [T; N]) -> Self {
@@ -337,6 +334,11 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     /// * `Option<usize>`
     ///     * `Some(degree)` - power of the highest order non-zero coefficient
     ///     * `None` - if the length is zero or all coefficients are zero
+    /// # Example
+    /// ```
+    /// use control_rs::Polynomial;
+    /// assert_eq!(Polynomial::new([1, 1]).degree(), Some(1));
+    /// ```
     #[inline]
     pub fn degree(&self) -> Option<usize> {
         utils::largest_nonzero_index(&self.coefficients)
@@ -352,14 +354,11 @@ impl<T: Clone, const N: usize> Polynomial<T, N> {
     /// * `T` - The value of the polynomial at the given value.
     ///
     /// # Example
-    ///
     /// ```rust
     /// use control_rs::polynomial::Polynomial;
-    ///
     /// let p = Polynomial::new([1, 2, 3]);
-    /// let result = p.evaluate(&2);
+    /// assert_eq!(p.evaluate(&2), 11);
     /// ```
-    ///
     /// TODO: Unit Test
     #[inline]
     pub fn evaluate<U>(&self, value: &U) -> U
@@ -584,7 +583,7 @@ impl<T: Clone + Zero + One + AddAssign + Div<Output = T>, const N: usize> Polyno
     /// # Examples
     /// ```
     /// use control_rs::polynomial::Polynomial;
-    /// let p1 = Polynomial::new([2_i32, 6_i32]); // 6x + 2
+    /// let p1 = Polynomial::from_data([2_i32, 6_i32]); // 6x + 2
     /// assert_eq!(
     ///     p1.integral(1i32),
     ///     Polynomial::from_data([1_i32, 2_i32, 3_i32]), // 3x^2 + 2x + 1
@@ -699,7 +698,9 @@ impl<T: Clone + Neg<Output = T>, const N: usize> Neg for Polynomial<T, N> {
 /// use control_rs::Polynomial;
 /// let p1 = Polynomial::new([]);
 /// let p2 = p1 * 1;
-/// assert_eq!(*p2.constant(), None);
+/// assert_eq!(p2.constant(), None);
+/// let p3 = Polynomial::<i32, 3>::from_element(1);
+/// assert_eq!(p3 * 2, Polynomial::<i32, 3>::from_element(2));
 /// ```
 impl<T: Clone + Mul<Output = T>, const N: usize> Mul<T> for Polynomial<T, N> {
     type Output = Self;
@@ -719,9 +720,9 @@ impl<T: Clone + Mul<Output = T>, const N: usize> Mul<T> for Polynomial<T, N> {
 /// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
-/// let mut p1 = Polynomial::new([]);
+/// let mut p1 = Polynomial::new([1]);
 /// p1 *= 2;
-/// assert_eq!(*p1.constant(), None);
+/// assert_eq!(p1.constant(), Some(&2));
 /// ```
 impl<T: Clone + MulAssign, const N: usize> MulAssign<T> for Polynomial<T, N> {
     fn mul_assign(&mut self, rhs: T) {
@@ -736,9 +737,9 @@ impl<T: Clone + MulAssign, const N: usize> MulAssign<T> for Polynomial<T, N> {
 /// # Example
 /// ```
 /// use control_rs::Polynomial;
-/// let p1 = Polynomial::new([]);
-/// let p2 = p1 / 1;
-/// assert_eq!(*p2.constant(), None);
+/// let p1 = Polynomial::new([3, 6, 9]);
+/// let p2 = p1 / 3;
+/// assert_eq!(p2, Polynomial::new([1, 2, 3]));
 /// ```
 impl<T: Clone + Div<Output = T>, const N: usize> Div<T> for Polynomial<T, N> {
     type Output = Self;
@@ -758,9 +759,9 @@ impl<T: Clone + Div<Output = T>, const N: usize> Div<T> for Polynomial<T, N> {
 /// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
-/// let mut p1 = Polynomial::new([]);
-/// p1 /= 2;
-/// assert_eq!(*p1.constant(), None);
+/// let mut p1 = Polynomial::new([3, 6, 9]);
+/// p1 /= 3;
+/// assert_eq!(p1, Polynomial::new([1, 2, 3]));
 /// ```
 impl<T: Clone + DivAssign, const N: usize> DivAssign<T> for Polynomial<T, N> {
     fn div_assign(&mut self, rhs: T) {
@@ -775,9 +776,9 @@ impl<T: Clone + DivAssign, const N: usize> DivAssign<T> for Polynomial<T, N> {
 /// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
-/// let p1 = Polynomial::new([]);
+/// let p1 = Polynomial::new([1, 2, 3]);
 /// let p2 = p1 % 2;
-/// assert_eq!(*p2.constant().unwrap(), None);
+/// assert_eq!(p2, Polynomial::new([1, 0, 1]));
 /// ```
 /// TODO: Unit Test
 impl<T: Clone + Rem<Output = T>, const N: usize> Rem<T> for Polynomial<T, N> {
@@ -797,9 +798,9 @@ impl<T: Clone + Rem<Output = T>, const N: usize> Rem<T> for Polynomial<T, N> {
 /// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
-/// let mut p1 = Polynomial::new([]);
+/// let mut p1 = Polynomial::new([1, 2, 3]);
 /// p1 %= 2;
-/// assert_eq!(*p1.constant().unwrap(), None);
+/// assert_eq!(p1, Polynomial::new([1, 0, 1]));
 /// ```
 /// TODO: Unit Test
 impl<T: Clone + RemAssign, const N: usize> RemAssign<T> for Polynomial<T, N> {
@@ -840,7 +841,7 @@ impl_generic_left_scalar_mul!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64
 /// use control_rs::Polynomial;
 /// let p1 = Polynomial::new([]);
 /// let p2 = p1 + 1;
-/// assert_eq!(*p2.constant().unwrap(), 1);
+/// assert_eq!(p2.constant(), Some(&1));
 /// ```
 impl<T> Add<T> for Polynomial<T, 0> {
     type Output = Polynomial<T, 1>;
@@ -862,7 +863,7 @@ impl<T> Add<T> for Polynomial<T, 0> {
 /// use control_rs::Polynomial;
 /// let p1 = Polynomial::new([]);
 /// let p2 = p1 - 1;
-/// assert_eq!(*p2.constant().unwrap(), -1);
+/// assert_eq!(p2.constant(), Some(&-1));
 /// ```
 impl<T: Neg<Output = T>> Sub<T> for Polynomial<T, 0> {
     type Output = Polynomial<T, 1>;
@@ -913,9 +914,8 @@ impl_base_case_left_scalar_arithmatic!(i8, u8, i16, u16, i32, u32, isize, usize,
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([]);
-/// let p2 = Polynomial::new([1]);
-/// let p3 = p1 + p2;
-/// assert_eq!(*p3.constant().unwrap(), 1);
+/// let p2 = Polynomial::new([1, 0, 1]);
+/// assert_eq!(p1 + p2, Polynomial::new([1, 0, 1]));
 /// ```
 /// TODO: Unit Test
 impl<T: Clone, const N: usize> Add<Polynomial<T, N>> for Polynomial<T, 0> {
@@ -932,9 +932,8 @@ impl<T: Clone, const N: usize> Add<Polynomial<T, N>> for Polynomial<T, 0> {
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([]);
-/// let p2 = Polynomial::new([1]);
-/// let p3 = p1 - p2;
-/// assert_eq!(*p3.constant().unwrap(), -1);
+/// let p2 = Polynomial::new([1, 2, 3]);
+/// assert_eq!(p1 - p2, Polynomial::new([-1, -2, -3]));
 /// ```
 /// TODO: Unit Test
 impl<T: Clone + Neg<Output = T>, const N: usize> Sub<Polynomial<T, N>> for Polynomial<T, 0> {

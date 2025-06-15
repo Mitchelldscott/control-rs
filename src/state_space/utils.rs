@@ -3,7 +3,7 @@
 
 use core::ops::{Add, Div, Mul, Neg};
 
-use nalgebra::{SMatrix, Scalar};
+use nalgebra::{SMatrix, Scalar, Const, DimSub, U1};
 use num_traits::{One, Zero};
 
 use super::StateSpace;
@@ -61,12 +61,13 @@ pub fn control_canonical<T, const N: usize, const M: usize, const L: usize>(
     a: [T; L],
 ) -> StateSpace<SMatrix<T, N, N>, SMatrix<T, N, 1>, SMatrix<T, 1, N>, SMatrix<T, 1, 1>>
 where
-    T: 'static + Copy + Scalar + Zero + One + Neg<Output = T>,
+    T: 'static + Copy + Scalar + Zero + One + Neg<Output = T> + Div<Output = T>,
+    Const<L>: DimSub<U1, Output = Const<N>>,
 {
     StateSpace {
         a: SMatrix::from_fn(|i, j| {
             if i == N - 1 {
-                -a[L - j - 1]
+                a[N - j - 1].neg() / a[L - 1]
             } else if i + 1 == j {
                 T::one()
             } else {
@@ -109,22 +110,8 @@ where
 /// # Example
 ///
 /// ```
-/// use control_rs::state_space::{StateSpace, utils::zoh};
-/// let ss = StateSpace::new(
-///   [
-///     [0.0, 1.0],
-///     [0.0, -0.1]
-///   ],
-///   [
-///     [0.0],
-///     [1.0]
-///   ],
-///   [
-///     [1.0, 0.0]
-///   ],
-///   [[0.0]]
-/// );
-///
+/// use control_rs::state_space::utils::{control_canonical, zoh};
+/// let ss = control_canonical([1.0, 1.0], [1.0, 1.0, 1.0]);
 /// let ssd = zoh(&ss, 0.1_f32);
 /// println!("{ssd}");
 /// ```

@@ -64,15 +64,8 @@ pub mod utils;
 /// let b = Matrix2x1::new(0.0, 1.0);
 /// let c = Matrix1x2::new(1.0, 0.0);
 /// let d = Matrix1::new(0.0);
-///
 /// // Create the StateSpace model
-/// let ss = StateSpace {
-///     a,
-///     b,
-///     c,
-///     d,
-/// };
-///
+/// let ss = StateSpace { a, b, c, d, };
 /// println!("{ss}");
 /// ```
 pub struct StateSpace<A, B, C, D> {
@@ -101,16 +94,14 @@ impl<A, B, C, D> StateSpace<A, B, C, D> {
     /// # Example
     ///
     /// ```
-    /// use nalgebra::{Matrix2, Matrix2x1, Matrix1x2};
-    /// use control_rs::{TransferFunction, StateSpace};
-    ///
+    /// use control_rs::StateSpace;
     /// let ss = StateSpace::new(
     ///      [[0.0, 1.0], [0.0, -0.1]],
     ///      [[0.0], [1.0]],
     ///      [[1.0, 0.0]],
     ///      [[0.0]]
     ///  );
-    ///  println!("{ss}");
+    ///  println!("{ss:?}");
     /// ```
     pub const fn new(a: A, b: B, c: C, d: D) -> Self {
         Self { a, b, c, d }
@@ -146,6 +137,22 @@ where
 // ===============================================================================================
 
 impl<A, B, C, D> fmt::Display for StateSpace<A, B, C, D>
+where
+    A: fmt::Display,
+    B: fmt::Display,
+    C: fmt::Display,
+    D: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "StateSpace:\nA{:}B{:}C{:}D{:}",
+            self.a, self.b, self.c, self.d
+        )
+    }
+}
+
+impl<A, B, C, D> fmt::Debug for StateSpace<A, B, C, D>
 where
     A: fmt::Display,
     B: fmt::Display,
