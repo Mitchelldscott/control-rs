@@ -58,7 +58,7 @@ impl<T: AddAssign> AddAssign<T> for Constant<T> {
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([0]);
 /// let p2 = p1 - 1;
-/// assert_eq!(*p2.constant().unwrap(), 1);
+/// assert_eq!(*p2.constant().unwrap(), -1);
 /// ```
 impl<T: Clone + Sub<Output = T>> Sub<T> for Constant<T> {
     type Output = Self;

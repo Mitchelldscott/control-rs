@@ -555,7 +555,7 @@ impl<T: Clone + AddAssign + Zero + One, const N: usize> Polynomial<T, N> {
     /// # Examples
     /// ```
     /// use control_rs::polynomial::Polynomial;
-    /// let p1 = Polynomial::new([1_i32, 2_i32, 3_i32]); // Represents 3x^2 + 2x + 1
+    /// let p1 = Polynomial::new([3_i32, 2_i32, 1_i32]); // Represents 3x^2 + 2x + 1
     /// assert_eq!(
     ///     p1.derivative(),
     ///     Polynomial::from_data([2_i32, 6_i32]), // 6x + 2
@@ -608,7 +608,7 @@ impl<T: Copy + Zero + One + Neg<Output = T> + Div<Output = T>, const N: usize> P
     /// use control_rs::polynomial::Polynomial;
     ///
     /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]); // x^3 - 6x^2 + 11x - 6
-    /// assert_eq!(p.companion(), [[6.0, -11.0, 6.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]], "incorrect companion");
+    /// assert_eq!(p.companion(), [[6.0, -11.0, 6.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], "incorrect companion");
     /// ```
     // TODO: Unit test
     pub fn companion<const M: usize>(&self) -> [[T; M]; M]
@@ -913,7 +913,7 @@ impl_base_case_left_scalar_arithmatic!(i8, u8, i16, u16, i32, u32, isize, usize,
 /// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
-/// let p1 = Polynomial::new([]);
+/// let p1 = Polynomial::new([0_i16; 0]);
 /// let p2 = Polynomial::new([1, 0, 1]);
 /// assert_eq!(p1 + p2, Polynomial::new([1, 0, 1]));
 /// ```
@@ -931,7 +931,7 @@ impl<T: Clone, const N: usize> Add<Polynomial<T, N>> for Polynomial<T, 0> {
 /// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
-/// let p1 = Polynomial::new([]);
+/// let p1 = Polynomial::<i32, 0>::new([]);
 /// let p2 = Polynomial::new([1, 2, 3]);
 /// assert_eq!(p1 - p2, Polynomial::new([-1, -2, -3]));
 /// ```

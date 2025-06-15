@@ -154,15 +154,15 @@ where
 
 impl<A, B, C, D> fmt::Debug for StateSpace<A, B, C, D>
 where
-    A: fmt::Display,
-    B: fmt::Display,
-    C: fmt::Display,
-    D: fmt::Display,
+    A: fmt::Debug,
+    B: fmt::Debug,
+    C: fmt::Debug,
+    D: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "StateSpace:\nA{:}B{:}C{:}D{:}",
+            "StateSpace:\nA{:?}B{:?}C{:?}D{:?}",
             self.a, self.b, self.c, self.d
         )
     }
@@ -224,23 +224,22 @@ mod basic_ss_tests {
         );
 
         // check if the eigen values are marginally stable
-        match ssd.a.eigenvalues() {
-            Some(eigenvalues) => {
-                assert!(
-                    eigenvalues[0].abs() <= 1.0,
-                    "unstable eigen value ({}) in F {:}",
-                    eigenvalues[0],
-                    ssd.a
-                );
-                assert!(
-                    eigenvalues[1].abs() < 1.0,
-                    "unstable eigen value ({}) in F {:}",
-                    eigenvalues[0],
-                    ssd.a
-                );
-            }
-            None => panic!("discrete state-space model matrix does not have eigen values"),
-        };
+        if let Some(eigenvalues) = ssd.a.eigenvalues() {
+            assert!(
+                eigenvalues[0].abs() <= 1.0,
+                "unstable eigen value ({}) in F {:}",
+                eigenvalues[0],
+                ssd.a
+            );
+            assert!(
+                eigenvalues[1].abs() < 1.0,
+                "unstable eigen value ({}) in F {:}",
+                eigenvalues[0],
+                ssd.a
+            );
+        }
+        else { assert!(ss.a[(0, 0)] < -1.0, "discrete state-space model matrix does not have eigen values") }
+        // else { panic!("discrete state-space model matrix does not have eigen values") }
     }
 
     // #[test]

@@ -211,8 +211,8 @@ where
 /// # Example
 /// ```
 /// use control_rs::polynomial::utils::companion;
-/// let coefficients = [20.0, -14.0, 2.0]; // p(x) = 2x^2 - 14x + 20
-/// assert_eq!(companion(&coefficients), [[7.0, -10.0], [1.0, 0.0]]);
+/// let coefficients = [6, -7, 0, 1]; // p(x) = x^3 - 7x + 6
+/// assert_eq!(companion(&coefficients), [[0, 7, -6], [1, 0, 0], [0, 1, 0]]);
 /// ```
 pub fn companion<T, const N: usize, const M: usize>(coefficients: &[T; N]) -> [[T; M]; M]
 where
@@ -224,26 +224,12 @@ where
 
     // SAFETY: `M` is a valid index because Const<N> impl DimSub<U1, Output = Const<M>> so `N > 0`
     // and `N - 1 = M`
-    let leading_coefficient = unsafe { coefficients.get_unchecked(M).clone() };
-    // if 0 < M && !leading_coefficient.is_zero() {
-    //     unsafe {
-    //         for i in 0..M {
-    //             // SAFETY: `i < M` i is a valid index for either dimension of the companion
-    //             // SAFETY: `i < M < N` i is a valid index for either dimension of the companion
-    //             *companion.get_unchecked_mut(i).get_unchecked_mut(M - i) =
-    //                 coefficients.get_unchecked(i).clone() / leading_coefficient.clone();
-    //         }
-    //         for i in 1..M {
-    //             // SAFETY: `0 < i < M` i is a valid index for either dimension of companion
-    //             *companion.get_unchecked_mut(i).get_unchecked_mut(i - 1) = T::one();
-    //         }
-    //     }
-    // }
-    if !leading_coefficient.is_zero() {
+    let leading_coefficient_neg = unsafe { coefficients.get_unchecked(M).clone().neg() };
+    if !leading_coefficient_neg.is_zero() {
         let mut companion_iter = companion.iter_mut();
         if let Some(row) = companion_iter.next() {
             for (companion_i, coefficient) in row.iter_mut().rev().zip(coefficients.iter()) {
-                *companion_i = coefficient.clone() / leading_coefficient.clone();
+                *companion_i = coefficient.clone() / leading_coefficient_neg.clone();
             }
             for (i, row) in companion_iter.enumerate() {
                 row[i] = T::one();
@@ -255,6 +241,7 @@ where
 
 /// Temporary marker struct indicating that the roots function was not able to calculate a
 /// solution.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub struct NoRoots;
 
 /// Computes the roots of the polynomial.
@@ -263,9 +250,13 @@ pub struct NoRoots;
 ///
 /// # Example
 /// ```
-/// use control_rs::polynomial::Polynomial;
+/// use nalgebra::Complex;
+/// use control_rs::{polynomial::Polynomial, assert_f64_eq};
 /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]); // x^3 - 6x^2 + 11x - 6
-/// // assert_eq!(p.roots(), Ok([1.0, 1.0, 1.0]), "Incorrect polynomial roots");
+/// let roots = p.roots().expect("Failed to calculate roots");
+/// assert_f64_eq!(roots[0].re, 3.0, 1.5e-14); // having precision issues...
+/// assert_f64_eq!(roots[1].re, 2.0, 1e-14);
+/// assert_f64_eq!(roots[2].re, 1.0);
 /// ```
 /// TODO: Docs + Unit Tests + better return object + use recursion for leading zero cases
 pub fn roots<T, const N: usize, const M: usize>(
