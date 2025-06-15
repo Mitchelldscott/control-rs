@@ -1,9 +1,9 @@
 //! Type aliases of [Polynomial].
 
+use crate::Polynomial;
 use core::ops::{DivAssign, MulAssign};
 use nalgebra::{Const, DimSub, U1};
 use num_traits::Zero;
-use crate::Polynomial;
 
 /// Specialization of `Polynomial` that has only the constant term.
 pub type Constant<T> = Polynomial<T, 1>;

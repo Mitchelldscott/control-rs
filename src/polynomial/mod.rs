@@ -39,7 +39,8 @@ use core::{
     slice,
 };
 use nalgebra::{
-    allocator::Allocator, Complex, Const, DefaultAllocator, DimAdd, DimMax, DimDiff, DimSub, RealField, U1,
+    allocator::Allocator, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax, DimSub,
+    RealField, U1,
 };
 use num_traits::{Num, One, Zero};
 
@@ -54,8 +55,7 @@ pub mod utils;
 // ===============================================================================================
 
 mod aliases;
-pub use aliases::{Constant, Line, Quadratic, Cubic, Quartic, Quintic};
-
+pub use aliases::{Constant, Cubic, Line, Quadratic, Quartic, Quintic};
 
 // ===============================================================================================
 //      Polynomial Tests
@@ -993,9 +993,7 @@ where
     /// Adds the coefficients of a polynomial together
     #[inline]
     fn add(self, rhs: Polynomial<T, M>) -> Self::Output {
-        Polynomial::<T, L>::from_data(
-            utils::add_generic(&self.coefficients, &rhs.coefficients)
-        )
+        Polynomial::<T, L>::from_data(utils::add_generic(&self.coefficients, &rhs.coefficients))
     }
 }
 
@@ -1044,9 +1042,7 @@ where
     /// Subtracts the coefficients of a polynomial from each other
     #[inline]
     fn sub(self, rhs: Polynomial<T, M>) -> Self::Output {
-        Polynomial::<T, L>::from_data(
-            utils::sub_generic(&self.coefficients, &rhs.coefficients)
-        )
+        Polynomial::<T, L>::from_data(utils::sub_generic(&self.coefficients, &rhs.coefficients))
     }
 }
 
@@ -1096,9 +1092,7 @@ where
     /// Multiplies the coefficients of a polynomial, also known as a convolution
     #[inline]
     fn mul(self, rhs: Polynomial<T, M>) -> Self::Output {
-        Polynomial::<T, L>::from_data(
-            utils::convolution(&self.coefficients, &rhs.coefficients)
-        )
+        Polynomial::<T, L>::from_data(utils::convolution(&self.coefficients, &rhs.coefficients))
     }
 }
 
@@ -1113,7 +1107,7 @@ where
 impl<T, const N: usize, const M: usize> Div<Polynomial<T, M>> for Polynomial<T, N>
 where
     T: Clone + Zero + Div<Output = T> + Mul<Output = T> + AddAssign + SubAssign,
-    Const<N>: DimMax<Const<M>, Output = Const<N>> +  DimSub<U1>,
+    Const<N>: DimMax<Const<M>, Output = Const<N>> + DimSub<U1>,
     Const<M>: DimSub<U1>,
 {
     type Output = Self;
@@ -1121,12 +1115,12 @@ where
     /// Performs long division with the two polynomials
     #[inline]
     fn div(self, divisor: Polynomial<T, M>) -> Self::Output {
-        Self::from_data(
-            utils::long_division(&self.coefficients, &divisor.coefficients)
-        )
+        Self::from_data(utils::long_division(
+            &self.coefficients,
+            &divisor.coefficients,
+        ))
     }
 }
-
 
 // ===============================================================================================
 //      Polynomial Display Implementation

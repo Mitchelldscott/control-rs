@@ -380,7 +380,7 @@ mod const_add {
     #[test]
     fn line_post_add() {
         let line: Polynomial<usize, 2> = Polynomial::from_element(1);
-        let constant = Polynomial::from_data([usize::MAX-1]);
+        let constant = Polynomial::from_data([usize::MAX - 1]);
         assert_eq!(line + constant, Polynomial::from_data([usize::MAX, 1]));
     }
     #[test]
@@ -480,7 +480,10 @@ mod const_sub {
     fn line_pre_sub() {
         let line: Polynomial<f32, 2> = Polynomial::from_element(10_000_000.0);
         let constant = Polynomial::from_data([1.0f32]);
-        assert_eq!(constant - line, Polynomial::from_data([-9_999_999.0, -10_000_000.0]));
+        assert_eq!(
+            constant - line,
+            Polynomial::from_data([-9_999_999.0, -10_000_000.0])
+        );
     }
     #[test]
     fn line_sub_assign() {

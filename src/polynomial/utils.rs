@@ -283,16 +283,14 @@ where
             if coefficients[1].is_zero() {
                 return Err(NoRoots);
             }
-            roots[0].re = coefficients[0].clone().neg()
-                / coefficients[1].clone();
+            roots[0].re = coefficients[0].clone().neg() / coefficients[1].clone();
         } else if degree == 2 {
             let a = coefficients[2].clone();
             if a.is_zero() {
                 if coefficients[1].is_zero() {
                     return Err(NoRoots);
                 }
-                roots[0].re = coefficients[0].clone().neg()
-                    / coefficients[1].clone();
+                roots[0].re = coefficients[0].clone().neg() / coefficients[1].clone();
             }
             let b = coefficients[1].clone();
             let ac = coefficients[0].clone() * a.clone();
@@ -302,10 +300,15 @@ where
             if discriminant < T::zero() {
                 let real_part = b_neg / two_a.clone();
                 let imag_part = (-discriminant).sqrt() / two_a;
-                roots[0] = Complex { re: real_part.clone(), im: imag_part.clone() };
-                roots[1] = Complex { re: real_part, im: imag_part.neg() };
-            }
-            else {
+                roots[0] = Complex {
+                    re: real_part.clone(),
+                    im: imag_part.clone(),
+                };
+                roots[1] = Complex {
+                    re: real_part,
+                    im: imag_part.neg(),
+                };
+            } else {
                 let discriminant_sqrt = discriminant.sqrt();
                 roots[0].re = (b_neg.clone() + discriminant_sqrt.clone()) / two_a.clone();
                 roots[1].re = (b_neg - discriminant_sqrt) / two_a;
@@ -329,7 +332,10 @@ where
 /// Adds two polynomials.
 ///
 /// This function does not put any requirements on the shape of the inputs and outputs
-pub fn add_generic<T, const N: usize, const M: usize, const L: usize>(lhs: &[T; N], rhs: &[T; M]) -> [T; L]
+pub fn add_generic<T, const N: usize, const M: usize, const L: usize>(
+    lhs: &[T; N],
+    rhs: &[T; M],
+) -> [T; L]
 where
     T: Clone + Add<Output = T> + Zero,
     Const<N>: DimMax<Const<M>, Output = Const<L>>,
@@ -344,7 +350,10 @@ where
 /// Subtracts two polynomials
 ///
 /// This function does not put any requirements on the shape of the inputs and outputs
-pub fn sub_generic<T, const N: usize, const M: usize, const L: usize>(lhs: &[T; N], rhs: &[T; M]) -> [T; L]
+pub fn sub_generic<T, const N: usize, const M: usize, const L: usize>(
+    lhs: &[T; N],
+    rhs: &[T; M],
+) -> [T; L]
 where
     T: Clone + Sub<Output = T> + Zero,
     Const<N>: DimMax<Const<M>, Output = Const<L>>,

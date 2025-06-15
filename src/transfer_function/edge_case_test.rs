@@ -82,10 +82,7 @@ fn delay_tests() {
 #[test]
 fn marginally_stable_tests() {
     assert_f64_eq!(dc_gain(&MARGINALLY_STABLE_TF), 1.0);
-    assert!(
-        !lhp(&MARGINALLY_STABLE_TF),
-        "lhp for MARGINALLY_STABLE_TF"
-    );
+    assert!(!lhp(&MARGINALLY_STABLE_TF), "lhp for MARGINALLY_STABLE_TF");
     assert_eq!(
         as_monic(&MARGINALLY_STABLE_TF),
         TransferFunction {
@@ -99,10 +96,7 @@ fn marginally_stable_tests() {
 #[test]
 fn critically_damped_tests() {
     assert_f64_eq!(dc_gain(&CRITICALLY_DAMPED_TF), 1.0);
-    assert!(
-        lhp(&CRITICALLY_DAMPED_TF),
-        "lhp for CRITICALLY_DAMPED_TF"
-    );
+    assert!(lhp(&CRITICALLY_DAMPED_TF), "lhp for CRITICALLY_DAMPED_TF");
     assert_eq!(
         as_monic(&CRITICALLY_DAMPED_TF),
         TransferFunction {

@@ -237,8 +237,12 @@ mod basic_ss_tests {
                 eigenvalues[0],
                 ssd.a
             );
+        } else {
+            assert!(
+                ss.a[(0, 0)] < -1.0,
+                "discrete state-space model matrix does not have eigen values"
+            )
         }
-        else { assert!(ss.a[(0, 0)] < -1.0, "discrete state-space model matrix does not have eigen values") }
         // else { panic!("discrete state-space model matrix does not have eigen values") }
     }
 

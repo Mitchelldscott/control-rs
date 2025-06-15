@@ -3,7 +3,7 @@
 
 use core::ops::{Add, Div, Mul, Neg};
 
-use nalgebra::{SMatrix, Scalar, Const, DimSub, U1};
+use nalgebra::{Const, DimSub, SMatrix, Scalar, U1};
 use num_traits::{One, Zero};
 
 use super::StateSpace;

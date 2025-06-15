@@ -99,7 +99,9 @@ where
     Const<L>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
 {
-    crate::polynomial::utils::roots::<T, N, L>(&crate::polynomial::utils::reverse_array(tf.denominator))
+    crate::polynomial::utils::roots::<T, N, L>(&crate::polynomial::utils::reverse_array(
+        tf.denominator,
+    ))
 }
 
 /// Check if the system's poles lie on the left-half plane (LHP), a condition for stability.
@@ -145,9 +147,11 @@ where
     Const<L>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
 {
-    poles::<T, M, N, L>(tf).is_ok_and(|roots| roots
-        .iter()
-        .all(|&pole| !pole.re.is_nan() && pole.re < T::zero()))
+    poles::<T, M, N, L>(tf).is_ok_and(|roots| {
+        roots
+            .iter()
+            .all(|&pole| !pole.re.is_nan() && pole.re < T::zero())
+    })
 }
 
 /// Helper function to create a state space model from a transfer function
