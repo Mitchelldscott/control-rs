@@ -1,13 +1,14 @@
 # Control-rs
 
-`control-rs` is a numerical modeling and control synthesis library tailored for embedded systems. Inspired by MATLAB’s 
-Control System Toolbox, it offers a structured framework for system modeling, analysis, and controller design. 
-Leveraging Rust’s ownership model and static type system, Control-rs ensures memory safety, concurrency guarantees, and 
-deterministic behavior—making it well-suited for real-time, resource-constrained applications.
+`control-rs` is a numerical modeling and analysis library made for embedded systems. The crate is inspired by 
+MATLAB’s Control System Toolbox to provide a familiar programming interface, while leveraging Rust's static type 
+system and ownership model to ensure determinism, safety and blazing fast implementations. The vision for this crate 
+is to provide an open source foundation to develop high performance embedded systems like electronic speed controllers, 
+battery management systems and even flight controllers.
 
 ## Features
 
-* **Modeling**: Support for Polynomial, Transfer Function, State-Space, and other nonlinear representations
+* **Modeling**: Support for Polynomial, Transfer Function, State-Space, and custom nonlinear structs
 * **Analysis**: Tools for classical, modern and robust system analysis
 * **Synthesis**: Direct and data-driven methods to create models
 * **Simulation**: Easy model integration and data visualization
@@ -18,7 +19,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-control-rs = "0.1.0"
+control-rs = "0.0.0"
 ```
 
 or run
@@ -32,11 +33,12 @@ cargo add control-rs
 Here's a simple example to get you started:
 
 ```rust
-use control_rs::transfer_function::{TransferFunction, dcgain};
+use control_rs::transfer_function::{TransferFunction, linear_tools::dc_gain};
 
 fn main() {
+  // create a transfer function 1 / s
     let mut tf = Transferfunction::new([1.0], [1.0, 0.0]);
-    println!("DC Gain of TF: {}", dcgain(tf));
+    println!("DC Gain of TF: {}", dc_gain(tf));
 }
 ```
 
@@ -54,9 +56,9 @@ fn main() {
 Examples are either based on a textbook problem or demo a practical application. This list covers a few examples that
 are in the works:
 - [ ] DC Motor lead-lag compensator
-- [ ] BLDC ESC (FOC)
+- [ ] BLDC ESC (FOC or fancy 6-stage commuter)
 - [ ] LiPo Battery model adaptive estimator
-- [ ] Orbit Determination
+- [ ] Orbit Determination (EKF, UKF using Nadir pointing pinhole camera and known landmarks)
 - [ ] Visual-Inertial Odometry
 
 ## Testing
@@ -66,14 +68,17 @@ are in the works:
 To keep unit tests purposeful and concise, the doc-tests should provide a majority of the code coverage. These will
 double as useful examples and a basic functionality check.
 
+* **Run all doc tests**: `cargo test --doc`
+* **Run specific doc test**: `cargo test --doc <test_name>`
+* **List all doc tests**: `cargo test --doc -- --list`
+
 ### Unit Tests
 
 * Located within the module containing the unit being tested (e.g., `src/<module>/...`).
-* Simple tests may reside in mod.rs, while more complex tests will have dedicated files to keep mod.rs concise.
-* Each test case should be:
-  * Short
-  * Independent
-  * Clearly descriptive of the test
+* test files will be named after the specific unit they are testing and end in `_test.rs`.
+* Each test module should contain a description of the tests
+
+* **Run unit tests**: `cargo test <module>::<unit_test_file_name>`
 
 ### Integration Tests
 
@@ -87,7 +92,7 @@ The documentation provides theoretical references and specific user guidance. Ea
 
 * A concise conceptual description (similar to [MathWorks TransferFunction docs](https://www.mathworks.com/help/control/ug/transfer-functions.html))
 * Links to theoretical references
-* Use cases (verified with doctests)
+* Examples
 
 ## Book
 
@@ -97,7 +102,8 @@ estimator and controller for an RC car or Quadcopter.
 
 ## Contributing
 
-We welcome contributions!
+We welcome contributions! If you are a controls student/enthusiast doing a project leave an issue on git with the 
+functions you need so `control-rs` can be your one-stop-shop solution for design and implementation.
 
 ## License
 
