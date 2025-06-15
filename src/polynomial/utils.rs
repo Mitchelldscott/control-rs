@@ -1,13 +1,12 @@
-//! Provides core logic of a [Polynomial] without edge case handling and explicit return types.
+//! Provides core logic of a Polynomial without edge case handling and explicit return types.
 //!
 //! This is used by other parts of `control_rs` that perform their own specialized edge cases and
-//! error handling. Users should call the provided [Polynomial] interface.
+//! error handling. Users should call the provided Polynomial interface.
 
 use core::{
     array, fmt, iter,
     mem::MaybeUninit,
-    ops::{AddAssign, Div, Mul, Neg, Sub, SubAssign},
-    ptr::copy_nonoverlapping,
+    ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign},
 };
 use nalgebra::{
     allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax,
@@ -15,7 +14,7 @@ use nalgebra::{
 };
 use num_traits::{One, Zero};
 
-/// Helper function to reverse arrays given to [`Polynomial::new()`]
+/// Helper function to reverse arrays given to `Polynomial::new()`
 #[inline]
 pub const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
     let mut output = input;
@@ -80,27 +79,27 @@ where
     }
 }
 
-/// # Safety
-///
-/// This function performs a raw memory copy of `N` elements from the input slice `src`
-/// into a newly constructed `[T; N]` array using [`copy_nonoverlapping`].
-///
-/// ## Preconditions
-/// To avoid undefined behavior, the caller **must** ensure the following:
-/// * `src.len() >= N`: The slice must contain **at least** `N` valid elements.
-/// * `src.as_ptr()` must be properly aligned for type `T` (This is guaranteed for slices of `T`,
-///   unless manually constructed unsafely).
-#[inline]
-const unsafe fn array_from_slice_copy<T: Copy, const N: usize>(src: &[T]) -> [T; N] {
-    let mut dst: MaybeUninit<[T; N]> = MaybeUninit::uninit();
-    // Behavior is undefined if any of the following conditions are violated:
-    // * `src` must be [valid] for reads of `count * size_of::<T>()` bytes.
-    // * `dst` must be [valid] for writes of `count * size_of::<T>()` bytes.
-    // * Both `src` and `dst` must be properly aligned.
-    copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr().cast::<T>(), N);
-    // SAFETY: All elements are initialized
-    dst.assume_init()
-}
+// /// # Safety
+// ///
+// /// This function performs a raw memory copy of `N` elements from the input slice `src`
+// /// into a newly constructed `[T; N]` array using [`copy_nonoverlapping`].
+// ///
+// /// ## Preconditions
+// /// To avoid undefined behavior, the caller **must** ensure the following:
+// /// * `src.len() >= N`: The slice must contain **at least** `N` valid elements.
+// /// * `src.as_ptr()` must be properly aligned for type `T` (This is guaranteed for slices of `T`,
+// ///   unless manually constructed unsafely).
+// #[inline]
+// const unsafe fn array_from_slice_copy<T: Copy, const N: usize>(src: &[T]) -> [T; N] {
+//     let mut dst: MaybeUninit<[T; N]> = MaybeUninit::uninit();
+//     // Behavior is undefined if any of the following conditions are violated:
+//     // * `src` must be [valid] for reads of `count * size_of::<T>()` bytes.
+//     // * `dst` must be [valid] for writes of `count * size_of::<T>()` bytes.
+//     // * Both `src` and `dst` must be properly aligned.
+//     copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr().cast::<T>(), N);
+//     // SAFETY: All elements are initialized
+//     dst.assume_init()
+// }
 
 /// Finds the **last** non-zero value in an array.
 ///
@@ -329,32 +328,30 @@ where
 
 /// Adds two polynomials.
 ///
-/// # Safety
-/// * `lhs` must have at least `N` elements or this will cause UB
-pub unsafe fn add_generic<T, const N: usize>(lhs: &[T], rhs: &[T]) -> [T; N]
+/// This function does not put any requirements on the shape of the inputs and outputs
+pub fn add_generic<T, const N: usize, const M: usize, const L: usize>(lhs: &[T; N], rhs: &[T; M]) -> [T; L]
 where
-    T: Copy + AddAssign + Zero,
+    T: Clone + Add<Output = T> + Zero,
+    Const<N>: DimMax<Const<M>, Output = Const<L>>,
 {
-    let mut result: [T; N] = array_from_slice_copy(lhs);
+    let mut result: [T; L] = array_from_iterator_with_default(lhs.iter().cloned(), T::zero());
     for (a, b) in result.iter_mut().zip(rhs.iter()) {
-        *a += *b;
+        *a = a.clone() + b.clone();
     }
     result
 }
 
 /// Subtracts two polynomials
 ///
-/// This requires that the left-hand side has a larger or equal capacity.
-///
-/// # Safety
-/// * `lhs` - must have at least `N` elements or this will cause UB
-pub unsafe fn sub_generic<T, const N: usize>(lhs: &[T], rhs: &[T]) -> [T; N]
+/// This function does not put any requirements on the shape of the inputs and outputs
+pub fn sub_generic<T, const N: usize, const M: usize, const L: usize>(lhs: &[T; N], rhs: &[T; M]) -> [T; L]
 where
-    T: Copy + SubAssign,
+    T: Clone + Sub<Output = T> + Zero,
+    Const<N>: DimMax<Const<M>, Output = Const<L>>,
 {
-    let mut result: [T; N] = array_from_slice_copy(lhs);
+    let mut result: [T; L] = array_from_iterator_with_default(lhs.iter().cloned(), T::zero());
     for (a, b) in result.iter_mut().zip(rhs.iter()) {
-        *a -= *b;
+        *a = a.clone() - b.clone();
     }
     result
 }
@@ -370,22 +367,22 @@ where
 ///
 /// # Example
 /// ```rust
-/// use control_rs::polynomial::utils::mul_generic;
+/// use control_rs::polynomial::utils::convolution;
 /// let p1 = [1i32; 2];
 /// let p2 = [1i32; 2];
 /// let mut p3 = [0i32; 3];
-/// mul_generic(&mut p3, &p1, &p2);
-/// assert_eq!(p3, [1i32, 2i32, 1i32], "wrong multiplication result");
+/// assert_eq!(convolution(&p1, &p2), [1i32, 2i32, 1i32], "wrong convolution result");
 /// ```
-pub fn mul_generic<T, const N: usize, const M: usize, const L: usize>(
-    result: &mut [T; L],
+pub fn convolution<T, const N: usize, const M: usize, const L: usize>(
     lhs: &[T; N],
     rhs: &[T; M],
-) where
-    T: Clone + Zero + AddAssign + Mul<Output = T>,
+) -> [T; L]
+where
+    T: Clone + AddAssign + Mul<Output = T> + Zero,
     Const<N>: DimAdd<Const<M>>,
     <Const<N> as DimAdd<Const<M>>>::Output: DimSub<U1, Output = Const<L>>,
 {
+    let mut result = array::from_fn(|_| T::zero());
     for i in 0..N {
         for j in 0..M {
             // SAFETY: `i + j = (N - 1) + (M - 1) < L` is a valid index of [T; L]
@@ -397,21 +394,20 @@ pub fn mul_generic<T, const N: usize, const M: usize, const L: usize>(
             }
         }
     }
+    result
 }
 
 /// Divides two polynomials.
 ///
 /// The result is a polynomial with capacity `N`. This may be larger than the degree of the result,
-/// in which case the higher order terms will be [`T::zero()`].
+/// in which case the higher order terms will be `T::zero()`.
 ///
 /// # Example
 /// ```rust
-/// use control_rs::polynomial::utils::div_generic;
+/// use control_rs::polynomial::utils::long_division;
 /// let p1 = [1i32; 2];
 /// let p2 = [1i32; 2];
-/// let mut p3 = [0i32; 2];
-/// div_generic(&mut p3, &p1, &p2);
-/// assert_eq!(p3, [1i32, 0i32], "wrong division result");
+/// assert_eq!(long_division(&p1, &p2), [1i32, 0i32], "wrong division result");
 /// ```
 ///
 /// # Algorithm
@@ -423,44 +419,46 @@ pub fn mul_generic<T, const N: usize, const M: usize, const L: usize>(
 ///     r ← r − t × d
 /// return (q, r)
 ///</pre>
-pub fn div_generic<T, const N: usize, const M: usize>(
-    quotient: &mut [T; N],
-    numerator: &[T; N],
-    denominator: &[T; M],
-) where
+pub fn long_division<T, const N: usize, const M: usize>(
+    dividend: &[T; N],
+    divisor: &[T; M],
+) -> [T; N]
+where
     T: Clone + Zero + Div<Output = T> + Mul<Output = T> + AddAssign + SubAssign,
     Const<N>: DimMax<Const<M>, Output = Const<N>>,
 {
+    let mut quotient = array::from_fn(|_| T::zero());
     // Find actual degrees
-    let numerator_order = largest_nonzero_index(numerator);
-    let denominator_order = largest_nonzero_index(denominator);
+    let dividend_order = largest_nonzero_index(dividend);
+    let divisor_order = largest_nonzero_index(divisor);
 
     // degree of self and rhs exists
-    if let Some(numerator_order) = numerator_order {
-        if let Some(denominator_order) = denominator_order {
-            let mut remainder = numerator.clone();
-            // SAFETY: denominator_order is less than the capacity of denominator
-            let leading_denominator = unsafe { denominator.get_unchecked(denominator_order) };
+    if let Some(dividend_order) = dividend_order {
+        if let Some(divisor_order) = divisor_order {
+            let mut remainder = dividend.clone();
+            // SAFETY: divisor_order is less than the capacity of divisor
+            let leading_divisor = unsafe { divisor.get_unchecked(divisor_order) };
 
-            for i in (denominator_order..=numerator_order).rev() {
-                // SAFETY: index is less than the capacity of numerator, remainder has the same
+            for i in (divisor_order..=dividend_order).rev() {
+                // SAFETY: index is less than the capacity of dividend, remainder has the same
                 // capacity
                 let rem_i = unsafe { remainder.get_unchecked(i) };
                 if rem_i.is_zero() {
                     continue;
                 }
 
-                let q_index = i - denominator_order;
-                let term_denominator = rem_i.clone() / leading_denominator.clone();
-                // SAFETY: q_index is less than the capacity of numerator, quotient has the same
+                let q_index = i - divisor_order;
+                let term_divisor = rem_i.clone() / leading_divisor.clone();
+                // SAFETY: q_index is less than the capacity of dividend, quotient has the same
                 // capacity
                 unsafe {
-                    *quotient.get_unchecked_mut(q_index) += term_denominator.clone();
+                    *quotient.get_unchecked_mut(q_index) += term_divisor.clone();
                 }
-                for (rem, div) in remainder.iter_mut().skip(q_index).zip(denominator.iter()) {
-                    *rem -= term_denominator.clone() * div.clone();
+                for (rem, div) in remainder.iter_mut().skip(q_index).zip(divisor.iter()) {
+                    *rem -= term_divisor.clone() * div.clone();
                 }
             }
         }
     }
+    quotient
 }

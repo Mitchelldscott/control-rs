@@ -39,7 +39,7 @@ use core::{
     slice,
 };
 use nalgebra::{
-    allocator::Allocator, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimSub, RealField, U1,
+    allocator::Allocator, Complex, Const, DefaultAllocator, DimAdd, DimMax, DimDiff, DimSub, RealField, U1,
 };
 use num_traits::{Num, One, Zero};
 
@@ -53,11 +53,9 @@ pub mod utils;
 //      Polynomial Specializations
 // ===============================================================================================
 
-mod constant;
-pub use constant::Constant;
+mod aliases;
+pub use aliases::{Constant, Line, Quadratic, Cubic, Quartic, Quintic};
 
-mod line;
-pub use line::Line;
 
 // ===============================================================================================
 //      Polynomial Tests
@@ -547,7 +545,7 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
 impl<T: Clone + AddAssign + Zero + One, const N: usize> Polynomial<T, N> {
     /// Computes the derivative of a polynomial.
     ///
-    /// See [`utils::polynomial_derivative()`] for more.
+    /// See [`utils::differentiate()`] for more.
     ///
     /// # Returns
     /// * `Polynomial` - a polynomial with capacity `N - 1`
@@ -575,7 +573,7 @@ impl<T: Clone + AddAssign + Zero + One, const N: usize> Polynomial<T, N> {
 impl<T: Clone + Zero + One + AddAssign + Div<Output = T>, const N: usize> Polynomial<T, N> {
     /// Computes the indefinite integral of a polynomial.
     ///
-    /// See [`utils::polynomial_integral()`] for more.
+    /// See [`utils::integrate()`] for more.
     ///
     /// # Returns
     /// * `Polynomial` - a polynomial with capacity `N + 1`
@@ -655,17 +653,7 @@ where
 }
 
 // ===============================================================================================
-//      Generic Polynomial-Scalar Arithmatic
-//
-//  The following operations are provided for polynomials of any capacity:
-//      * Neg
-//      * Mul<T> & Mul<Polynomial<T,N>> for T
-//      * MulAssign<T>
-//      * Div<T>
-//      * DivAssign<T>
-//      * Rem<T>
-//      * RemAssign<T>
-//
+//      Polynomial-Scalar Arithmatic
 // ===============================================================================================
 
 /// # -Polynomial<T, N>
@@ -691,18 +679,117 @@ impl<T: Clone + Neg<Output = T>, const N: usize> Neg for Polynomial<T, N> {
     }
 }
 
+/// # Polynomial<T, N> + T
+///
+/// # Example
+/// ```
+/// use control_rs::polynomial::Polynomial;
+/// let p1 = Polynomial::new([0]);
+/// let p2 = p1 + 1;
+/// assert_eq!(*p2.constant().unwrap(), 1);
+/// ```
+impl<T: Clone + Add<Output = T>, const N: usize> Add<T> for Polynomial<T, N>
+where
+    Const<N>: DimSub<U1>, // N > 0
+{
+    type Output = Self;
+
+    #[inline]
+    fn add(self, rhs: T) -> Self::Output {
+        let mut result = self.clone();
+        // SAFETY: `N > 0` so the index is valid
+        unsafe {
+            *result.get_unchecked_mut(0) = self.get_unchecked(0).clone() + rhs;
+        }
+        result
+    }
+}
+
+/// # Polynomial<T, N> += T
+///
+/// # Example
+/// ```
+/// use control_rs::polynomial::Polynomial;
+/// let mut p1 = Polynomial::new([0]);
+/// p1 += 1;
+/// assert_eq!(*p1.constant().unwrap(), 1);
+/// ```
+impl<T: AddAssign, const N: usize> AddAssign<T> for Polynomial<T, N>
+where
+    Const<N>: DimSub<U1>, // N > 0
+{
+    #[inline]
+    fn add_assign(&mut self, rhs: T) {
+        // SAFETY: `N > 0` so the index is always valid
+        unsafe {
+            *self.get_unchecked_mut(0) += rhs;
+        }
+    }
+}
+
+/// # Polynomial<T, N> - T
+///
+/// # Example
+/// ```
+/// use control_rs::polynomial::Polynomial;
+/// let p1 = Polynomial::new([0]);
+/// let p2 = p1 - 1;
+/// assert_eq!(*p2.constant().unwrap(), -1);
+/// ```
+impl<T: Clone + Sub<Output = T>, const N: usize> Sub<T> for Polynomial<T, N>
+where
+    Const<N>: DimSub<U1>,
+{
+    type Output = Self;
+
+    #[inline]
+    fn sub(self, rhs: T) -> Self::Output {
+        let mut result = self.clone();
+        // SAFETY: `N > 0` so the index is valid
+        unsafe {
+            *result.get_unchecked_mut(0) = self.get_unchecked(0).clone() - rhs;
+        }
+        result
+    }
+}
+
+/// # Polynomial<T, N> -= T
+///
+/// # Example
+/// ```
+/// use control_rs::polynomial::Polynomial;
+/// let mut p1 = Polynomial::new([0]);
+/// p1 -= 1;
+/// assert_eq!(*p1.constant().unwrap(), -1);
+/// ```
+impl<T: SubAssign, const N: usize> SubAssign<T> for Polynomial<T, N>
+where
+    Const<N>: DimSub<U1>,
+{
+    #[inline]
+    fn sub_assign(&mut self, rhs: T) {
+        // SAFETY: `N > 0` so the index is valid
+        unsafe {
+            *self.get_unchecked_mut(0) -= rhs;
+        }
+    }
+}
+
 /// # Polynomial<T, N> * T
 ///
 /// # Example
 /// ```
-/// use control_rs::Polynomial;
-/// let p1 = Polynomial::new([]);
+/// use control_rs::{Polynomial, polynomial::Quadratic};
+/// let p1 = Polynomial::new([0i32]);
 /// let p2 = p1 * 1;
-/// assert_eq!(p2.constant(), None);
-/// let p3 = Polynomial::<i32, 3>::from_element(1);
-/// assert_eq!(p3 * 2, Polynomial::<i32, 3>::from_element(2));
+/// assert_eq!(p2.constant(), Some(&0));
+/// let p3 = Quadratic::<i32>::from_element(1);
+/// assert_eq!(p3 * 2, Quadratic::<i32>::from_element(2));
 /// ```
-impl<T: Clone + Mul<Output = T>, const N: usize> Mul<T> for Polynomial<T, N> {
+impl<T: Clone + Mul<Output = T>, const N: usize> Mul<T> for Polynomial<T, N>
+where
+    Const<N>: DimSub<U1>,
+{
     type Output = Self;
 
     /// Returns a new polynomial with all coefficients scaled by rhs
@@ -724,7 +811,10 @@ impl<T: Clone + Mul<Output = T>, const N: usize> Mul<T> for Polynomial<T, N> {
 /// p1 *= 2;
 /// assert_eq!(p1.constant(), Some(&2));
 /// ```
-impl<T: Clone + MulAssign, const N: usize> MulAssign<T> for Polynomial<T, N> {
+impl<T: Clone + MulAssign, const N: usize> MulAssign<T> for Polynomial<T, N>
+where
+    Const<N>: DimSub<U1>,
+{
     fn mul_assign(&mut self, rhs: T) {
         for a_i in self.iter_mut() {
             *a_i *= rhs.clone();
@@ -741,7 +831,10 @@ impl<T: Clone + MulAssign, const N: usize> MulAssign<T> for Polynomial<T, N> {
 /// let p2 = p1 / 3;
 /// assert_eq!(p2, Polynomial::new([1, 2, 3]));
 /// ```
-impl<T: Clone + Div<Output = T>, const N: usize> Div<T> for Polynomial<T, N> {
+impl<T: Clone + Div<Output = T>, const N: usize> Div<T> for Polynomial<T, N>
+where
+    Const<N>: DimSub<U1>,
+{
     type Output = Self;
 
     /// Returns a new polynomial with all coefficients scaled by 1 / rhs
@@ -763,7 +856,10 @@ impl<T: Clone + Div<Output = T>, const N: usize> Div<T> for Polynomial<T, N> {
 /// p1 /= 3;
 /// assert_eq!(p1, Polynomial::new([1, 2, 3]));
 /// ```
-impl<T: Clone + DivAssign, const N: usize> DivAssign<T> for Polynomial<T, N> {
+impl<T: Clone + DivAssign, const N: usize> DivAssign<T> for Polynomial<T, N>
+where
+    Const<N>: DimSub<U1>,
+{
     fn div_assign(&mut self, rhs: T) {
         for a_i in self.iter_mut() {
             *a_i /= rhs.clone();
@@ -781,7 +877,10 @@ impl<T: Clone + DivAssign, const N: usize> DivAssign<T> for Polynomial<T, N> {
 /// assert_eq!(p2, Polynomial::new([1, 0, 1]));
 /// ```
 /// TODO: Unit Test
-impl<T: Clone + Rem<Output = T>, const N: usize> Rem<T> for Polynomial<T, N> {
+impl<T: Clone + Rem<Output = T>, const N: usize> Rem<T> for Polynomial<T, N>
+where
+    Const<N>: DimSub<U1>,
+{
     type Output = Self;
 
     fn rem(self, rhs: T) -> Self::Output {
@@ -803,7 +902,10 @@ impl<T: Clone + Rem<Output = T>, const N: usize> Rem<T> for Polynomial<T, N> {
 /// assert_eq!(p1, Polynomial::new([1, 0, 1]));
 /// ```
 /// TODO: Unit Test
-impl<T: Clone + RemAssign, const N: usize> RemAssign<T> for Polynomial<T, N> {
+impl<T: Clone + RemAssign, const N: usize> RemAssign<T> for Polynomial<T, N>
+where
+    Const<N>: DimSub<U1>,
+{
     fn rem_assign(&mut self, rhs: T) {
         for a_i in self.iter_mut() {
             *a_i %= rhs.clone();
@@ -811,138 +913,220 @@ impl<T: Clone + RemAssign, const N: usize> RemAssign<T> for Polynomial<T, N> {
     }
 }
 
-macro_rules! impl_generic_left_scalar_mul {
+macro_rules! impl_left_scalar_ops {
     ($($scalar:ty),*) => {
         $(
-            impl<const N: usize> Mul<Polynomial<$scalar, N>> for $scalar {
+            impl<const N: usize> Add<Polynomial<$scalar, N>> for $scalar
+            where
+                Const<N>: DimSub<U1>,
+            {
                 type Output = Polynomial<$scalar, N>;
-
+                #[inline(always)]
+                fn add(self, rhs: Polynomial<$scalar, N>) -> Self::Output {
+                    rhs + self.clone()
+                }
+            }
+            impl<const N: usize> Sub<Polynomial<$scalar, N>> for $scalar
+            where
+                Const<N>: DimSub<U1>,
+            {
+                type Output = Polynomial<$scalar, N>;
+                #[inline(always)]
+                fn sub(self, rhs: Polynomial<$scalar, N>) -> Self::Output {
+                    let mut result = Self::Output::from_iterator([self.clone()]);
+                    for (a, b) in result.iter_mut().zip(rhs.iter()) {
+                        *a = a.clone() - b.clone();
+                    }
+                    result
+                }
+            }
+            impl<const N: usize> Mul<Polynomial<$scalar, N>> for $scalar
+            where
+                Const<N>: DimSub<U1>,
+            {
+                type Output = Polynomial<$scalar, N>;
+                #[inline(always)]
                 fn mul(self, rhs: Polynomial<$scalar, N>) -> Self::Output {
-                    Self::Output::from_iterator(rhs.iter().map(|a_i| self.clone() * a_i.clone()))
+                    rhs.clone() * self.clone()
+                }
+            }
+            impl<const N: usize> Div<Polynomial<$scalar, N>> for $scalar
+            where
+                Const<N>: DimSub<U1>,
+            {
+                type Output = Polynomial<$scalar, N>;
+                #[inline(always)]
+                fn div(self, rhs: Polynomial<$scalar, N>) -> Self::Output {
+                    let mut result = rhs.clone();
+                    for a_i in result.iter_mut() {
+                        *a_i = self.clone() / a_i.clone();
+                    }
+                    result
                 }
             }
         )*
     };
 }
 
-impl_generic_left_scalar_mul!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
+impl_left_scalar_ops!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
 
 // ===============================================================================================
-//      Empty Polynomial-Scalar Arithmatic
+//      Polynomial-Polynomial Arithmatic
 // ===============================================================================================
 
-/// # Polynomial<T, 0> + T
-///
-/// This is a base case implementation where a scalar is added to an empty polynomial. The result
-/// is a polynomial with a constant term equal to the scalar.
+/// # Polynomial<T, N> + Polynomial<T, M>
 ///
 /// # Example
 /// ```
 /// use control_rs::Polynomial;
-/// let p1 = Polynomial::new([]);
-/// let p2 = p1 + 1;
-/// assert_eq!(p2.constant(), Some(&1));
+/// let p1 = Polynomial::new([1, 2, 3]);
+/// assert_eq!(p1 + Polynomial::new([-1, -2, -3]), Polynomial::from_element(0));
 /// ```
-impl<T> Add<T> for Polynomial<T, 0> {
-    type Output = Polynomial<T, 1>;
+impl<T, const N: usize, const M: usize, const L: usize> Add<Polynomial<T, M>> for Polynomial<T, N>
+where
+    T: Clone + Add<Output = T> + Zero,
+    Const<N>: DimMax<Const<M>, Output = Const<L>> + DimSub<U1>,
+    Const<M>: DimSub<U1>,
+{
+    type Output = Polynomial<T, L>;
 
-    /// Returns a new polynomial with the given constant term
+    /// Adds the coefficients of a polynomial together
     #[inline]
-    fn add(self, rhs: T) -> Self::Output {
-        Polynomial::from_data([rhs])
+    fn add(self, rhs: Polynomial<T, M>) -> Self::Output {
+        Polynomial::<T, L>::from_data(
+            utils::add_generic(&self.coefficients, &rhs.coefficients)
+        )
     }
 }
 
-/// # Polynomial<T, 0> - T
-///
-/// This is a base case implementation where a scalar is subtracted from an empty polynomial. The
-/// result is a polynomial with a constant term equal to 0 - rhs.
+/// # Polynomial<T, N> += Polynomial<T, M>
 ///
 /// # Example
 /// ```
 /// use control_rs::Polynomial;
-/// let p1 = Polynomial::new([]);
-/// let p2 = p1 - 1;
-/// assert_eq!(p2.constant(), Some(&-1));
+/// let mut p1 = Polynomial::new([1, 2, 3]);
+/// p1 += Polynomial::new([-1, -2, -3]);
+/// assert_eq!(p1, Polynomial::from_element(0));
 /// ```
-impl<T: Neg<Output = T>> Sub<T> for Polynomial<T, 0> {
-    type Output = Polynomial<T, 1>;
-
-    /// Returns a new polynomial with the constant term equal to -rhs
+impl<T, const N: usize, const M: usize> AddAssign<Polynomial<T, M>> for Polynomial<T, N>
+where
+    T: Clone + AddAssign,
+    Const<N>: DimMax<Const<M>, Output = Const<N>> + DimSub<U1>,
+    Const<M>: DimSub<U1>,
+{
+    /// Adds the coefficients of a polynomial together
+    ///
+    /// Only available if N >= M
     #[inline]
-    fn sub(self, rhs: T) -> Self::Output {
-        Self::Output::from_data([rhs.neg()])
+    fn add_assign(&mut self, rhs: Polynomial<T, M>) {
+        for (lhs, rhs) in self.iter_mut().zip(rhs.iter()) {
+            *lhs += rhs.clone();
+        }
     }
 }
 
-macro_rules! impl_base_case_left_scalar_arithmatic {
-    ($($scalar:ty),*) => {
-        $(
-            impl Add<Polynomial<$scalar, 0>> for $scalar {
-                type Output = Polynomial<$scalar, 1>;
-
-                fn add(self, _: Polynomial<$scalar, 0>) -> Self::Output {
-                    Polynomial::from_data([self.clone()])
-                }
-            }
-            impl AddAssign<Polynomial<$scalar, 0>> for $scalar {
-                fn add_assign(&mut self, _rhs: Polynomial<$scalar, 0>) {}
-            }
-            impl Sub<Polynomial<$scalar, 0>> for $scalar {
-                type Output = Polynomial<$scalar, 1>;
-
-                fn sub(self, _: Polynomial<$scalar, 0>) -> Self::Output {
-                    Polynomial::from_data([self.clone()])
-                }
-            }
-            impl SubAssign<Polynomial<$scalar, 0>> for $scalar {
-                fn sub_assign(&mut self, _rhs: Polynomial<$scalar, 0>) {}
-            }
-        )*
-    };
-}
-
-impl_base_case_left_scalar_arithmatic!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
-
-// ===============================================================================================
-//      Generic Polynomial Arithmatic
-// ===============================================================================================
-
-/// # Polynomial<T, 0> + Polynomial<T, N>
+/// # Polynomial<T, N> - Polynomial<T, M>
 ///
 /// # Example
 /// ```
-/// use control_rs::polynomial::Polynomial;
-/// let p1 = Polynomial::new([0_i16; 0]);
-/// let p2 = Polynomial::new([1, 0, 1]);
-/// assert_eq!(p1 + p2, Polynomial::new([1, 0, 1]));
+/// use control_rs::Polynomial;
+/// let p1 = Polynomial::new([1, 2, 3]);
+/// assert_eq!(p1 - p1, Polynomial::from_element(0));
 /// ```
-/// TODO: Unit Test
-impl<T: Clone, const N: usize> Add<Polynomial<T, N>> for Polynomial<T, 0> {
-    type Output = Polynomial<T, N>;
+impl<T, const N: usize, const M: usize, const L: usize> Sub<Polynomial<T, M>> for Polynomial<T, N>
+where
+    T: Clone + Sub<Output = T> + Zero,
+    Const<N>: DimMax<Const<M>, Output = Const<L>> + DimSub<U1>,
+    Const<M>: DimSub<U1>,
+{
+    type Output = Polynomial<T, L>;
 
-    fn add(self, rhs: Polynomial<T, N>) -> Self::Output {
-        rhs
+    /// Subtracts the coefficients of a polynomial from each other
+    #[inline]
+    fn sub(self, rhs: Polynomial<T, M>) -> Self::Output {
+        Polynomial::<T, L>::from_data(
+            utils::sub_generic(&self.coefficients, &rhs.coefficients)
+        )
     }
 }
 
-/// # Polynomial<T, 0> - Polynomial<T, N>
+/// # Polynomial<T, N> -= Polynomial<T, M>
 ///
 /// # Example
 /// ```
-/// use control_rs::polynomial::Polynomial;
-/// let p1 = Polynomial::<i32, 0>::new([]);
-/// let p2 = Polynomial::new([1, 2, 3]);
-/// assert_eq!(p1 - p2, Polynomial::new([-1, -2, -3]));
+/// use control_rs::Polynomial;
+/// let mut p1 = Polynomial::new([1, 2, 3]);
+/// p1 -= Polynomial::new([1, 2, 3]);
+/// assert_eq!(p1, Polynomial::from_element(0));
 /// ```
-/// TODO: Unit Test
-impl<T: Clone + Neg<Output = T>, const N: usize> Sub<Polynomial<T, N>> for Polynomial<T, 0> {
-    type Output = Polynomial<T, N>;
-
-    fn sub(self, rhs: Polynomial<T, N>) -> Self::Output {
-        rhs.neg()
+impl<T, const N: usize, const M: usize> SubAssign<Polynomial<T, M>> for Polynomial<T, N>
+where
+    T: Clone + SubAssign,
+    Const<N>: DimMax<Const<M>, Output = Const<N>> + DimSub<U1>,
+    Const<M>: DimSub<U1>,
+{
+    /// Subtracts the coefficients of a polynomial from each other
+    ///
+    /// Only available if N >= M
+    #[inline]
+    fn sub_assign(&mut self, rhs: Polynomial<T, M>) {
+        for (a, b) in self.iter_mut().zip(rhs.iter()) {
+            *a -= b.clone();
+        }
     }
 }
+
+/// # Polynomial<T, N> * Polynomial<T, M>
+///
+/// # Example
+/// ```
+/// use control_rs::Polynomial;
+/// let p1 = Polynomial::new([1, 0, 1]);
+/// assert_eq!(p1 * Polynomial::new([2, 7]), Polynomial::new([2, 7, 2, 7]));
+/// ```
+impl<T, const N: usize, const M: usize, const L: usize> Mul<Polynomial<T, M>> for Polynomial<T, N>
+where
+    T: Clone + AddAssign + Mul<Output = T> + Zero,
+    Const<M>: DimSub<U1>,
+    Const<N>: DimAdd<Const<M>> + DimSub<U1>,
+    <Const<N> as DimAdd<Const<M>>>::Output: DimSub<U1, Output = Const<L>>,
+{
+    type Output = Polynomial<T, L>;
+
+    /// Multiplies the coefficients of a polynomial, also known as a convolution
+    #[inline]
+    fn mul(self, rhs: Polynomial<T, M>) -> Self::Output {
+        Polynomial::<T, L>::from_data(
+            utils::convolution(&self.coefficients, &rhs.coefficients)
+        )
+    }
+}
+
+/// # Polynomial<T, N> / Polynomial<T, M>
+///
+/// # Example
+/// ```
+/// use control_rs::Polynomial;
+/// let p1 = Polynomial::new([1, 1, 1, 1]);
+/// assert_eq!(p1 / Polynomial::new([1]), Polynomial::new([1, 1, 1, 1]));
+/// ```
+impl<T, const N: usize, const M: usize> Div<Polynomial<T, M>> for Polynomial<T, N>
+where
+    T: Clone + Zero + Div<Output = T> + Mul<Output = T> + AddAssign + SubAssign,
+    Const<N>: DimMax<Const<M>, Output = Const<N>> +  DimSub<U1>,
+    Const<M>: DimSub<U1>,
+{
+    type Output = Self;
+
+    /// Performs long division with the two polynomials
+    #[inline]
+    fn div(self, divisor: Polynomial<T, M>) -> Self::Output {
+        Self::from_data(
+            utils::long_division(&self.coefficients, &divisor.coefficients)
+        )
+    }
+}
+
 
 // ===============================================================================================
 //      Polynomial Display Implementation

@@ -4,7 +4,21 @@
 //! specialized polynomial types.
 //!
 //! The tests currently cover u8, i8, u16, i16, u32, i32, f32, f64.(neg tests do not cover
-//! unsigned integers). 64-bit and up: u64, i64, u128, i128, and other big_nums are not covered.
+//! unsigned integers). 64-bit and up: u64, i64, u128, i128, and other `big_nums` are not covered.
+//!
+//! ## Methods covered in this module:
+//! * `neg`
+//! * `coefficient`/`coefficient_mut`
+//! * `constant`/`constant_mut`
+//! * `degree`
+//! * `is_emtpy`
+//! * `is_monic`
+//! *  `leading_coefficient`/`leading_coefficient_mut`
+//! * `from_data`
+//! * `from_iterator`
+//! * `from_element`
+//! * `from_fn`
+//! * `new`
 
 use crate::polynomial::{Constant, Line, Polynomial};
 
@@ -42,9 +56,9 @@ mod coefficient_accessors {
     #[test]
     fn empty() {
         let p = Polynomial::new([1u8; 0]);
-        assert_eq!(p.is_empty(), true, "not empty");
+        assert!(p.is_empty(), "not empty");
         assert_eq!(p.degree(), None, "degree not none");
-        assert_eq!(p.is_monic(), false, "monic");
+        assert!(!p.is_monic(), "monic");
         assert_eq!(p.coefficient(0), None, "coefficient(0) not none");
         assert_eq!(p.coefficient(1), None, "coefficient(1) not none");
         assert_eq!(p.constant(), None, "constant not none");
@@ -58,9 +72,9 @@ mod coefficient_accessors {
     #[test]
     fn empty_mut() {
         let mut p_mut = Polynomial::from_data([1i8; 0]);
-        assert_eq!(p_mut.is_empty(), true, "mut not empty");
+        assert!(p_mut.is_empty(), "mut not empty");
         assert_eq!(p_mut.degree(), None, "degree not none");
-        assert_eq!(p_mut.is_monic(), false, "monic");
+        assert!(!p_mut.is_monic(), "monic");
         assert_eq!(
             p_mut.coefficient_mut(0),
             None,
@@ -81,9 +95,9 @@ mod coefficient_accessors {
     #[test]
     fn constant() {
         let p = Constant::from_element(10u16);
-        assert_eq!(p.is_empty(), false, "p is empty");
+        assert!(!p.is_empty(), "p is empty");
         assert_eq!(p.degree(), Some(0), "degree");
-        assert_eq!(p.is_monic(), false, "monic");
+        assert!(!p.is_monic(), "monic");
         assert_eq!(p.coefficient(0), Some(&10), "coefficient(0)");
         assert_eq!(p.coefficient(1), None, "coefficient(1) not none");
         assert_eq!(p.constant(), Some(&10), "constant");
@@ -92,9 +106,9 @@ mod coefficient_accessors {
     #[test]
     fn constant_mut() {
         let mut p_mut = Constant::from_iterator([10i16]);
-        assert_eq!(p_mut.is_empty(), false, "mut not empty");
+        assert!(!p_mut.is_empty(), "mut not empty");
         assert_eq!(p_mut.degree(), Some(0), "degree");
-        assert_eq!(p_mut.is_monic(), false, "monic");
+        assert!(!p_mut.is_monic(), "monic");
         assert_eq!(
             p_mut.coefficient_mut(0),
             Some(&mut 10),
@@ -115,9 +129,9 @@ mod coefficient_accessors {
     #[test]
     fn line() {
         let p = Line::from_fn(|_| 1u32);
-        assert_eq!(p.is_empty(), false, "p is empty");
+        assert!(!p.is_empty(), "p is empty");
         assert_eq!(p.degree(), Some(1), "degree");
-        assert_eq!(p.is_monic(), true, "monic");
+        assert!(p.is_monic(), "monic");
         assert_eq!(p.coefficient(0), Some(&1), "coefficient(0)");
         assert_eq!(p.coefficient(1), Some(&1), "coefficient(1)");
         assert_eq!(p.coefficient(2), None, "coefficient(2)");
@@ -127,9 +141,9 @@ mod coefficient_accessors {
     #[test]
     fn line_mut() {
         let mut p_mut = Line::new([2i32, 1i32]);
-        assert_eq!(p_mut.is_empty(), false, "mut not empty");
+        assert!(!p_mut.is_empty(), "mut not empty");
         assert_eq!(p_mut.degree(), Some(1), "degree");
-        assert_eq!(p_mut.is_monic(), false, "monic");
+        assert!(!p_mut.is_monic(), "monic");
         assert_eq!(p_mut.coefficient_mut(0), Some(&mut 1), "coefficient_mut(0)");
         assert_eq!(p_mut.coefficient_mut(1), Some(&mut 2), "coefficient_mut(1)");
         assert_eq!(
@@ -147,9 +161,9 @@ mod coefficient_accessors {
     #[test]
     fn large() {
         let p = Polynomial::<f32, 24>::from_fn(|_| 1.0);
-        assert_eq!(p.is_empty(), false, "p is empty");
+        assert!(!p.is_empty(), "p is empty");
         assert_eq!(p.degree(), Some(23), "degree");
-        assert_eq!(p.is_monic(), true, "monic");
+        assert!(p.is_monic(), "monic");
         assert_eq!(p.coefficient(0), Some(&1.0), "coefficient(0)");
         assert_eq!(p.coefficient(1), Some(&1.0), "coefficient(1)");
         assert_eq!(p.coefficient(2), Some(&1.0), "coefficient(2)");
@@ -161,9 +175,9 @@ mod coefficient_accessors {
     #[test]
     fn large_mut() {
         let mut p_mut = Polynomial::<f64, 16>::from_iterator([1.0]);
-        assert_eq!(p_mut.is_empty(), false, "mut not empty");
+        assert!(!p_mut.is_empty(), "mut not empty");
         assert_eq!(p_mut.degree(), Some(0), "degree");
-        assert_eq!(p_mut.is_monic(), true, "monic");
+        assert!(p_mut.is_monic(), "monic");
         assert_eq!(
             p_mut.coefficient_mut(0),
             Some(&mut 1.0),
