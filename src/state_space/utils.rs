@@ -40,12 +40,10 @@ use super::StateSpace;
 /// </pre>
 ///
 /// # Arguments
-///
-/// * `b` - coefficients of a transfer functions numerator `[b_n ... b_1]`
-/// * `a` - coefficients of a transfer functions denominator `[1.0, a_n .. a_1]`
+/// * `b` - coefficients of a transfer function's numerator `[b_n ... b_1]`
+/// * `a` - coefficients of a transfer function's denominator `[a_n ... a_1]`
 ///
 /// # Returns
-///
 /// * `StateSpace` - state-space model in control canonical form
 ///
 /// # Example
@@ -67,7 +65,7 @@ where
     StateSpace {
         a: SMatrix::from_fn(|i, j| {
             if i == N - 1 {
-                a[N - j - 1].neg() / a[L - 1]
+                a[L - j - 1].neg() / a[0]
             } else if i + 1 == j {
                 T::one()
             } else {

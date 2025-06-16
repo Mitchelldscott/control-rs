@@ -670,7 +670,7 @@ where
 /// use control_rs::Polynomial;
 /// let p1 = Polynomial::new([1, 2, 3]);
 /// let p2 = -p1; // Negate p1
-/// assert_eq!(p2.constant(), -3);
+/// assert_eq!(p2.constant(), &-3);
 /// assert_eq!(*p2.leading_coefficient().unwrap(), -1);
 /// ```
 impl<T: Clone + Neg<Output = T>, const N: usize> Neg for Polynomial<T, N> {
@@ -693,7 +693,7 @@ impl<T: Clone + Neg<Output = T>, const N: usize> Neg for Polynomial<T, N> {
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([0]);
 /// let p2 = p1 + 1;
-/// assert_eq!(p2.constant(), 1);
+/// assert_eq!(p2.constant(), &1);
 /// ```
 impl<T: Clone + Add<Output = T>, const N: usize> Add<T> for Polynomial<T, N>
 where
@@ -719,7 +719,7 @@ where
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([0]);
 /// p1 += 1;
-/// assert_eq!(p1.constant(), 1);
+/// assert_eq!(p1.constant(), &1);
 /// ```
 impl<T: AddAssign, const N: usize> AddAssign<T> for Polynomial<T, N>
 where
@@ -741,7 +741,7 @@ where
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([0]);
 /// let p2 = p1 - 1;
-/// assert_eq!(p2.constant(), -1);
+/// assert_eq!(p2.constant(), &-1);
 /// ```
 impl<T: Clone + Sub<Output = T>, const N: usize> Sub<T> for Polynomial<T, N>
 where
@@ -767,7 +767,7 @@ where
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([0]);
 /// p1 -= 1;
-/// assert_eq!(p1.constant(), -1);
+/// assert_eq!(p1.constant(), &-1);
 /// ```
 impl<T: SubAssign, const N: usize> SubAssign<T> for Polynomial<T, N>
 where
@@ -789,7 +789,7 @@ where
 /// use control_rs::{Polynomial, polynomial::Quadratic};
 /// let p1 = Polynomial::new([0i32]);
 /// let p2 = p1 * 1;
-/// assert_eq!(p2.constant(), Some(&0));
+/// assert_eq!(p2.constant(), &0);
 /// let p3 = Quadratic::<i32>::from_element(1);
 /// assert_eq!(p3 * 2, Quadratic::<i32>::from_element(2));
 /// ```
@@ -816,7 +816,7 @@ where
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([1]);
 /// p1 *= 2;
-/// assert_eq!(p1.constant(), 2);
+/// assert_eq!(p1.constant(), &2);
 /// ```
 impl<T: Clone + MulAssign, const N: usize> MulAssign<T> for Polynomial<T, N>
 where

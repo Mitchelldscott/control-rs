@@ -94,16 +94,17 @@ fn main() {
     // Numerator: [Km]
     // Denominator: JLs^2 + (JR + bL)s + bR + Km^2
     let motor_tf = TransferFunction::new([Km], [J * L, J * R + L * b, (R * b) + (Km * Km)]);
-
+    let motor_ss = tf2ss(motor_tf);
     println!("DC Motor {motor_tf}");
     println!("DC Gain: {:?}", dc_gain(&motor_tf));
     println!("System Poles: {:?}", poles(&motor_tf).ok());
+    println!("DC Motor {motor_ss}");
 
     // simulate for 100 steps
-    let _sim_data = sim(tf2ss(motor_tf), 0.1, MotorState::new(0.0, 0.0));
+    let _sim_data = sim(motor_ss, 0.1, MotorState::new(0.0, 0.0));
 
     #[cfg(feature = "std")]
-    plot(sim_data);
+    plot(_sim_data);
 
     // Simulates adding a simple feedforward controller that scales the input by the inverse of the
     // dc_gain, resulting in a new dc_gain = 1. In reality, this drives the motor state to the value
