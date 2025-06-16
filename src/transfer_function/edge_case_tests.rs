@@ -30,7 +30,7 @@ fn improper_tests() {
     assert_eq!(
         as_monic(&IMPROPER_TF),
         TransferFunction {
-            numerator: [1.0, 2.0, 0.0, 1.0],
+            numerator: [1.0, 0.0, 2.0, 1.0],
             denominator: [1.0, 1.0, 1.0]
         },
         "as_monic for IMPROPER_TF"
@@ -44,7 +44,7 @@ fn differentiator_tests() {
     assert_eq!(
         as_monic(&DIFFERENTIATOR_TF),
         TransferFunction {
-            numerator: [1.0, 0.0],
+            numerator: [0.0, 1.0],
             denominator: [1.0]
         },
         "as_monic for DIFFERENTIATOR_TF"
@@ -59,7 +59,7 @@ fn integrator_tests() {
         as_monic(&INTEGRATOR_TF),
         TransferFunction {
             numerator: [1.0],
-            denominator: [1.0, 0.0]
+            denominator: [0.0, 1.0]
         },
         "as_monic for INTEGRATOR_TF"
     );
@@ -72,7 +72,7 @@ fn delay_tests() {
     assert_eq!(
         as_monic(&DELAY_TF),
         TransferFunction {
-            numerator: [1.0, -1.0],
+            numerator: [-1.0, 1.0],
             denominator: [1.0, 1.0]
         },
         "as_monic for DELAY_TF"
@@ -128,8 +128,8 @@ fn zp_cancel_tests() {
     assert_eq!(
         as_monic(&ZP_CANCEL_TF),
         TransferFunction {
-            numerator: [1.0, -1.0],
-            denominator: [1.0, -1.0]
+            numerator: [-1.0, 1.0],
+            denominator: [-1.0, 1.0]
         },
         "as_monic for ZP_CANCEL_TF"
     );

@@ -94,7 +94,7 @@ fn main() {
     // Numerator: [Km]
     // Denominator: JLs^2 + (JR + bL)s + bR + Km^2
     let motor_tf = TransferFunction::new([Km], [J * L, J * R + L * b, (R * b) + (Km * Km)]);
-    let motor_ss = tf2ss(motor_tf);
+    let motor_ss = tf2ss(&motor_tf);
     println!("DC Motor {motor_tf}");
     println!("DC Gain: {:?}", dc_gain(&motor_tf));
     println!("System Poles: {:?}", poles(&motor_tf).ok());
@@ -106,6 +106,8 @@ fn main() {
     #[cfg(feature = "std")]
     plot(_sim_data);
 
+    // let cl_motor_tf = feedback(motor_tf, 1.0, );
+
     // Simulates adding a simple feedforward controller that scales the input by the inverse of the
     // dc_gain, resulting in a new dc_gain = 1. In reality, this drives the motor state to the value
     // of the input voltage. An additional gain can scale the output value to an appropriate speed.
@@ -114,7 +116,7 @@ fn main() {
         [J * L, J * R + L * b, (R * b) + (Km * Km)],
     );
 
-    let compensated_motor_ss = tf2ss(compensated_motor_tf);
+    let compensated_motor_ss = tf2ss(&compensated_motor_tf);
     println!("DC Motor with gain compensation {compensated_motor_ss}");
 
     // simulate for 100 steps

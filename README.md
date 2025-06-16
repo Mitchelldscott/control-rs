@@ -1,30 +1,20 @@
 # Control-rs
 
-`control-rs` is a Rust library for control system modeling and design, built for real-time embedded applications. It 
-offers a familiar interface, inspired by MATLAB’s Control System Toolbox, while embracing Rust’s compile-time safety 
-guarantees and memory model. All data structures are statically sized, with dimensionality and type constraints 
-enforced at compile time—eliminating the need for heap allocation and enabling deterministic behavior without adding any
-additional code.
+`control-rs` is a control system toolbox built for real-time embedded applications. The crate provides generic 
+implementations and specializations of numerical models, similar to how nalgebra's `Matrix` works. Unlike nalgebra, all 
+models are statically sized, so there are no allocations.
 
-The crate is `no_std` compatible and supports both fixed-point and floating-point numeric types, making it suitable 
+The crate is `no_std` by default and supports both fixed-point and floating-point numeric types, making it suitable 
 for deployment on a wide range of microcontrollers. In the future `control-rs` hopes to provide template projects for 
 components like motor controllers, battery management systems, and autonomous navigation logic. The goal is to provide 
-a reliable and high performance, open-source foundation for embedded control software in robotics and aerospace.
-
-`control-rs` bridges the gap between the theoretical foundations of control theory and the practical demands of 
-embedded systems. While powerful tools exist for control design, translating their results into reliable, 
-high-performance code for microcontrollers remains a significant challenge. This crate provides foundational components 
-for building control systems in Rust—a language uniquely suited for real-time and mission-critical applications. Its 
-emphasis on memory safety and concurrency makes it an efficient low-level language. `control-rs` enables the 
-development of robust, real-time control algorithms for resource-constrained embedded hardware where performance and 
-reliability are critical.
+a reliable and high performance, open-source foundation for embedded control software.
 
 ## Features
 
 * **Modeling**: Support for Polynomial, Transfer Function, State-Space, and custom nonlinear structs
 * **Analysis**: Tools for classical, modern and robust system analysis
-* **Synthesis**: Direct and data-driven methods to create models
-* **Simulation**: Easy model integration and data visualization
+* **Synthesis**: Direct and data-driven methods to construct models
+* **Simulation**: Precision model integration (and in the future time-series/episodic dataset tools)
 
 ## Installation (Not Supported... haven't published the crate yet, clone this repo instead)
 
@@ -49,12 +39,17 @@ Here's a simple example to get you started:
 use control_rs::transfer_function::{TransferFunction, linear_tools::dc_gain};
 
 fn main() {
+    let dt = 0.1;
     // create a transfer function 1 / s
-    let mut tf = Transferfunction::new([1.0], [1.0, 0.0]);
+    let mut tf = Transferfunction::new([1.0], [1.0, 0.1, 0.0]);
     println!("{tf}");
     println!("DC Gain of TF: {}", dc_gain(tf));
-    let ss = tf2ss(tf);
+    let ss = zoh(tf2ss(tf), dt);
     println!("{ss}");
+    let mut x = nalgebra::Vector2(0.0, 0.0);
+    for i in 0..100 {
+        x = ss.dynamics(x, 1.0);
+    }
 }
 ```
 
@@ -97,9 +92,15 @@ double as useful examples and a basic functionality check.
 
 The documentation provides theoretical references and specific user guidance. Each module should include:
 
-* A concise conceptual description (similar to [MathWorks TransferFunction docs](https://www.mathworks.com/help/control/ug/transfer-functions.html))
-* Links to theoretical references
-* Examples
+* A conceptual description of the module (similar to [MathWorks TransferFunction docs](https://www.mathworks.com/help/control/ug/transfer-functions.html))
+* Links to theoretical references for more in-depth understanding
+* Example of how to use the module
+
+## Project Templates
+
+In addition to providing the foundational blocks for implementing control systems, `control-rs` should have templates
+that integrate control systems with crates from the embedded rust community. These templates can then provide users a
+starting point for developing their own products.
 
 ## Book
 

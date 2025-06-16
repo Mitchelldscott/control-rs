@@ -47,10 +47,10 @@ use crate::{state_space::utils::control_canonical, StateSpace, TransferFunction}
 /// ```
 pub fn dc_gain<T: Float, const M: usize, const N: usize>(tf: &TransferFunction<T, M, N>) -> T {
     if N > 0 {
-        if tf.denominator[N - 1].is_zero() {
+        if tf.denominator[0].is_zero() {
             T::infinity()
         } else if M > 0 {
-            tf.numerator[M - 1] / tf.denominator[N - 1]
+            tf.numerator[0] / tf.denominator[0]
         } else {
             T::nan()
         }
@@ -166,30 +166,31 @@ where
 /// * `TransferFunction` - transfer function scaled by `self.denominator[0]`
 ///
 /// # Example
-///
 /// ```
 /// use control_rs::{assert_f64_eq, transfer_function::{TransferFunction, as_monic}};
 /// let tf = TransferFunction::new([2.0, 1.0], [3.0, 1.0, 1.0]);
 /// let monic_tf = as_monic(&tf);
-/// assert_f64_eq!(monic_tf.numerator[0], 2.0 / 3.0);
+/// assert_f64_eq!(monic_tf.numerator[1], 2.0 / 3.0);
 /// ```
+///
+/// TODO: move to polynomial utils
 pub fn as_monic<T, const M: usize, const N: usize>(
     tf: &TransferFunction<T, M, N>,
 ) -> TransferFunction<T, M, N>
 where
-    T: Clone + Zero + Float,
+    T: Clone + Zero + Sub<Output = T> + Div<Output = T> + PartialOrd,
 {
-    let mut numerator = tf.numerator;
-    let mut denominator = tf.denominator;
+    let mut numerator = tf.numerator.clone();
+    let mut denominator = tf.denominator.clone();
 
-    if N > 0 && !denominator[0].is_zero() {
-        let leading_denominator = denominator[0];
+    if N > 0 && !denominator[N-1].is_zero() {
+        let leading_denominator = if denominator[N-1] > T::zero() {denominator[N-1].clone()} else {T::zero() - denominator[N-1].clone()};
         numerator
             .iter_mut()
-            .for_each(|b_i| *b_i = *b_i / leading_denominator);
+            .for_each(|b_i| *b_i = b_i.clone() / leading_denominator.clone());
         denominator
             .iter_mut()
-            .for_each(|a_i| *a_i = *a_i / leading_denominator);
+            .for_each(|a_i| *a_i = a_i.clone() / leading_denominator.clone());
     }
 
     TransferFunction {
@@ -202,12 +203,12 @@ where
 ///
 ///
 pub fn tf2ss<T, const N: usize, const M: usize, const L: usize>(
-    tf: TransferFunction<T, M, L>,
+    tf: &TransferFunction<T, M, L>,
 ) -> StateSpace<SMatrix<T, N, N>, SMatrix<T, N, 1>, SMatrix<T, 1, N>, SMatrix<T, 1, 1>>
 where
-    T: Float + Scalar,
+    T: Scalar + Clone + Zero + One + Neg<Output = T> + Div<Output = T> + Sub<Output = T> + PartialOrd,
     Const<L>: DimSub<U1, Output = Const<N>>,
 {
-    let tf_as_monic = as_monic(&tf);
-    control_canonical(tf_as_monic.numerator, tf_as_monic.denominator)
+    let tf_as_monic = as_monic(tf);
+    control_canonical(&tf_as_monic.numerator, &tf_as_monic.denominator)
 }

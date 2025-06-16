@@ -56,13 +56,13 @@ pub mod utils;
 
 mod aliases;
 pub use aliases::{Constant, Cubic, Line, Quadratic, Quartic, Quintic};
-
+use crate::systems::System;
 // ===============================================================================================
 //      Polynomial Tests
 // ===============================================================================================
 
 #[cfg(test)]
-mod basic_tests;
+mod basic_polynomial_tests;
 
 #[cfg(test)]
 mod arithmetic_tests;
@@ -660,6 +660,23 @@ where
 }
 
 // ===============================================================================================
+//      Polynomial System traits
+// ===============================================================================================
+
+impl<T, const N: usize> System for Polynomial<T, N>
+where
+    T: Copy + Clone + Zero + One,
+{
+    fn zero() -> Self {
+        Self::from_element(T::zero())
+    }
+
+    fn identity() -> Self {
+        Self::from_iterator([T::one()])
+    }
+}
+
+// ===============================================================================================
 //      Polynomial-Scalar Arithmetic
 // ===============================================================================================
 
@@ -679,10 +696,11 @@ impl<T: Clone + Neg<Output = T>, const N: usize> Neg for Polynomial<T, N> {
     /// Negates all coefficients in the polynomial
     #[inline]
     fn neg(self) -> Self::Output {
-        Self::from_fn(|i| {
-            // SAFETY: The index is usize (>= 0) and less than N
-            unsafe { self.get_unchecked(i).clone().neg() }
-        })
+        let mut neg_self = self;
+        for a in &mut neg_self.coefficients {
+            *a = a.clone().neg();
+        }
+        neg_self
     }
 }
 

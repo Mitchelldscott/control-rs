@@ -18,41 +18,51 @@ use core::{
     fmt,
     ops::{Add, Div, Mul, Neg},
 };
-use nalgebra::{Complex, RealField};
+use nalgebra::{Complex, Const, DimMax, DimSub, RealField, U1};
 use num_traits::{Float, One, Zero};
 
-use crate::frequency_tools::{FrequencyResponse, FrequencyTools};
+use crate::{
+    polynomial::utils::{reverse_array, array_from_iterator_with_default, add_generic},
+    frequency_tools::{FrequencyResponse, FrequencyTools}
+};
 
 // ===============================================================================================
 //      TransferFunction Tests
 // ===============================================================================================
 
 #[cfg(test)]
-mod edge_case_test;
+mod basic_tf_tests;
+
+#[cfg(test)]
+mod edge_case_tests;
 
 #[cfg(test)]
 mod tf_frequency_tests;
+
+#[cfg(test)]
+mod tf_arithmatic_tests;
 
 // ===============================================================================================
 //      TransferFunction Sub-modules
 // ===============================================================================================
 
 pub mod linear_tools;
-pub use linear_tools::*;
 
+pub use linear_tools::*;
+use crate::systems::System;
 // ===============================================================================================
-//      TransferFunction Tests
+//      TransferFunction
 // ===============================================================================================
 
 /// # Transfer Function
 ///
 /// <pre>
 /// G(s) = b(s) / a(s)
-/// a(s) = (a_0 * s^(N-1) + a_1 * s^(N-2) + ... + a_(N-1))
-/// b(s) = (b_0 * s^(M-1) + b_1 * s^(M-2) + ... + b_(M-1))
+/// a(s) = (a_n * s^n + a_1 * s^(n-1) + ... + a_0)
+/// b(s) = (b_m * s^m + b_1 * s^(m-1) + ... + b_0)
 /// </pre>
 ///
-/// Stores two polynomials, one for the numerator and one for the denominator.
+/// Stores the coefficients of two polynomials, one for the numerator and one for the denominator.
 ///
 /// # Generic Arguments
 /// * `T` - type of the coefficients
@@ -72,7 +82,29 @@ pub struct TransferFunction<T, const M: usize, const N: usize> {
 }
 
 impl<T, const M: usize, const N: usize> TransferFunction<T, M, N> {
-    /// Create a new transfer function from arrays of coefficients
+    /// Create a new transfer function from arrays of coefficients in degree-minor order
+    ///
+    /// # Arguments
+    /// * `numerator` - coefficients of the numerator `[b_0, b_1, ... b_m]`
+    /// * `denominator` - coefficients of the denominator `[a_0, a_1, ... a_n]`
+    ///
+    /// # Returns
+    /// * `TransferFunction` - static Transfer Function
+    ///
+    /// # Example
+    /// ```
+    /// use control_rs::TransferFunction;
+    /// // 1 / s^2
+    /// let tf = TransferFunction::new([1.0], [0.0, 0.0, 1.0]);
+    /// println!("{tf}");
+    /// ```
+    pub const fn from_data(numerator: [T; M], denominator: [T; N]) -> Self {
+        Self { numerator, denominator }
+    }
+}
+
+impl<T: Copy, const M: usize, const N: usize> TransferFunction<T, M, N> {
+    /// Create a new transfer function from arrays of coefficients in degree-major order
     ///
     /// # Arguments
     /// * `numerator` - coefficients of the numerator `[b_m, ... b_1, b_0]`
@@ -82,17 +114,17 @@ impl<T, const M: usize, const N: usize> TransferFunction<T, M, N> {
     /// * `TransferFunction` - static Transfer Function
     ///
     /// # Example
-    ///
     /// ```
     /// use control_rs::TransferFunction;
+    /// // s + 1 / s^2 + s + 1
     /// let tf = TransferFunction::new([1.0, 1.0], [1.0, 1.0, 1.0]);
     /// println!("{tf}");
     /// ```
     /// TODO: Unit Test
     pub const fn new(numerator: [T; M], denominator: [T; N]) -> Self {
         Self {
-            numerator,
-            denominator,
+            numerator: reverse_array(numerator),
+            denominator: reverse_array(denominator),
         }
     }
 }
@@ -104,13 +136,17 @@ impl<T: Clone, const N: usize, const M: usize> TransferFunction<T, M, N> {
     {
         self.numerator
             .iter()
-            .fold(U::zero(), |acc, a_i| acc * value.clone() + a_i.clone())
+            .rfold(U::zero(), |acc, a_i| acc * value.clone() + a_i.clone())
             / self
                 .denominator
                 .iter()
-                .fold(U::zero(), |acc, a_i| acc * value.clone() + a_i.clone())
+                .rfold(U::zero(), |acc, a_i| acc * value.clone() + a_i.clone())
     }
 }
+
+// ===============================================================================================
+//      Polynomial System traits
+// ===============================================================================================
 
 impl<T: Float + RealField, const M: usize, const N: usize> FrequencyTools<T, 1, 1>
     for TransferFunction<T, M, N>
@@ -127,6 +163,67 @@ impl<T: Float + RealField, const M: usize, const N: usize> FrequencyTools<T, 1, 
             });
     }
 }
+
+impl<T, const N: usize, const M: usize> System for TransferFunction<T, M, N>
+where
+    T: Copy + Clone + Zero + One,
+    Const<N>: DimSub<U1>,
+    Const<M>: DimSub<U1>,
+{
+    fn zero() -> Self {
+        Self::new([T::zero(); M], [T::zero(); N])
+    }
+
+    fn identity() -> Self {
+        Self::from_data(
+            array_from_iterator_with_default([T::one()], T::zero()),
+            array_from_iterator_with_default([T::one()], T::zero())
+        )
+    }
+}
+
+// ===============================================================================================
+//      TransferFunction-Scalar Arithmetic
+// ===============================================================================================
+
+impl<T: Clone + Neg<Output = T>, const M: usize, const N: usize> Neg for TransferFunction<T, M, N> {
+    type Output = Self;
+    fn neg(self) -> Self {
+        let mut neg_self = self;
+        for b in &mut neg_self.numerator {
+            *b = b.clone().neg();
+        }
+        for a in &mut neg_self.denominator {
+            *a = a.clone().neg();
+        }
+        neg_self
+    }
+}
+
+impl<T: Clone + Add<Output = T> + Mul<Output = T> + Zero,  const M: usize, const N: usize, const L: usize> Add<T> for TransferFunction<T, M, N>
+where
+    Const<N>: DimMax<Const<M>, Output = Const<L>>,
+{
+    type Output = TransferFunction<T, L, N>;
+    fn add(self, rhs: T) -> Self::Output {
+        let mut scaled_denom = self.denominator.clone();
+        #[allow(clippy::suspicious_arithmetic_impl)]
+        for a in &mut scaled_denom {
+            *a = a.clone() * rhs.clone();
+        }
+
+        TransferFunction::from_data(
+            add_generic(&scaled_denom, &self.numerator),
+            self.denominator
+        )
+
+    }
+}
+
+// ===============================================================================================
+//      TransferFunction Formatters
+// ===============================================================================================
+
 struct FmtLengthCounter {
     length: usize,
 }
@@ -181,44 +278,5 @@ where
         writeln!(f, "{}", crate::Polynomial::new(self.denominator))?;
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod basic_tf_tests {
-    //! Basic test cases to make sure the Transfer Function is usable
-    use crate::{assert_f64_eq, transfer_function::*};
-
-    #[test]
-    fn initialize_integrator() {
-        let tf = TransferFunction::new([1.0], [1.0, 0.0]);
-        assert_f64_eq!(tf.numerator[0], 1.0);
-        assert_f64_eq!(tf.denominator[0], 1.0);
-        assert_f64_eq!(tf.denominator[1], 0.0);
-    }
-
-    #[test]
-    fn tf_as_monic() {
-        let tf = TransferFunction::new([2.0], [2.0, 0.0]);
-        let monic_tf = as_monic(&tf);
-        assert_f64_eq!(monic_tf.numerator[0], 1.0);
-        assert_f64_eq!(monic_tf.denominator[0], 1.0);
-        assert_f64_eq!(monic_tf.denominator[1], 0.0);
-    }
-
-    #[test]
-    fn monic_tf_as_monic() {
-        let tf = TransferFunction::new([1.0, 1.0], [1.0, 0.0]);
-        let monic_tf = as_monic(&tf);
-        assert_f64_eq!(monic_tf.numerator[0], 1.0);
-        assert_f64_eq!(monic_tf.numerator[1], 1.0);
-        assert_f64_eq!(monic_tf.denominator[0], 1.0);
-        assert_f64_eq!(monic_tf.denominator[1], 0.0);
-    }
-
-    #[test]
-    fn test_lhp() {
-        let tf = TransferFunction::new([1.0, 1.0], [1.0, 1.0]);
-        assert!(lhp(&tf), "TF is not LHP stable");
     }
 }

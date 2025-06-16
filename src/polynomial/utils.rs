@@ -43,7 +43,7 @@ pub const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
 /// The safety relies on:
 /// - Fully initializing all elements of the `[MaybeUninit<T>; N]` array before calling `read()`
 /// - Not reading from or dropping uninitialized memory
-pub(super) fn array_from_iterator_with_default<I, T, const N: usize>(
+pub(crate) fn array_from_iterator_with_default<I, T, const N: usize>(
     iterator: I,
     default: T,
 ) -> [T; N]

@@ -1,7 +1,7 @@
 //! Utilities for creating, converting and analyzing SS models
 //!
 
-use core::ops::{Add, Div, Mul, Neg};
+use core::ops::{Add, Sub, Div, Mul, Neg};
 
 use nalgebra::{Const, DimSub, SMatrix, Scalar, U1};
 use num_traits::{One, Zero};
@@ -50,22 +50,22 @@ use super::StateSpace;
 ///
 /// ```
 /// use control_rs::state_space::{StateSpace, utils::control_canonical};
-/// let ss = control_canonical([1.0], [0.1, 0.0]);
+/// let ss = control_canonical(&[1.0], &[0.1, 0.0]);
 /// println!("{ss}");
 /// ```
 /// # TODO: repair docs
 pub fn control_canonical<T, const N: usize, const M: usize, const L: usize>(
-    b: [T; M],
-    a: [T; L],
+    b: &[T; M],
+    a: &[T; L],
 ) -> StateSpace<SMatrix<T, N, N>, SMatrix<T, N, 1>, SMatrix<T, 1, N>, SMatrix<T, 1, 1>>
 where
-    T: 'static + Copy + Scalar + Zero + One + Neg<Output = T> + Div<Output = T>,
+    T: Scalar + Clone + Zero + One + Neg<Output = T> + Div<Output = T>,
     Const<L>: DimSub<U1, Output = Const<N>>,
 {
     StateSpace {
         a: SMatrix::from_fn(|i, j| {
             if i == N - 1 {
-                a[L - j - 1].neg() / a[0]
+                a[j].clone().neg() / a[L-1].clone()
             } else if i + 1 == j {
                 T::one()
             } else {
@@ -73,7 +73,7 @@ where
             }
         }),
         b: SMatrix::from_fn(|i, _| if i == N - 1 { T::one() } else { T::zero() }),
-        c: SMatrix::from_fn(|_, j| if j < M { b[M - j - 1] } else { T::zero() }),
+        c: SMatrix::from_fn(|_, j| if j < M { b[j].clone() } else { T::zero() }),
         d: SMatrix::from_fn(|_, _| T::zero()),
     }
 }
@@ -109,7 +109,7 @@ where
 ///
 /// ```
 /// use control_rs::state_space::utils::{control_canonical, zoh};
-/// let ss = control_canonical([1.0, 1.0], [1.0, 1.0, 1.0]);
+/// let ss = control_canonical(&[1.0, 1.0], &[1.0, 1.0, 1.0]);
 /// let ssd = zoh(&ss, 0.1_f32);
 /// println!("{ssd}");
 /// ```
@@ -118,7 +118,7 @@ where
 /// - [ ] compare with [`nalgebra::Matrix::exp`]
 pub fn zoh<T, A, B, C, D>(ss: &StateSpace<A, B, C, D>, ts: T) -> StateSpace<A, B, C, D>
 where
-    T: Clone + Scalar + Zero + One + From<u8>,
+    T: Clone + Zero + One + Sub<Output = T>,
     A: Clone
         + One
         + Add<Output = A>
@@ -131,10 +131,18 @@ where
     C: Clone,
     D: Clone,
 {
-    let k: u8 = 10;
+    let k = 10;
+    // TODO: Really need constants to remove this garbage
+    let k_as_t = (0..k).fold(T::zero(), |t, _| T::one() + t.clone());
     let identity = A::one();
-    let psi = (0..k - 1).fold(identity.clone(), |psi, i| {
-        identity.clone() + ss.a.clone() * ts.clone() * psi / T::from(k - i)
+    // let psi = (0..k - 1).fold(identity.clone(), |psi, i| {
+    //     identity.clone() + ss.a.clone() * ts.clone() * psi / T::from(k - i)
+    // });
+    let (_, psi) = (0..k-1).fold((k_as_t, identity.clone()), |(k, psi), _| {
+        (
+            k.clone() - T::one(),
+            identity.clone() + ss.a.clone() * ts.clone() * psi / k
+        )
     });
     StateSpace {
         a: identity + ss.a.clone() * ts.clone() * psi.clone(),
