@@ -451,18 +451,6 @@ impl<T, const N: usize> Polynomial<T, N> {
         }
     }
 
-    /// Returns the constant term of the polynomial
-    ///
-    /// # Returns
-    /// * `Option<&T>`
-    ///     * `Some(constant)` - when N > 0
-    ///     * `None` - when N == 0
-    #[inline]
-    #[must_use]
-    pub fn constant(&self) -> Option<&T> {
-        self.coefficient(0)
-    }
-
     /// Returns a coefficient of the polynomial
     ///
     /// # Arguments
@@ -483,20 +471,6 @@ impl<T, const N: usize> Polynomial<T, N> {
         } else {
             None
         }
-    }
-
-    /// Returns the constant term of the polynomial
-    ///
-    /// # Returns
-    /// * `Option<&mut T>`
-    ///     * `Some(constant)` - when N > 0
-    ///     * `None` - when N == 0
-    ///
-    /// TODO: Unit Test + Example
-    #[inline]
-    #[must_use]
-    pub fn constant_mut(&mut self) -> Option<&mut T> {
-        self.coefficient_mut(0)
     }
 }
 
@@ -535,6 +509,39 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
         // SAFETY: degree exists and so is a valid index
         self.degree()
             .map(|degree| unsafe { self.get_unchecked_mut(degree) })
+    }
+}
+
+impl<T, const N: usize> Polynomial<T, N>
+where
+    Const<N>: DimSub<U1>,
+{
+    /// Returns the constant term of the polynomial
+    ///
+    /// # Returns
+    /// * `Option<&T>`
+    ///     * `Some(constant)` - when N > 0
+    ///     * `None` - when N == 0
+    #[inline]
+    #[must_use]
+    pub fn constant(&self) -> &T {
+        // SAFETY: `N > 0` so this is valid
+        unsafe { self.get_unchecked(0) }
+    }
+
+    /// Returns the constant term of the polynomial
+    ///
+    /// # Returns
+    /// * `Option<&mut T>`
+    ///     * `Some(constant)` - when N > 0
+    ///     * `None` - when N == 0
+    ///
+    /// TODO: Unit Test + Example
+    #[inline]
+    #[must_use]
+    pub fn constant_mut(&mut self) -> &mut T {
+        // SAFETY: `N > 0` so this is valid
+        unsafe { self.get_unchecked_mut(0) }
     }
 }
 
@@ -663,7 +670,7 @@ where
 /// use control_rs::Polynomial;
 /// let p1 = Polynomial::new([1, 2, 3]);
 /// let p2 = -p1; // Negate p1
-/// assert_eq!(*p2.constant().unwrap(), -3);
+/// assert_eq!(p2.constant(), -3);
 /// assert_eq!(*p2.leading_coefficient().unwrap(), -1);
 /// ```
 impl<T: Clone + Neg<Output = T>, const N: usize> Neg for Polynomial<T, N> {
@@ -686,7 +693,7 @@ impl<T: Clone + Neg<Output = T>, const N: usize> Neg for Polynomial<T, N> {
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([0]);
 /// let p2 = p1 + 1;
-/// assert_eq!(*p2.constant().unwrap(), 1);
+/// assert_eq!(p2.constant(), 1);
 /// ```
 impl<T: Clone + Add<Output = T>, const N: usize> Add<T> for Polynomial<T, N>
 where
@@ -712,7 +719,7 @@ where
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([0]);
 /// p1 += 1;
-/// assert_eq!(*p1.constant().unwrap(), 1);
+/// assert_eq!(p1.constant(), 1);
 /// ```
 impl<T: AddAssign, const N: usize> AddAssign<T> for Polynomial<T, N>
 where
@@ -734,7 +741,7 @@ where
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([0]);
 /// let p2 = p1 - 1;
-/// assert_eq!(*p2.constant().unwrap(), -1);
+/// assert_eq!(p2.constant(), -1);
 /// ```
 impl<T: Clone + Sub<Output = T>, const N: usize> Sub<T> for Polynomial<T, N>
 where
@@ -760,7 +767,7 @@ where
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([0]);
 /// p1 -= 1;
-/// assert_eq!(*p1.constant().unwrap(), -1);
+/// assert_eq!(p1.constant(), -1);
 /// ```
 impl<T: SubAssign, const N: usize> SubAssign<T> for Polynomial<T, N>
 where
@@ -809,7 +816,7 @@ where
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([1]);
 /// p1 *= 2;
-/// assert_eq!(p1.constant(), Some(&2));
+/// assert_eq!(p1.constant(), 2);
 /// ```
 impl<T: Clone + MulAssign, const N: usize> MulAssign<T> for Polynomial<T, N>
 where
@@ -886,9 +893,7 @@ where
     fn rem(self, rhs: T) -> Self::Output {
         Self::from_fn(|i|
             // SAFETY: The index is usize (>= 0) and less than N
-            unsafe {
-                self.get_unchecked(i).clone() % rhs.clone()
-            })
+            unsafe { self.get_unchecked(i).clone() % rhs.clone() })
     }
 }
 
