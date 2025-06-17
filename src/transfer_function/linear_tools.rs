@@ -183,8 +183,12 @@ where
     let mut numerator = tf.numerator.clone();
     let mut denominator = tf.denominator.clone();
 
-    if N > 0 && !denominator[N-1].is_zero() {
-        let leading_denominator = if denominator[N-1] > T::zero() {denominator[N-1].clone()} else {T::zero() - denominator[N-1].clone()};
+    if N > 0 && !denominator[N - 1].is_zero() {
+        let leading_denominator = if denominator[N - 1] > T::zero() {
+            denominator[N - 1].clone()
+        } else {
+            T::zero() - denominator[N - 1].clone()
+        };
         numerator
             .iter_mut()
             .for_each(|b_i| *b_i = b_i.clone() / leading_denominator.clone());
@@ -206,7 +210,14 @@ pub fn tf2ss<T, const N: usize, const M: usize, const L: usize>(
     tf: &TransferFunction<T, M, L>,
 ) -> StateSpace<SMatrix<T, N, N>, SMatrix<T, N, 1>, SMatrix<T, 1, N>, SMatrix<T, 1, 1>>
 where
-    T: Scalar + Clone + Zero + One + Neg<Output = T> + Div<Output = T> + Sub<Output = T> + PartialOrd,
+    T: Scalar
+        + Clone
+        + Zero
+        + One
+        + Neg<Output = T>
+        + Div<Output = T>
+        + Sub<Output = T>
+        + PartialOrd,
     Const<L>: DimSub<U1, Output = Const<N>>,
 {
     let tf_as_monic = as_monic(tf);

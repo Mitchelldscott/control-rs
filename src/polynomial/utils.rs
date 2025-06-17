@@ -406,10 +406,7 @@ where
 ///     r ← r − t × d
 /// return (q, r)
 ///</pre>
-pub fn long_division<T, const N: usize, const M: usize>(
-    dividend: [T; N],
-    divisor: [T; M],
-) -> [T; N]
+pub fn long_division<T, const N: usize, const M: usize>(dividend: [T; N], divisor: [T; M]) -> [T; N]
 where
     T: Clone + Zero + Div<Output = T> + Mul<Output = T> + AddAssign + SubAssign,
     Const<N>: DimMax<Const<M>, Output = Const<N>>,

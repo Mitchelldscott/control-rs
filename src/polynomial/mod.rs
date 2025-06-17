@@ -55,8 +55,8 @@ pub mod utils;
 // ===============================================================================================
 
 mod aliases;
-pub use aliases::{Constant, Cubic, Line, Quadratic, Quartic, Quintic};
 use crate::systems::System;
+pub use aliases::{Constant, Cubic, Line, Quadratic, Quartic, Quintic};
 // ===============================================================================================
 //      Polynomial Tests
 // ===============================================================================================

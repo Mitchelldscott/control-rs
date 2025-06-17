@@ -1,7 +1,7 @@
 //! Utilities for creating, converting and analyzing SS models
 //!
 
-use core::ops::{Add, Sub, Div, Mul, Neg};
+use core::ops::{Add, Div, Mul, Neg, Sub};
 
 use nalgebra::{Const, DimSub, SMatrix, Scalar, U1};
 use num_traits::{One, Zero};
@@ -65,7 +65,7 @@ where
     StateSpace {
         a: SMatrix::from_fn(|i, j| {
             if i == N - 1 {
-                a[j].clone().neg() / a[L-1].clone()
+                a[j].clone().neg() / a[L - 1].clone()
             } else if i + 1 == j {
                 T::one()
             } else {
@@ -138,10 +138,10 @@ where
     // let psi = (0..k - 1).fold(identity.clone(), |psi, i| {
     //     identity.clone() + ss.a.clone() * ts.clone() * psi / T::from(k - i)
     // });
-    let (_, psi) = (0..k-1).fold((k_as_t, identity.clone()), |(k, psi), _| {
+    let (_, psi) = (0..k - 1).fold((k_as_t, identity.clone()), |(k, psi), _| {
         (
             k.clone() - T::one(),
-            identity.clone() + ss.a.clone() * ts.clone() * psi / k
+            identity.clone() + ss.a.clone() * ts.clone() * psi / k,
         )
     });
     StateSpace {

@@ -22,8 +22,8 @@ use nalgebra::{Complex, Const, DimMax, DimSub, RealField, U1};
 use num_traits::{Float, One, Zero};
 
 use crate::{
-    polynomial::utils::{reverse_array, array_from_iterator_with_default, add_generic},
-    frequency_tools::{FrequencyResponse, FrequencyTools}
+    frequency_tools::{FrequencyResponse, FrequencyTools},
+    polynomial::utils::{add_generic, array_from_iterator_with_default, reverse_array},
 };
 
 // ===============================================================================================
@@ -48,8 +48,8 @@ mod tf_arithmatic_tests;
 
 pub mod linear_tools;
 
-pub use linear_tools::*;
 use crate::systems::System;
+pub use linear_tools::*;
 // ===============================================================================================
 //      TransferFunction
 // ===============================================================================================
@@ -99,7 +99,10 @@ impl<T, const M: usize, const N: usize> TransferFunction<T, M, N> {
     /// println!("{tf}");
     /// ```
     pub const fn from_data(numerator: [T; M], denominator: [T; N]) -> Self {
-        Self { numerator, denominator }
+        Self {
+            numerator,
+            denominator,
+        }
     }
 }
 
@@ -177,7 +180,7 @@ where
     fn identity() -> Self {
         Self::from_data(
             array_from_iterator_with_default([T::one()], T::zero()),
-            array_from_iterator_with_default([T::one()], T::zero())
+            array_from_iterator_with_default([T::one()], T::zero()),
         )
     }
 }
@@ -200,7 +203,12 @@ impl<T: Clone + Neg<Output = T>, const M: usize, const N: usize> Neg for Transfe
     }
 }
 
-impl<T: Clone + Add<Output = T> + Mul<Output = T> + Zero,  const M: usize, const N: usize, const L: usize> Add<T> for TransferFunction<T, M, N>
+impl<
+        T: Clone + Add<Output = T> + Mul<Output = T> + Zero,
+        const M: usize,
+        const N: usize,
+        const L: usize,
+    > Add<T> for TransferFunction<T, M, N>
 where
     Const<N>: DimMax<Const<M>, Output = Const<L>>,
 {
@@ -212,11 +220,7 @@ where
             *a = a.clone() * rhs.clone();
         }
 
-        TransferFunction::from_data(
-            add_generic(scaled_denom, self.numerator),
-            self.denominator
-        )
-
+        TransferFunction::from_data(add_generic(scaled_denom, self.numerator), self.denominator)
     }
 }
 

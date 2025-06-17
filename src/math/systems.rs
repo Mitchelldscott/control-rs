@@ -61,7 +61,6 @@ pub trait System: Clone {
     fn identity() -> Self;
 }
 
-
 #[cfg(test)]
 mod feedback_test {
     use super::*;
@@ -86,8 +85,7 @@ mod feedback_test {
         GH: System + Add<Output = GH>,
         H: System,
     {
-        sign_in * sys1.clone()
-            / (GH::identity() + sign_feedback * sys1.clone() * sys2.clone())
+        sign_in * sys1.clone() / (GH::identity() + sign_feedback * sys1.clone() * sys2.clone())
     }
 
     #[test]
