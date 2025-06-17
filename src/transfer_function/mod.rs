@@ -213,7 +213,7 @@ where
         }
 
         TransferFunction::from_data(
-            add_generic(&scaled_denom, &self.numerator),
+            add_generic(scaled_denom, self.numerator),
             self.denominator
         )
 

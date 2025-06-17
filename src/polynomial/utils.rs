@@ -309,36 +309,36 @@ where
 
 /// Adds two polynomials.
 ///
-/// This function does not put any requirements on the shape of the inputs and outputs
+/// This function takes ownership of the given arrays
 pub fn add_generic<T, const N: usize, const M: usize, const L: usize>(
-    lhs: &[T; N],
-    rhs: &[T; M],
+    lhs: [T; N],
+    rhs: [T; M],
 ) -> [T; L]
 where
     T: Clone + Add<Output = T> + Zero,
     Const<N>: DimMax<Const<M>, Output = Const<L>>,
 {
-    let mut result: [T; L] = array_from_iterator_with_default(lhs.iter().cloned(), T::zero());
-    for (a, b) in result.iter_mut().zip(rhs.iter()) {
-        *a = a.clone() + b.clone();
+    let mut result: [T; L] = array_from_iterator_with_default(lhs, T::zero());
+    for (a, b) in result.iter_mut().zip(rhs.into_iter()) {
+        *a = a.clone().add(b);
     }
     result
 }
 
 /// Subtracts two polynomials
 ///
-/// This function does not put any requirements on the shape of the inputs and outputs
+/// This function takes ownership of the given arrays
 pub fn sub_generic<T, const N: usize, const M: usize, const L: usize>(
-    lhs: &[T; N],
-    rhs: &[T; M],
+    lhs: [T; N],
+    rhs: [T; M],
 ) -> [T; L]
 where
     T: Clone + Sub<Output = T> + Zero,
     Const<N>: DimMax<Const<M>, Output = Const<L>>,
 {
-    let mut result: [T; L] = array_from_iterator_with_default(lhs.iter().cloned(), T::zero());
-    for (a, b) in result.iter_mut().zip(rhs.iter()) {
-        *a = a.clone() - b.clone();
+    let mut result: [T; L] = array_from_iterator_with_default(lhs, T::zero());
+    for (a, b) in result.iter_mut().zip(rhs.into_iter()) {
+        *a = a.clone().sub(b);
     }
     result
 }
@@ -358,11 +358,11 @@ where
 /// let p1 = [1i32; 2];
 /// let p2 = [1i32; 2];
 /// let mut p3 = [0i32; 3];
-/// assert_eq!(convolution(&p1, &p2), [1i32, 2i32, 1i32], "wrong convolution result");
+/// assert_eq!(convolution(p1, p2), [1i32, 2i32, 1i32], "wrong convolution result");
 /// ```
 pub fn convolution<T, const N: usize, const M: usize, const L: usize>(
-    lhs: &[T; N],
-    rhs: &[T; M],
+    lhs: [T; N],
+    rhs: [T; M],
 ) -> [T; L]
 where
     T: Clone + AddAssign + Mul<Output = T> + Zero,
@@ -394,7 +394,7 @@ where
 /// use control_rs::polynomial::utils::long_division;
 /// let p1 = [1i32; 2];
 /// let p2 = [1i32; 2];
-/// assert_eq!(long_division(&p1, &p2), [1i32, 0i32], "wrong division result");
+/// assert_eq!(long_division(p1, p2), [1i32, 0i32], "wrong division result");
 /// ```
 ///
 /// # Algorithm
@@ -407,8 +407,8 @@ where
 /// return (q, r)
 ///</pre>
 pub fn long_division<T, const N: usize, const M: usize>(
-    dividend: &[T; N],
-    divisor: &[T; M],
+    dividend: [T; N],
+    divisor: [T; M],
 ) -> [T; N]
 where
     T: Clone + Zero + Div<Output = T> + Mul<Output = T> + AddAssign + SubAssign,
@@ -416,13 +416,13 @@ where
 {
     let mut quotient = array::from_fn(|_| T::zero());
     // Find actual degrees
-    let dividend_order = largest_nonzero_index(dividend);
-    let divisor_order = largest_nonzero_index(divisor);
+    let dividend_order = largest_nonzero_index(&dividend);
+    let divisor_order = largest_nonzero_index(&divisor);
 
     // degree of self and rhs exists
     if let Some(dividend_order) = dividend_order {
         if let Some(divisor_order) = divisor_order {
-            let mut remainder = dividend.clone();
+            let mut remainder = dividend;
             // SAFETY: divisor_order is less than the capacity of divisor
             let leading_divisor = unsafe { divisor.get_unchecked(divisor_order) };
 

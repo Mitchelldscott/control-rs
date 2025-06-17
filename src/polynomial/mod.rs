@@ -721,10 +721,10 @@ where
 
     #[inline]
     fn add(self, rhs: T) -> Self::Output {
-        let mut result = self.clone();
+        let mut result = self;
         // SAFETY: `N > 0` so the index is valid
         unsafe {
-            *result.get_unchecked_mut(0) = self.get_unchecked(0).clone() + rhs;
+            *result.get_unchecked_mut(0) = result.get_unchecked(0).clone().add(rhs);
         }
         result
     }
@@ -745,9 +745,9 @@ where
 {
     #[inline]
     fn add_assign(&mut self, rhs: T) {
-        // SAFETY: `N > 0` so the index is always valid
+        // SAFETY: `N > 0` so the index is valid
         unsafe {
-            *self.get_unchecked_mut(0) += rhs;
+            self.get_unchecked_mut(0).add_assign(rhs);
         }
     }
 }
@@ -769,10 +769,10 @@ where
 
     #[inline]
     fn sub(self, rhs: T) -> Self::Output {
-        let mut result = self.clone();
+        let mut result = self;
         // SAFETY: `N > 0` so the index is valid
         unsafe {
-            *result.get_unchecked_mut(0) = self.get_unchecked(0).clone() - rhs;
+            *result.get_unchecked_mut(0) = result.get_unchecked(0).clone().sub(rhs);
         }
         result
     }
@@ -795,7 +795,7 @@ where
     fn sub_assign(&mut self, rhs: T) {
         // SAFETY: `N > 0` so the index is valid
         unsafe {
-            *self.get_unchecked_mut(0) -= rhs;
+            self.get_unchecked_mut(0).sub_assign(rhs);
         }
     }
 }
@@ -820,10 +820,11 @@ where
     /// Returns a new polynomial with all coefficients scaled by rhs
     #[inline]
     fn mul(self, rhs: T) -> Self::Output {
-        Self::Output::from_fn(|i| {
-            // SAFETY: The index is usize (>= 0) and less than N
-            unsafe { self.get_unchecked(i).clone() * rhs.clone() }
-        })
+        let mut product = self;
+        for a in product.iter_mut() {
+            *a = a.clone().mul(rhs.clone());
+        }
+        product
     }
 }
 
@@ -842,7 +843,7 @@ where
 {
     fn mul_assign(&mut self, rhs: T) {
         for a_i in self.iter_mut() {
-            *a_i *= rhs.clone();
+            a_i.mul_assign(rhs.clone());
         }
     }
 }
@@ -865,10 +866,11 @@ where
     /// Returns a new polynomial with all coefficients scaled by 1 / rhs
     #[inline]
     fn div(self, rhs: T) -> Self::Output {
-        Self::Output::from_fn(|i| {
-            // SAFETY: The index is usize (>= 0) and less than N
-            unsafe { self.get_unchecked(i).clone() / rhs.clone() }
-        })
+        let mut quotient = self;
+        for a in quotient.iter_mut() {
+            *a = a.clone().div(rhs.clone());
+        }
+        quotient
     }
 }
 
@@ -886,8 +888,8 @@ where
     Const<N>: DimSub<U1>,
 {
     fn div_assign(&mut self, rhs: T) {
-        for a_i in self.iter_mut() {
-            *a_i /= rhs.clone();
+        for a_i in &mut self.coefficients {
+            a_i.div_assign(rhs.clone());
         }
     }
 }
@@ -898,8 +900,7 @@ where
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([1, 2, 3]);
-/// let p2 = p1 % 2;
-/// assert_eq!(p2, Polynomial::new([1, 0, 1]));
+/// assert_eq!(p1 % 2, Polynomial::new([1, 0, 1]));
 /// ```
 /// TODO: Unit Test
 impl<T: Clone + Rem<Output = T>, const N: usize> Rem<T> for Polynomial<T, N>
@@ -909,9 +910,11 @@ where
     type Output = Self;
 
     fn rem(self, rhs: T) -> Self::Output {
-        Self::from_fn(|i|
-            // SAFETY: The index is usize (>= 0) and less than N
-            unsafe { self.get_unchecked(i).clone() % rhs.clone() })
+        let mut remainder = self;
+        for a in remainder.iter_mut() {
+            *a = a.clone().rem(rhs.clone());
+        }
+        remainder
     }
 }
 
@@ -931,7 +934,7 @@ where
 {
     fn rem_assign(&mut self, rhs: T) {
         for a_i in self.iter_mut() {
-            *a_i %= rhs.clone();
+            a_i.rem_assign(rhs.clone());
         }
     }
 }
@@ -946,7 +949,7 @@ macro_rules! impl_left_scalar_ops {
                 type Output = Polynomial<$scalar, N>;
                 #[inline(always)]
                 fn add(self, rhs: Polynomial<$scalar, N>) -> Self::Output {
-                    rhs + self.clone()
+                    rhs.add(self)
                 }
             }
             impl<const N: usize> Sub<Polynomial<$scalar, N>> for $scalar
@@ -956,9 +959,9 @@ macro_rules! impl_left_scalar_ops {
                 type Output = Polynomial<$scalar, N>;
                 #[inline(always)]
                 fn sub(self, rhs: Polynomial<$scalar, N>) -> Self::Output {
-                    let mut result = Self::Output::from_iterator([self.clone()]);
+                    let mut result = Self::Output::from_iterator([self]);
                     for (a, b) in result.iter_mut().zip(rhs.iter()) {
-                        *a = a.clone() - b.clone();
+                        *a = a.clone().sub(b.clone());
                     }
                     result
                 }
@@ -970,7 +973,7 @@ macro_rules! impl_left_scalar_ops {
                 type Output = Polynomial<$scalar, N>;
                 #[inline(always)]
                 fn mul(self, rhs: Polynomial<$scalar, N>) -> Self::Output {
-                    rhs.clone() * self.clone()
+                    rhs.mul(self)
                 }
             }
             impl<const N: usize> Div<Polynomial<$scalar, N>> for $scalar
@@ -980,9 +983,9 @@ macro_rules! impl_left_scalar_ops {
                 type Output = Polynomial<$scalar, N>;
                 #[inline(always)]
                 fn div(self, rhs: Polynomial<$scalar, N>) -> Self::Output {
-                    let mut result = rhs.clone();
+                    let mut result = rhs;
                     for a_i in result.iter_mut() {
-                        *a_i = self.clone() / a_i.clone();
+                        *a_i = self.clone().div(a_i.clone());
                     }
                     result
                 }
@@ -1016,7 +1019,7 @@ where
     /// Adds the coefficients of a polynomial together
     #[inline]
     fn add(self, rhs: Polynomial<T, M>) -> Self::Output {
-        Polynomial::<T, L>::from_data(utils::add_generic(&self.coefficients, &rhs.coefficients))
+        Polynomial::from_data(utils::add_generic(self.coefficients, rhs.coefficients))
     }
 }
 
@@ -1065,7 +1068,7 @@ where
     /// Subtracts the coefficients of a polynomial from each other
     #[inline]
     fn sub(self, rhs: Polynomial<T, M>) -> Self::Output {
-        Polynomial::<T, L>::from_data(utils::sub_generic(&self.coefficients, &rhs.coefficients))
+        Polynomial::from_data(utils::sub_generic(self.coefficients, rhs.coefficients))
     }
 }
 
@@ -1115,7 +1118,7 @@ where
     /// Multiplies the coefficients of a polynomial, also known as a convolution
     #[inline]
     fn mul(self, rhs: Polynomial<T, M>) -> Self::Output {
-        Polynomial::<T, L>::from_data(utils::convolution(&self.coefficients, &rhs.coefficients))
+        Polynomial::from_data(utils::convolution(self.coefficients, rhs.coefficients))
     }
 }
 
@@ -1139,8 +1142,8 @@ where
     #[inline]
     fn div(self, divisor: Polynomial<T, M>) -> Self::Output {
         Self::from_data(utils::long_division(
-            &self.coefficients,
-            &divisor.coefficients,
+            self.coefficients,
+            divisor.coefficients,
         ))
     }
 }
