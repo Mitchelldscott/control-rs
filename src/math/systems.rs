@@ -61,14 +61,32 @@ pub trait System: Clone {
     fn identity() -> Self;
 }
 
+impl System for f32 {
+    fn zero() -> Self {
+        0.0f32
+    }
+    fn identity() -> Self {
+        1.0f32
+    }
+}
+impl System for f64 {
+    fn zero() -> Self {
+        0.0f64
+    }
+    fn identity() -> Self {
+        1.0f64
+    }
+}
+
 #[cfg(test)]
 mod feedback_test {
     use super::*;
 
     use core::ops::{Add, Div, Mul};
 
+    use crate::assert_f32_eq;
     use crate::polynomial::Constant;
-    // use crate::TransferFunction;
+    use crate::TransferFunction;
 
     use num_traits::{One, Zero};
 
@@ -78,11 +96,11 @@ mod feedback_test {
     ///
     /// # Generic Arguments
     /// * `T` - Type of the input variable(s)
-    fn feedback<T, G, H, GH, CL>(sys1: &G, sys2: &H, sign_in: T, sign_feedback: T) -> CL
+    fn feedback<T, G, H, GH, GH2, CL>(sys1: &G, sys2: &H, sign_in: T, sign_feedback: T) -> CL
     where
         T: Clone + Zero + One + Mul<G, Output = G> + Mul<GH, Output = GH>,
-        G: System + Mul<H, Output = GH> + Div<GH, Output = CL>,
-        GH: System + Add<Output = GH>,
+        G: System + Mul<H, Output = GH> + Div<GH2, Output = CL>,
+        GH: System + Add<Output = GH2>, // GH2 is needed because TFa + TFa = TFb, TFa::M != TFb::M
         H: System,
     {
         sign_in * sys1.clone() / (GH::identity() + sign_feedback * sys1.clone() * sys2.clone())
@@ -113,9 +131,15 @@ mod feedback_test {
         );
     }
 
-    // #[test]
-    // fn tf_closed_loop() {
-    //     let tf = TransferFunction::new([1.0], [1.0, 0.1, 0.0]);
-    //     let cl_tf = feedback(&tf, &1.0, 1.0, -1.0);
-    // }
+    #[test]
+    fn tf_closed_loop() {
+        let tf = TransferFunction::new([1.0], [1.0, 1.0]);
+        let cl_tf = feedback(&tf, &1.0, 1.0, -1.0);
+        assert_f32_eq!(cl_tf.numerator[0], 1.0);
+        assert_f32_eq!(cl_tf.numerator[1], 1.0);
+        assert_f32_eq!(cl_tf.numerator[2], 0.0);
+        assert_f32_eq!(cl_tf.denominator[0], 0.0);
+        assert_f32_eq!(cl_tf.denominator[1], 1.0);
+        assert_f32_eq!(cl_tf.denominator[2], 1.0);
+    }
 }

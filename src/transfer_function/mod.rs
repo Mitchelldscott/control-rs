@@ -16,14 +16,17 @@
 
 use core::{
     fmt,
-    ops::{Add, Div, Mul, Neg},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
-use nalgebra::{Complex, Const, DimMax, DimSub, RealField, U1};
+use nalgebra::{Complex, Const, DimAdd, DimMax, DimSub, RealField, U1};
 use num_traits::{Float, One, Zero};
 
 use crate::{
     frequency_tools::{FrequencyResponse, FrequencyTools},
-    polynomial::utils::{add_generic, array_from_iterator_with_default, reverse_array},
+    polynomial::utils::{
+        add_generic, array_from_iterator_with_default, convolution, reverse_array, sub_generic,
+    },
+    systems::System,
 };
 
 // ===============================================================================================
@@ -34,22 +37,23 @@ use crate::{
 mod basic_tf_tests;
 
 #[cfg(test)]
-mod edge_case_tests;
+mod tf_edge_case_tests;
 
 #[cfg(test)]
 mod tf_frequency_tests;
 
 #[cfg(test)]
-mod tf_arithmatic_tests;
+mod tf_scalar_arithmetic_tests;
+
+#[cfg(test)]
+mod tf_arithmetic_tests;
 
 // ===============================================================================================
 //      TransferFunction Sub-modules
 // ===============================================================================================
 
-pub mod linear_tools;
-
-use crate::systems::System;
-pub use linear_tools::*;
+pub mod utils;
+pub use utils::*;
 // ===============================================================================================
 //      TransferFunction
 // ===============================================================================================
@@ -203,24 +207,309 @@ impl<T: Clone + Neg<Output = T>, const M: usize, const N: usize> Neg for Transfe
     }
 }
 
-impl<
-        T: Clone + Add<Output = T> + Mul<Output = T> + Zero,
-        const M: usize,
-        const N: usize,
-        const L: usize,
-    > Add<T> for TransferFunction<T, M, N>
+impl<T, const M: usize, const N: usize, const M2: usize> Add<T> for TransferFunction<T, M, N>
 where
-    Const<N>: DimMax<Const<M>, Output = Const<L>>,
+    T: Clone + Add<Output = T> + Mul<Output = T> + Zero,
+    Const<M>: DimMax<Const<N>, Output = Const<M2>>,
 {
-    type Output = TransferFunction<T, L, N>;
+    type Output = TransferFunction<T, M2, N>;
     fn add(self, rhs: T) -> Self::Output {
         let mut scaled_denom = self.denominator.clone();
         #[allow(clippy::suspicious_arithmetic_impl)]
         for a in &mut scaled_denom {
-            *a = a.clone() * rhs.clone();
+            *a = a.clone().mul(rhs.clone());
         }
 
-        TransferFunction::from_data(add_generic(scaled_denom, self.numerator), self.denominator)
+        TransferFunction::from_data(add_generic(self.numerator, scaled_denom), self.denominator)
+    }
+}
+
+impl<T, const M: usize, const N: usize> AddAssign<T> for TransferFunction<T, M, N>
+where
+    T: Clone + AddAssign + Mul<Output = T>,
+    Const<M>: DimMax<Const<N>, Output = Const<M>>,
+{
+    fn add_assign(&mut self, rhs: T) {
+        let mut scaled_denom = self.denominator.clone();
+        #[allow(clippy::suspicious_arithmetic_impl)]
+        for a in &mut scaled_denom {
+            *a = a.clone().mul(rhs.clone());
+        }
+        for (numerator, denominator) in self.numerator.iter_mut().zip(scaled_denom.into_iter()) {
+            numerator.add_assign(denominator);
+        }
+    }
+}
+
+impl<T, const M: usize, const N: usize, const L: usize> Sub<T> for TransferFunction<T, M, N>
+where
+    T: Clone + Sub<Output = T> + Mul<Output = T> + Zero,
+    Const<M>: DimMax<Const<N>, Output = Const<L>>,
+{
+    type Output = TransferFunction<T, L, N>;
+    fn sub(self, rhs: T) -> Self::Output {
+        let mut scaled_denom = self.denominator.clone();
+        #[allow(clippy::suspicious_arithmetic_impl)]
+        for a in &mut scaled_denom {
+            *a = a.clone().mul(rhs.clone());
+        }
+
+        TransferFunction::from_data(sub_generic(self.numerator, scaled_denom), self.denominator)
+    }
+}
+
+impl<T, const M: usize, const N: usize> SubAssign<T> for TransferFunction<T, M, N>
+where
+    T: Clone + SubAssign + Mul<Output = T>,
+    Const<M>: DimMax<Const<N>, Output = Const<M>>,
+{
+    fn sub_assign(&mut self, rhs: T) {
+        let mut scaled_denom = self.denominator.clone();
+        #[allow(clippy::suspicious_arithmetic_impl)]
+        for a in &mut scaled_denom {
+            *a = a.clone().mul(rhs.clone());
+        }
+        for (numerator, denominator) in self.numerator.iter_mut().zip(scaled_denom.into_iter()) {
+            numerator.sub_assign(denominator);
+        }
+    }
+}
+
+impl<T, const M: usize, const N: usize> Mul<T> for TransferFunction<T, M, N>
+where
+    T: Clone + Mul<Output = T>,
+{
+    type Output = Self;
+    fn mul(self, rhs: T) -> Self::Output {
+        let mut product = self;
+        for numerator in &mut product.numerator {
+            *numerator = numerator.clone().mul(rhs.clone());
+        }
+        product
+    }
+}
+
+impl<T, const M: usize, const N: usize> MulAssign<T> for TransferFunction<T, M, N>
+where
+    T: Clone + MulAssign,
+{
+    fn mul_assign(&mut self, rhs: T) {
+        for numerator in &mut self.numerator {
+            numerator.mul_assign(rhs.clone());
+        }
+    }
+}
+impl<T, const M: usize, const N: usize> Div<T> for TransferFunction<T, M, N>
+where
+    T: Clone + Mul<Output = T> + Zero,
+{
+    type Output = Self;
+    fn div(self, rhs: T) -> Self::Output {
+        let mut product = self;
+        for denominator in &mut product.denominator {
+            *denominator = denominator.clone().mul(rhs.clone());
+        }
+        product
+    }
+}
+
+impl<T, const M: usize, const N: usize> DivAssign<T> for TransferFunction<T, M, N>
+where
+    T: Clone + MulAssign,
+{
+    fn div_assign(&mut self, rhs: T) {
+        for denominator in &mut self.denominator {
+            denominator.mul_assign(rhs.clone());
+        }
+    }
+}
+
+macro_rules! impl_left_scalar_ops {
+    ($($scalar:ty),*) => {
+        $(
+            impl<const M: usize, const N: usize, const M2: usize> Add<TransferFunction<$scalar, M, N>> for $scalar
+            where
+                Const<M>: DimMax<Const<N>, Output = Const<M2>>,
+            {
+                type Output = TransferFunction<$scalar, M2, N>;
+                #[inline(always)]
+                fn add(self, rhs: TransferFunction<$scalar, M, N>) -> Self::Output {
+                    rhs.add(self)
+                }
+            }
+            impl<const M: usize, const N: usize, const M2: usize> Sub<TransferFunction<$scalar, M, N>> for $scalar
+            where
+                Const<N>: DimMax<Const<M>, Output = Const<M2>>,
+            {
+                type Output = TransferFunction<$scalar, M2, N>;
+                #[inline(always)]
+                fn sub(self, rhs: TransferFunction<$scalar, M, N>) -> Self::Output {
+                    let mut scaled_denom = rhs.denominator.clone();
+                    for a in &mut scaled_denom {
+                        *a = a.clone().mul(self.clone());
+                    }
+                    TransferFunction::from_data(sub_generic(scaled_denom, rhs.numerator), rhs.denominator)
+                }
+            }
+            impl<const M: usize, const N: usize> Mul<TransferFunction<$scalar, M, N>> for $scalar
+            where
+                Const<N>: DimSub<U1>,
+            {
+                type Output = TransferFunction<$scalar, M, N>;
+                #[inline(always)]
+                fn mul(self, rhs: TransferFunction<$scalar, M, N>) -> Self::Output {
+                    rhs.mul(self)
+                }
+            }
+            impl<const M: usize, const N: usize> Div<TransferFunction<$scalar, M, N>> for $scalar
+            where
+                Const<N>: DimSub<U1>,
+            {
+                type Output = TransferFunction<$scalar, N, M>;
+                #[inline(always)]
+                fn div(self, rhs: TransferFunction<$scalar, M, N>) -> Self::Output {
+                    let mut scaled_denom = rhs.denominator.clone();
+                    for a in &mut scaled_denom {
+                        *a = a.clone().mul(self.clone());
+                    }
+                    TransferFunction::from_data(scaled_denom, rhs.numerator)
+                }
+            }
+        )*
+    };
+}
+
+impl_left_scalar_ops!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
+
+// ===============================================================================================
+//      TransferFunction Arithmetic
+// ===============================================================================================
+
+impl<
+        T,
+        const M1: usize,
+        const N1: usize,
+        const M2: usize,
+        const N2: usize,
+        const S1: usize,
+        const S2: usize,
+        const M3: usize,
+        const N3: usize,
+    > Add<TransferFunction<T, M2, N2>> for TransferFunction<T, M1, N1>
+where
+    T: Clone + AddAssign + Mul<Output = T> + Zero,
+    // Bound for self.numerator * rhs.denominator
+    Const<M1>: DimAdd<Const<N2>>,
+    <Const<M1> as DimAdd<Const<N2>>>::Output: DimSub<U1, Output = Const<S1>>,
+    // Bound for rhs.numerator * self.denominator
+    Const<M2>: DimAdd<Const<N1>>,
+    <Const<M2> as DimAdd<Const<N1>>>::Output: DimSub<U1, Output = Const<S2>>,
+    // Bound for (self.numerator * rhs.denominator) + (rhs.numerator * self.denominator)
+    Const<S1>: DimMax<Const<S2>, Output = Const<M3>>,
+    // Bound for self.denominator * rhs.denominator
+    Const<N1>: DimAdd<Const<N2>>,
+    <Const<N1> as DimAdd<Const<N2>>>::Output: DimSub<U1, Output = Const<N3>>,
+{
+    type Output = TransferFunction<T, M3, N3>;
+    fn add(self, rhs: TransferFunction<T, M2, N2>) -> Self::Output {
+        TransferFunction::from_data(
+            add_generic(
+                convolution(self.numerator, rhs.denominator.clone()),
+                convolution(rhs.numerator, self.denominator.clone()),
+            ),
+            convolution(self.denominator, rhs.denominator),
+        )
+    }
+}
+
+impl<
+        T,
+        const M1: usize,
+        const N1: usize,
+        const M2: usize,
+        const N2: usize,
+        const S1: usize,
+        const S2: usize,
+        const M3: usize,
+        const N3: usize,
+    > Sub<TransferFunction<T, M2, N2>> for TransferFunction<T, M1, N1>
+where
+    T: Clone + AddAssign + Sub<Output = T> + Mul<Output = T> + Zero,
+    // Bound for self.numerator * rhs.denominator
+    Const<M1>: DimAdd<Const<N2>>,
+    <Const<M1> as DimAdd<Const<N2>>>::Output: DimSub<U1, Output = Const<S1>>,
+    // Bound for rhs.numerator * self.denominator
+    Const<M2>: DimAdd<Const<N1>>,
+    <Const<M2> as DimAdd<Const<N1>>>::Output: DimSub<U1, Output = Const<S2>>,
+    // Bound for (self.numerator * rhs.denominator) + (rhs.numerator * self.denominator)
+    Const<S1>: DimMax<Const<S2>, Output = Const<M3>>,
+    // Bound for self.denominator * rhs.denominator
+    Const<N1>: DimAdd<Const<N2>>,
+    <Const<N1> as DimAdd<Const<N2>>>::Output: DimSub<U1, Output = Const<N3>>,
+{
+    type Output = TransferFunction<T, M3, N3>;
+    fn sub(self, rhs: TransferFunction<T, M2, N2>) -> Self::Output {
+        TransferFunction::from_data(
+            sub_generic(
+                convolution(self.numerator, rhs.denominator.clone()),
+                convolution(rhs.numerator, self.denominator.clone()),
+            ),
+            convolution(self.denominator, rhs.denominator),
+        )
+    }
+}
+
+impl<
+        T,
+        const M1: usize,
+        const N1: usize,
+        const M2: usize,
+        const N2: usize,
+        const M3: usize,
+        const N3: usize,
+    > Mul<TransferFunction<T, M2, N2>> for TransferFunction<T, M1, N1>
+where
+    T: Clone + AddAssign + Mul<Output = T> + Zero,
+    // Bound for self.numerator * rhs.numerator
+    Const<M1>: DimAdd<Const<M2>>,
+    <Const<M1> as DimAdd<Const<M2>>>::Output: DimSub<U1, Output = Const<M3>>,
+    // Bound for self.denominator * rhs.denominator
+    Const<N1>: DimAdd<Const<N2>>,
+    <Const<N1> as DimAdd<Const<N2>>>::Output: DimSub<U1, Output = Const<N3>>,
+{
+    type Output = TransferFunction<T, M3, N3>;
+    fn mul(self, rhs: TransferFunction<T, M2, N2>) -> Self::Output {
+        TransferFunction::from_data(
+            convolution(self.numerator, rhs.numerator),
+            convolution(self.denominator, rhs.denominator),
+        )
+    }
+}
+
+impl<
+        T,
+        const M1: usize,
+        const N1: usize,
+        const M2: usize,
+        const N2: usize,
+        const M3: usize,
+        const N3: usize,
+    > Div<TransferFunction<T, M2, N2>> for TransferFunction<T, M1, N1>
+where
+    T: Clone + AddAssign + Mul<Output = T> + Zero,
+    // Bound for self.numerator * rhs.denominator
+    Const<M1>: DimAdd<Const<N2>>,
+    <Const<M1> as DimAdd<Const<N2>>>::Output: DimSub<U1, Output = Const<M3>>,
+    // Bound for self.denominator * rhs.numerator
+    Const<N1>: DimAdd<Const<M2>>,
+    <Const<N1> as DimAdd<Const<M2>>>::Output: DimSub<U1, Output = Const<N3>>,
+{
+    type Output = TransferFunction<T, M3, N3>;
+    fn div(self, rhs: TransferFunction<T, M2, N2>) -> Self::Output {
+        TransferFunction::from_data(
+            convolution(self.numerator, rhs.denominator),
+            convolution(self.denominator, rhs.numerator),
+        )
     }
 }
 
