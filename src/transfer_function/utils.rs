@@ -12,6 +12,7 @@ use nalgebra::{
 use num_traits::{Float, One, Zero};
 
 use crate::{state_space::utils::control_canonical, StateSpace, TransferFunction};
+use crate::polynomial::utils::largest_nonzero_index;
 
 /// Computes the DC gain of a continuous transfer function.
 ///
@@ -99,9 +100,7 @@ where
     Const<L>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
 {
-    crate::polynomial::utils::roots::<T, N, L>(&crate::polynomial::utils::reverse_array(
-        tf.denominator,
-    ))
+    crate::polynomial::utils::roots::<T, N, L>(&tf.denominator)
 }
 
 /// Check if the system's poles lie on the left-half plane (LHP), a condition for stability.
@@ -183,12 +182,8 @@ where
     let mut numerator = tf.numerator.clone();
     let mut denominator = tf.denominator.clone();
 
-    if N > 0 && !denominator[N - 1].is_zero() {
-        let leading_denominator = if denominator[N - 1] > T::zero() {
-            denominator[N - 1].clone()
-        } else {
-            T::zero() - denominator[N - 1].clone()
-        };
+    if let Some(den_deg) = largest_nonzero_index(&denominator) {
+        let leading_denominator = denominator[den_deg].clone();
         numerator
             .iter_mut()
             .for_each(|b_i| *b_i = b_i.clone() / leading_denominator.clone());

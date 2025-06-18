@@ -528,10 +528,11 @@ impl fmt::Write for FmtLengthCounter {
     }
 }
 
-fn formatted_length<T: fmt::Display>(value: &T) -> usize {
+fn formatted_length<T: fmt::Display>(value: &T, f: &mut fmt::Formatter<'_>) -> usize {
     use fmt::Write;
+    let precision = f.precision().unwrap_or(crate::math::DEFAULT_PRECISION);
     let mut counter = FmtLengthCounter { length: 0 };
-    write!(&mut counter, "{value}").unwrap();
+    write!(&mut counter, "{value:precision$}").unwrap();
     counter.length
 }
 
@@ -541,8 +542,11 @@ where
     T: Copy + Zero + One + Neg<Output = T> + PartialOrd + fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let num_len = formatted_length(&crate::Polynomial::new(self.numerator));
-        let den_len = formatted_length(&crate::Polynomial::new(self.denominator));
+        let num = crate::Polynomial::from_data(self.numerator);
+        let den = crate::Polynomial::from_data(self.denominator);
+        let num_len = formatted_length(&num, f);
+        let den_len = formatted_length(&den, f);
+        let precision = f.precision().unwrap_or(crate::math::DEFAULT_PRECISION);
 
         let (n_align, d_align, bar_len) = if den_len > num_len {
             ((den_len - num_len) / 2, 0, den_len)
@@ -556,7 +560,7 @@ where
         for _ in 0..n_align {
             write!(f, " ")?;
         }
-        writeln!(f, "{}", crate::Polynomial::new(self.numerator))?;
+        writeln!(f, "{num:.precision$}")?;
 
         // Write division bar
         for _ in 0..bar_len {
@@ -568,7 +572,7 @@ where
         for _ in 0..d_align {
             write!(f, " ")?;
         }
-        writeln!(f, "{}", crate::Polynomial::new(self.denominator))?;
+        writeln!(f, "{den:.precision$}")?;
 
         Ok(())
     }

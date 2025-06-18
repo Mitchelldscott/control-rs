@@ -107,6 +107,8 @@ fn main() {
     plot(_sim_data);
 
     let cl_motor_tf = feedback(&motor_tf, &1.0, 1.0, -1.0);
+    println!("CL {cl_motor_tf:.6}");
+    println!("CL System Poles: {:?}", poles(&cl_motor_tf).ok());
 
     // Simulates adding a simple feedforward controller that scales the input by the inverse of the
     // dc_gain, resulting in a new dc_gain = 1. In reality, this drives the motor state to the value
