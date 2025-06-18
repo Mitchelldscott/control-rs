@@ -1,5 +1,7 @@
 //! higher level traits for numerical models
 
+use core::ops::{Add, Div, Mul};
+use num_traits::{One, Zero};
 use crate::state_space::StateSpace;
 
 /// # Dynamical System
@@ -61,6 +63,22 @@ pub trait System: Clone {
     fn identity() -> Self;
 }
 
+/// Feedback of two systems
+///
+/// This function implements the feedback of two systems.
+///
+/// # Generic Arguments
+/// * `T` - Type of the input variable(s)
+pub fn feedback<T, G, H, GH, CL>(sys1: &G, sys2: &H, sign_in: T, sign_feedback: T) -> CL
+where
+    T: Clone + Zero + One + Mul<G, Output = G> + Mul<GH, Output = GH>,
+    G: System + Mul<H, Output = GH> + Div<GH, Output = CL>,
+    GH: System + Add<Output = GH>,
+    H: System,
+{
+    sign_in * sys1.clone() / (GH::identity() + sign_feedback * sys1.clone() * sys2.clone())
+}
+
 #[cfg(test)]
 mod feedback_test {
     use super::*;
@@ -71,22 +89,6 @@ mod feedback_test {
     // use crate::TransferFunction;
 
     use num_traits::{One, Zero};
-
-    /// Feedback of two systems
-    ///
-    /// This function implements the feedback of two systems.
-    ///
-    /// # Generic Arguments
-    /// * `T` - Type of the input variable(s)
-    fn feedback<T, G, H, GH, CL>(sys1: &G, sys2: &H, sign_in: T, sign_feedback: T) -> CL
-    where
-        T: Clone + Zero + One + Mul<G, Output = G> + Mul<GH, Output = GH>,
-        G: System + Mul<H, Output = GH> + Div<GH, Output = CL>,
-        GH: System + Add<Output = GH>,
-        H: System,
-    {
-        sign_in * sys1.clone() / (GH::identity() + sign_feedback * sys1.clone() * sys2.clone())
-    }
 
     #[test]
     fn zero_constant() {

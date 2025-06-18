@@ -307,7 +307,6 @@ impl<T: Copy, const N: usize> Polynomial<T, N> {
     /// assert_eq!(Polynomial::new([1, 2, 3]), Polynomial::from_data([3, 2, 1])); // x^2 + 2x + 3
     /// assert_eq!(Polynomial::new([0.0, 1.0, 2.0]), Polynomial::from_iterator([2.0, 1.0])); // x + 2
     /// ```
-    /// TODO: Unit Test
     #[inline]
     pub const fn new(coefficients: [T; N]) -> Self {
         Self::from_data(utils::reverse_array(coefficients))
@@ -439,7 +438,12 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///     * `Some(coefficient)` - when N > degree
     ///     * `None` - when N <= degree
     ///
-    /// TODO: Unit Test
+    /// # Example
+    /// ```
+    /// use control_rs::Polynomial;
+    /// let p = Polynomial::new([1, 2, 3]);
+    /// assert_eq!(p.constant(), p.coefficient(0).unwrap());
+    /// ```
     #[inline]
     #[must_use]
     pub fn coefficient(&self, degree: usize) -> Option<&T> {
@@ -461,7 +465,12 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///     * `Some(coefficient)` - when N > degree
     ///     * `None` - when N <= degree
     ///
-    /// TODO: Unit Test + Example
+    /// ```
+    /// use control_rs::Polynomial;
+    /// let mut p = Polynomial::new([0, 2, 3]);
+    /// *p.coefficient_mut(2).unwrap() += 1;
+    /// assert_eq!(p, Polynomial::new([1, 2, 3]));
+    /// ```
     #[inline]
     #[must_use]
     pub fn coefficient_mut(&mut self, degree: usize) -> Option<&mut T> {
@@ -484,7 +493,12 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     ///     * `Some(leading_coefficient)` - when N > 0
     ///     * `None` - when N == 0
     ///
-    /// TODO: Unit Test
+    /// # Example
+    /// ```
+    /// use control_rs::Polynomial;
+    /// let p = Polynomial::new([0, 0, 1]);
+    /// assert_eq!(p.constant(), p.leading_coefficient().unwrap());
+    /// ```
     #[inline]
     #[must_use]
     pub fn leading_coefficient(&self) -> Option<&T> {
@@ -502,7 +516,14 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     ///     * `Some(leading_coefficient)` - when N > 0
     ///     * `None` - when N == 0
     ///
-    /// TODO: Unit Test + Example
+    ///
+    /// # Example
+    /// ```
+    /// use control_rs::Polynomial;
+    /// let mut p = Polynomial::new([0, 0, 1]);
+    /// *p.leading_coefficient_mut().unwrap() += 1;
+    /// assert_eq!(p, Polynomial::new([0, 0, 2]));
+    /// ```
     #[inline]
     #[must_use]
     pub fn leading_coefficient_mut(&mut self) -> Option<&mut T> {
@@ -522,6 +543,13 @@ where
     /// * `Option<&T>`
     ///     * `Some(constant)` - when N > 0
     ///     * `None` - when N == 0
+    ///
+    /// # Example
+    /// ```
+    /// use control_rs::Polynomial;
+    /// let p = Polynomial::new([1]);
+    /// assert_eq!(p.constant(), &1);
+    /// ```
     #[inline]
     #[must_use]
     pub fn constant(&self) -> &T {
@@ -536,7 +564,13 @@ where
     ///     * `Some(constant)` - when N > 0
     ///     * `None` - when N == 0
     ///
-    /// TODO: Unit Test + Example
+    /// # Example
+    /// ```
+    /// use control_rs::Polynomial;
+    /// let mut p = Polynomial::new([1, 0, 0]);
+    /// *p.constant_mut() += 1;
+    /// assert_eq!(p, Polynomial::new([1, 0, 1]));
+    /// ```
     #[inline]
     #[must_use]
     pub fn constant_mut(&mut self) -> &mut T {

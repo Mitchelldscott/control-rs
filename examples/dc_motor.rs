@@ -30,7 +30,7 @@
 ///
 /// ## Plant
 /// <pre> P(s) = Km / ((Js + b)(Ls + R) + Km^2) (rad/sec / V) </pre>
-use control_rs::{integrators::runge_kutta4, math::systems::DynamicalSystem, transfer_function::*};
+use control_rs::{integrators::runge_kutta4, math::systems::{DynamicalSystem, feedback}, transfer_function::*};
 use nalgebra::{Vector1, Vector2};
 
 // Define motor parameters
@@ -106,7 +106,7 @@ fn main() {
     #[cfg(feature = "std")]
     plot(_sim_data);
 
-    // let cl_motor_tf = feedback(motor_tf, 1.0, );
+    let cl_motor_tf = feedback(&motor_tf, &1.0, 1.0, -1.0);
 
     // Simulates adding a simple feedforward controller that scales the input by the inverse of the
     // dc_gain, resulting in a new dc_gain = 1. In reality, this drives the motor state to the value
