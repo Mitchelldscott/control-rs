@@ -1,8 +1,8 @@
 # Control-rs
 
 `control-rs` is a control system toolbox built for real-time embedded applications. The crate provides generic 
-implementations and specializations of numerical models, similar to how nalgebra's `Matrix` works. Unlike nalgebra, all 
-models are statically sized, so there are no allocations.
+implementations and specializations of numerical models, similar to how nalgebra's `Matrix` works. On top of these
+models `control-rs` provides a set of traits for analyzing, synthesizing and simulating the models.
 
 The crate is `no_std` by default and supports both fixed-point and floating-point numeric types, making it suitable 
 for deployment on a wide range of microcontrollers. In the future `control-rs` hopes to provide template projects for 
