@@ -1,8 +1,8 @@
 //! higher level traits for numerical models
 
+use crate::state_space::StateSpace;
 use core::ops::{Add, Div, Mul};
 use num_traits::{One, Zero};
-use crate::state_space::StateSpace;
 
 /// # Dynamical System
 ///
@@ -100,11 +100,7 @@ impl System for f64 {
 mod feedback_test {
     use super::*;
 
-    use crate::{
-        assert_f32_eq,
-        TransferFunction,
-        polynomial::Constant,
-    };
+    use crate::{assert_f32_eq, polynomial::Constant, TransferFunction};
 
     #[test]
     fn zero_constant() {

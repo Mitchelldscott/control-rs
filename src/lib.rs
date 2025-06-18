@@ -1,8 +1,7 @@
 //! # Control-rs
 //!
 //! `control-rs` is structured around core numerical model representations, each implementing common
-//! traits to have a consistent interface for simulation, analysis and synthesis. This is all done
-//! to provide a clean interface for users to turn models into datasets and datasets into models.
+//! traits to have a consistent process for simulation, analysis and synthesis.
 //!
 //! Each numerical model type has its own module and utilities. The models are re-exported to be
 //! available from the crate root while the utilities are only available through the specific
@@ -38,18 +37,18 @@
 #![warn(rust_2018_idioms)]
 #![warn(missing_docs, unused)]
 
-pub mod state_space;
-pub use state_space::StateSpace;
-
-pub mod transfer_function;
-pub use transfer_function::TransferFunction;
-
 pub mod frequency_tools;
-
-pub mod polynomial;
-pub use polynomial::Polynomial;
 
 pub mod integrators;
 
 pub mod math;
 pub use math::systems;
+
+pub mod polynomial;
+pub use polynomial::Polynomial;
+
+pub mod state_space;
+pub use state_space::StateSpace;
+
+pub mod transfer_function;
+pub use transfer_function::TransferFunction;

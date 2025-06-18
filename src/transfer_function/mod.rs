@@ -414,10 +414,10 @@ where
     fn add(self, rhs: TransferFunction<T, M2, N2>) -> Self::Output {
         TransferFunction::from_data(
             add_generic(
-                convolution(self.numerator, rhs.denominator.clone()),
-                convolution(rhs.numerator, self.denominator.clone()),
+                convolution(&self.numerator, &rhs.denominator),
+                convolution(&rhs.numerator, &self.denominator),
             ),
-            convolution(self.denominator, rhs.denominator),
+            convolution(&self.denominator, &rhs.denominator),
         )
     }
 }
@@ -451,10 +451,10 @@ where
     fn sub(self, rhs: TransferFunction<T, M2, N2>) -> Self::Output {
         TransferFunction::from_data(
             sub_generic(
-                convolution(self.numerator, rhs.denominator.clone()),
-                convolution(rhs.numerator, self.denominator.clone()),
+                convolution(&self.numerator, &rhs.denominator),
+                convolution(&rhs.numerator, &self.denominator),
             ),
-            convolution(self.denominator, rhs.denominator),
+            convolution(&self.denominator, &rhs.denominator),
         )
     }
 }
@@ -480,8 +480,8 @@ where
     type Output = TransferFunction<T, M3, N3>;
     fn mul(self, rhs: TransferFunction<T, M2, N2>) -> Self::Output {
         TransferFunction::from_data(
-            convolution(self.numerator, rhs.numerator),
-            convolution(self.denominator, rhs.denominator),
+            convolution(&self.numerator, &rhs.numerator),
+            convolution(&self.denominator, &rhs.denominator),
         )
     }
 }
@@ -507,8 +507,8 @@ where
     type Output = TransferFunction<T, M3, N3>;
     fn div(self, rhs: TransferFunction<T, M2, N2>) -> Self::Output {
         TransferFunction::from_data(
-            convolution(self.numerator, rhs.denominator),
-            convolution(self.denominator, rhs.numerator),
+            convolution(&self.numerator, &rhs.denominator),
+            convolution(&self.denominator, &rhs.numerator),
         )
     }
 }
@@ -528,7 +528,7 @@ impl fmt::Write for FmtLengthCounter {
     }
 }
 
-fn formatted_length<T: fmt::Display>(value: &T, f: &mut fmt::Formatter<'_>) -> usize {
+fn formatted_length<T: fmt::Display>(value: &T, f: &fmt::Formatter<'_>) -> usize {
     use fmt::Write;
     let precision = f.precision().unwrap_or(crate::math::DEFAULT_PRECISION);
     let mut counter = FmtLengthCounter { length: 0 };

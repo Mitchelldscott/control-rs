@@ -11,8 +11,8 @@ use nalgebra::{
 };
 use num_traits::{Float, One, Zero};
 
-use crate::{state_space::utils::control_canonical, StateSpace, TransferFunction};
 use crate::polynomial::utils::largest_nonzero_index;
+use crate::{state_space::utils::control_canonical, StateSpace, TransferFunction};
 
 /// Computes the DC gain of a continuous transfer function.
 ///

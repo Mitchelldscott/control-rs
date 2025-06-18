@@ -1,13 +1,21 @@
 # Control-rs
 
-`control-rs` is a control system toolbox built for real-time embedded applications. The crate provides generic 
-implementations and specializations of numerical models, similar to how nalgebra's `Matrix` works. On top of these
-models `control-rs` provides a set of traits for analyzing, synthesizing and simulating the models.
+Rust-native numerical modeling and synthesis library for embedded projects.
 
 The crate is `no_std` by default and supports both fixed-point and floating-point numeric types, making it suitable 
-for deployment on a wide range of microcontrollers. In the future `control-rs` hopes to provide template projects for 
-components like motor controllers, battery management systems, and autonomous navigation logic. The goal is to provide 
-a reliable and high performance, open-source foundation for embedded control software.
+for deployment on a wide range of microcontrollers. The goal is to provide Cargo project templates to enable a reliable 
+and high performance, open-source foundation for embedded control software.
+
+The vision is that users can use the templates to either fabricate their own robot components or integrate the 
+templates into more complex modules.
+
+This list covers a few projects that are in the works:
+- [ ] DC Motor lead-lag compensator
+- [ ] BLDC ESC (FOC or fancy 6-stage commuter)
+- [ ] LiPo Battery model adaptive estimator
+- [ ] Quadcopter attitude/altitude controller
+- [ ] Visual-Inertial Odometry
+- [ ] Orbit Determination/Visual localization (EKF, UKF using Nadir pointing pinhole camera and known landmarks)
 
 ## Features
 
@@ -16,7 +24,9 @@ a reliable and high performance, open-source foundation for embedded control sof
 * **Synthesis**: Direct and data-driven methods to construct models
 * **Simulation**: Precision model integration (and in the future time-series/episodic dataset tools)
 
-## Installation (Not Supported... haven't published the crate yet, clone this repo instead)
+## Getting Started
+
+### Installation (Not Supported... haven't published the crate yet, clone this repo instead)
 
 Add this to your `Cargo.toml`:
 
@@ -31,7 +41,7 @@ or run
 cargo add control-rs
 ```
 
-## Usage
+### Example
 
 Here's a simple example to get you started:
 
@@ -52,16 +62,6 @@ fn main() {
     }
 }
 ```
-
-## Examples
-
-Examples are either based on a textbook problem or demo a practical application. This list covers a few examples that
-are in the works:
-- [ ] DC Motor lead-lag compensator
-- [ ] BLDC ESC (FOC or fancy 6-stage commuter)
-- [ ] LiPo Battery model adaptive estimator
-- [ ] Orbit Determination (EKF, UKF using Nadir pointing pinhole camera and known landmarks)
-- [ ] Visual-Inertial Odometry
 
 ## Testing
 
@@ -118,3 +118,9 @@ functions you need so `control-rs` can be your one-stop-shop solution for design
 This project should have a license, but vscode kept complaining. I'll bring it back soon.
 
 Thank you for using `control-rs`!
+
+## Acknowledgements
+
+This project is heavily inspired by the MATLab Control Systems Toolbox, many of the functions were written to have the
+same call signatures. Also, the core models are almost an exact copy of `nalgebra`'s matrix and many of the trait bounds 
+wouldn't be possible without their crate.

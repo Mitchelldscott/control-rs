@@ -69,7 +69,10 @@ pub use aliases::{Constant, Cubic, Line, Quadratic, Quartic, Quintic};
 mod basic_polynomial_tests;
 
 #[cfg(test)]
-mod arithmetic_tests;
+mod polynomial_arithmetic_tests;
+
+#[cfg(test)]
+mod polynomial_utility_tests;
 
 // ===============================================================================================
 //      Polynomial
@@ -602,31 +605,58 @@ where
 //      Calculus
 // ===============================================================================================
 
+/// Represents the base cases of polynomial differentiation
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum DerivativeEdgeCase {
+    /// The polynomial has no non-zero coefficients
+    DerivativeOfZero,
+    /// Only the polynomial's constant term is non-zero (degree = 0)
+    Zero,
+}
+
 impl<T: Clone + AddAssign + Zero + One, const N: usize> Polynomial<T, N> {
     /// Computes the derivative of a polynomial.
     ///
     /// See [`utils::differentiate()`] for more.
     ///
     /// # Returns
-    /// * `Polynomial` - a polynomial with capacity `N - 1`
+    /// *`Polynomial` - a polynomial with capacity `N - 1`
+    ///
+    /// # Errors
+    /// * `Zero` - The polynomial's degree is zero, this replaces returning an empty polynomial
+    /// * `DerivativeOfZero` - The polynomial has no non-zero terms
     ///
     /// # Examples
     /// ```
     /// use control_rs::polynomial::Polynomial;
     /// let p1 = Polynomial::new([3_i32, 2_i32, 1_i32]); // Represents 3x^2 + 2x + 1
     /// assert_eq!(
-    ///     p1.derivative(),
+    ///     p1.derivative().expect("Incorrect derivative"),
     ///     Polynomial::from_data([2_i32, 6_i32]), // 6x + 2
-    ///     "Incorrect polynomial derivative"
+    ///     "Incorrect derivative"
     /// );
     /// ```
-    // TODO: Unit test
     #[inline]
-    pub fn derivative<const M: usize>(&self) -> Polynomial<T, M>
+    pub fn derivative<const M: usize>(&self) -> Result<Polynomial<T, M>, DerivativeEdgeCase>
     where
-        Const<N>: DimSub<U1, Output = Const<M>> + nalgebra::ToTypenum,
+        Const<N>: DimSub<U1, Output = Const<M>>, // `N > 0`, successful derivative is `N-1` items
     {
-        Polynomial::from_data(utils::differentiate(&self.coefficients))
+        self.degree().map_or_else(
+            || Err(DerivativeEdgeCase::DerivativeOfZero),
+            |degree| match degree {
+                0 => Err(DerivativeEdgeCase::Zero), // derivative of constant is zero, `N > 0`
+                1 => {
+                    // derivative of a line is a constant, the constant is not zero
+                    // this case avoids a few additions but might not boost performance by much
+                    // SAFETY: degree is 1, so 1 is a valid index
+                    let constant = unsafe { self.get_unchecked(1).clone() };
+                    Ok(Polynomial::from_iterator([constant]))
+                }
+                _ => Ok(Polynomial::from_data(utils::differentiate(
+                    &self.coefficients,
+                ))),
+            },
+        )
     }
 }
 
@@ -648,7 +678,6 @@ impl<T: Clone + Zero + One + AddAssign + Div<Output = T>, const N: usize> Polyno
     ///     "Incorrect polynomial integral"
     /// );
     /// ```
-    // TODO: Unit test
     #[inline]
     pub fn integral<const M: usize>(&self, constant: T) -> Polynomial<T, M>
     where
@@ -668,7 +697,6 @@ impl<T: Copy + Zero + One + Neg<Output = T> + Div<Output = T>, const N: usize> P
     /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]); // x^3 - 6x^2 + 11x - 6
     /// assert_eq!(p.companion(), [[6.0, -11.0, 6.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], "incorrect companion");
     /// ```
-    // TODO: Unit test
     pub fn companion<const M: usize>(&self) -> [[T; M]; M]
     where
         Const<N>: DimSub<U1, Output = Const<M>>,
@@ -691,7 +719,8 @@ where
     /// ```
     /// # Errors
     /// * `NoRoots` - the polynomial has no roots, or the function could not compute them
-    // TODO: Unit test
+    ///
+    /// TODO: Review return cases
     pub fn roots<const M: usize>(&self) -> Result<[Complex<T>; M], utils::NoRoots>
     where
         T: Copy
@@ -733,7 +762,7 @@ where
 //      Polynomial-Scalar Arithmetic
 // ===============================================================================================
 
-/// # -Polynomial<T, N>
+/// Negates the coefficients of a polynomial.
 ///
 /// # Example
 /// ```
@@ -757,7 +786,7 @@ impl<T: Clone + Neg<Output = T>, const N: usize> Neg for Polynomial<T, N> {
     }
 }
 
-/// Adds a scalar value to a polynomial.
+/// Adds a constant to a polynomial.
 ///
 /// Only available for polynomials that have a constant term (i.e., `N > 0`).
 ///
@@ -785,7 +814,7 @@ where
     }
 }
 
-/// # Polynomial<T, N> += T
+/// Adds a constant to a polynomial and assigns the result to the original polynomial.
 ///
 /// # Example
 /// ```
@@ -807,7 +836,7 @@ where
     }
 }
 
-/// # Polynomial<T, N> - T
+/// Subtracts a constant from a polynomial.
 ///
 /// # Example
 /// ```
@@ -833,7 +862,7 @@ where
     }
 }
 
-/// # Polynomial<T, N> -= T
+/// Subtracts a constant from a polynomial and assigns the result to the original polynomial.
 ///
 /// # Example
 /// ```
@@ -855,7 +884,7 @@ where
     }
 }
 
-/// # Polynomial<T, N> * T
+/// Multiplies a polynomial by its field type.
 ///
 /// # Example
 /// ```
@@ -883,7 +912,7 @@ where
     }
 }
 
-/// # Polynomial<T, N> *= T
+/// Multiplies a polynomial by its field type and assigns the result to the original polynomial.
 ///
 /// # Example
 /// ```
@@ -903,7 +932,7 @@ where
     }
 }
 
-/// # Polynomial<T, N> / T
+/// Divides a polynomial by its field type.
 ///
 /// # Example
 /// ```
@@ -929,7 +958,7 @@ where
     }
 }
 
-/// # Polynomial<T, N> /= T
+/// Divides a polynomial by its field type and assigns the result to the original polynomial.
 ///
 /// # Example
 /// ```
@@ -949,7 +978,7 @@ where
     }
 }
 
-/// # Polynomial<T, N> % T
+/// Computes the remainder of a polynomial divided by its field type.
 ///
 /// # Example
 /// ```
@@ -973,7 +1002,8 @@ where
     }
 }
 
-/// # Polynomial<T, N> %= T
+/// Computes the remainder of polynomial divided by its field type and assigns the result to the
+/// original polynomial.
 ///
 /// # Example
 /// ```
@@ -1055,7 +1085,7 @@ impl_left_scalar_ops!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
 //      Polynomial-Polynomial Arithmetic
 // ===============================================================================================
 
-/// # Polynomial<T, N> + Polynomial<T, M>
+/// Add two polynomials.
 ///
 /// # Example
 /// ```
@@ -1173,7 +1203,7 @@ where
     /// Multiplies the coefficients of a polynomial, also known as a convolution
     #[inline]
     fn mul(self, rhs: Polynomial<T, M>) -> Self::Output {
-        Polynomial::from_data(utils::convolution(self.coefficients, rhs.coefficients))
+        Polynomial::from_data(utils::convolution(&self.coefficients, &rhs.coefficients))
     }
 }
 

@@ -111,10 +111,12 @@ pub fn largest_nonzero_index<T: Zero>(coefficients: &[T]) -> Option<usize> {
 /// It iterates through the coefficients, effectively shifting them to a lower exponent
 /// and multiplying by the original exponent.
 ///
+/// > **Note**: if `N == 1` the result will be an empty array, in some cases this may be unexpected
+///
 /// # Examples
 /// ```
 /// use control_rs::polynomial::utils::differentiate;
-/// assert_eq!(differentiate(&[0]), []); // d/dt(1) = 0 base case is an empty array
+/// assert_eq!(differentiate(&[1]), []); // d/dt(1) = 0 base case is an empty array
 /// assert_eq!(differentiate(&[1, 2]), [2]); // d/dt(2x + 1) = 2
 /// assert_eq!(differentiate(&[1, 1, 1]), [1, 2]); // d/dt(x^2 + x + 1) = 2x + 1
 /// ```
@@ -173,7 +175,7 @@ where
 /// It is constructed from an identity matrix, a zero column and a row of the polynomial's
 /// coefficients scaled by the highest term.
 ///
-/// **Note**: if the leading coefficient is zero, the result will be incorrect.
+/// > **Note**: if the leading coefficient is zero, the result will be incorrect.
 ///
 /// <pre>
 /// companion(a_n * x^n + ... + a_1 * x + a_0) =
@@ -196,7 +198,6 @@ where
     T: Clone + Zero + One + Neg<Output = T> + Div<Output = T>,
     Const<N>: DimSub<U1, Output = Const<M>>,
 {
-    // assert!(coefficients.len() == M+1, "M is not a valid index to coefficients");
     let mut companion = array::from_fn(|_| array::from_fn(|_| T::zero()));
 
     // SAFETY: `M` is a valid index because Const<N> impl DimSub<U1, Output = Const<M>> so `N > 0`
@@ -235,7 +236,7 @@ pub struct NoRoots;
 /// assert_f64_eq!(roots[1].re, 2.0, 1e-14);
 /// assert_f64_eq!(roots[2].re, 1.0);
 /// ```
-/// TODO: Docs + Unit Tests + better return object + use recursion for leading zero cases
+/// TODO: Docs + Unit Tests + Integer implementation
 pub fn roots<T, const N: usize, const M: usize>(
     coefficients: &[T; N],
 ) -> Result<[Complex<T>; M], NoRoots>
@@ -358,11 +359,11 @@ where
 /// let p1 = [1i32; 2];
 /// let p2 = [1i32; 2];
 /// let mut p3 = [0i32; 3];
-/// assert_eq!(convolution(p1, p2), [1i32, 2i32, 1i32], "wrong convolution result");
+/// assert_eq!(convolution(&p1, &p2), [1i32, 2i32, 1i32], "wrong convolution result");
 /// ```
 pub fn convolution<T, const N: usize, const M: usize, const L: usize>(
-    lhs: [T; N],
-    rhs: [T; M],
+    lhs: &[T; N],
+    rhs: &[T; M],
 ) -> [T; L]
 where
     T: Clone + AddAssign + Mul<Output = T> + Zero,
