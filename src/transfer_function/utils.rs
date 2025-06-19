@@ -95,7 +95,8 @@ where
         + Div<Output = T>
         + PartialOrd
         + fmt::Debug
-        + RealField,
+        + RealField
+        + Float,
     Const<N>: DimSub<U1, Output = Const<L>>,
     Const<L>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,

@@ -12,7 +12,7 @@ use nalgebra::{
     allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax,
     DimSub, RealField, SMatrix, U1,
 };
-use num_traits::{One, Zero};
+use num_traits::{Float, One, Zero};
 
 /// Helper function to reverse arrays given to `Polynomial::new()`
 #[inline]
@@ -222,7 +222,86 @@ where
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub struct NoRoots;
 
+/// Computes the root of a line.
+///
+/// # Errors
+/// * `NoRoots` - the function was not able to compute a solution for the line
+///
+/// # Example
+/// ```
+/// use control_rs::{polynomial::utils::linear_root, assert_f64_eq};
+/// assert_eq!(linear_root(1, 0), Ok(0));
+/// ```
+pub fn linear_root<T: Zero + Neg<Output = T> + Div<Output = T>>(m: T, b: T) -> Result<T, NoRoots> {
+    if m.is_zero() {
+        return Err(NoRoots);
+    }
+
+    Ok(b.neg() / m)
+}
+
+/// Computes the root of a quadratic.
+///
+/// # Errors
+/// * `NoRoots` - the function was not able to compute a solution for the quadratic
+///
+/// # Example
+/// ```
+/// use control_rs::{polynomial::utils::quadratic_roots, assert_f64_eq};
+/// let roots = quadratic_roots(1.0, 0.0, 0.0);
+/// assert_f64_eq!(roots[0].re, 0.0, 1.5e-14); // having precision issues...
+/// assert_f64_eq!(roots[1].re, 0.0, 1e-14);
+/// ```
+/// TODO: Integer support
+pub fn quadratic_roots<T>(a: T, b: T, c: T) -> Result<[Complex<T>; 2], NoRoots>
+where
+    T: Clone
+        + PartialOrd
+        + Zero
+        + Sub<Output = T>
+        + Div<Output = T>
+        + Mul<Output = T>
+        + Neg<Output = T>
+        + RealField,
+{
+    let ac = a.clone() * c;
+    let discriminant = (b.clone() * b.clone()) - (ac.clone() + ac.clone() + ac.clone() + ac);
+    let two_a = a.clone() + a;
+    let b_neg = b.neg();
+    if discriminant < T::zero() {
+        let real_part = b_neg / two_a.clone();
+        let imag_part = (-discriminant).sqrt() / two_a;
+        Ok([
+            Complex {
+                re: real_part.clone(),
+                im: imag_part.clone(),
+            },
+            Complex {
+                re: real_part,
+                im: imag_part.neg(),
+            },
+        ])
+    } else {
+        let discriminant_sqrt = discriminant.sqrt();
+        Ok([
+            Complex {
+                re: (b_neg.clone() + discriminant_sqrt.clone()) / two_a.clone(),
+                im: T::zero(),
+            },
+            Complex {
+                re: (b_neg - discriminant_sqrt) / two_a,
+                im: T::zero(),
+            },
+        ])
+    }
+}
+
 /// Computes the roots of the polynomial.
+///
+/// This function returns an array of `Complex<T>` that may have a larger capacity than the
+/// polynomial has roots. By default elements of the returned array have a real and imaginary part
+/// set to NaN. This prevents the function from being available for integer types.
+///
 /// # Errors
 /// * `NoRoots` - the function was not able to compute roots for the given polynomial
 ///
@@ -236,7 +315,7 @@ pub struct NoRoots;
 /// assert_f64_eq!(roots[1].re, 2.0, 1e-14);
 /// assert_f64_eq!(roots[2].re, 1.0);
 /// ```
-/// TODO: Docs + Unit Tests + Integer implementation
+/// TODO: Integer support + Return type upgrade
 pub fn roots<T, const N: usize, const M: usize>(
     coefficients: &[T; N],
 ) -> Result<[Complex<T>; M], NoRoots>
@@ -249,63 +328,45 @@ where
         + Div<Output = T>
         + PartialOrd
         + fmt::Debug
-        + RealField,
+        + RealField
+        + Float,
     Const<N>: DimSub<U1, Output = Const<M>>,
     Const<M>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<M>, DimDiff<Const<M>, U1>> + Allocator<DimDiff<Const<M>, U1>>,
 {
-    if let Some(degree) = largest_nonzero_index(coefficients) {
-        let mut roots = array::from_fn(|_| Complex::zero());
-        if degree == 0 {
-            return Err(NoRoots);
-        } else if degree == 1 {
-            if coefficients[1].is_zero() {
-                return Err(NoRoots);
-            }
-            roots[0].re = coefficients[0].clone().neg() / coefficients[1].clone();
-        } else if degree == 2 {
-            let a = coefficients[2].clone();
-            if a.is_zero() {
-                if coefficients[1].is_zero() {
-                    return Err(NoRoots);
-                }
-                roots[0].re = coefficients[0].clone().neg() / coefficients[1].clone();
-            }
-            let b = coefficients[1].clone();
-            let ac = coefficients[0].clone() * a.clone();
-            let discriminant = b.clone().powi(2) - (ac.clone() + ac.clone() + ac.clone() + ac);
-            let two_a = a.clone() + a;
-            let b_neg = b.neg();
-            if discriminant < T::zero() {
-                let real_part = b_neg / two_a.clone();
-                let imag_part = (-discriminant).sqrt() / two_a;
-                roots[0] = Complex {
-                    re: real_part.clone(),
-                    im: imag_part.clone(),
-                };
-                roots[1] = Complex {
-                    re: real_part,
-                    im: imag_part.neg(),
-                };
-            } else {
-                let discriminant_sqrt = discriminant.sqrt();
-                roots[0].re = (b_neg.clone() + discriminant_sqrt.clone()) / two_a.clone();
-                roots[1].re = (b_neg - discriminant_sqrt) / two_a;
-            }
-        } else {
-            let matrix = SMatrix::from_data(ArrayStorage(companion::<T, N, M>(coefficients)));
-            for (eigenvalue, root) in matrix
-                .complex_eigenvalues()
-                .into_iter()
-                .zip(roots.iter_mut())
-            {
-                *root = eigenvalue.clone();
-            }
+    let Some(degree) = largest_nonzero_index(coefficients) else {
+        return Err(NoRoots);
+    };
+
+    let mut roots = array::from_fn(|_| Complex::new(T::nan(), T::nan()));
+
+    if degree == 0 {
+        return Err(NoRoots);
+    } else if degree == 1 {
+        roots[0].re = linear_root(coefficients[1], coefficients[0])?;
+        roots[0].im = T::zero();
+    } else if degree == 2 {
+        let a = coefficients[2];
+        if a.is_zero() {
+            roots[0].re = linear_root(coefficients[1], coefficients[0])?;
         }
-        Ok(roots)
+        for (q_root, root) in quadratic_roots(a, coefficients[1], coefficients[0])?
+            .into_iter()
+            .zip(roots.iter_mut())
+        {
+            *root = q_root;
+        }
     } else {
-        Err(NoRoots)
+        let matrix = SMatrix::from_data(ArrayStorage(companion::<T, N, M>(coefficients)));
+        for (eigenvalue, root) in matrix
+            .complex_eigenvalues()
+            .into_iter()
+            .zip(roots.iter_mut())
+        {
+            *root = *eigenvalue;
+        }
     }
+    Ok(roots)
 }
 
 /// Adds two polynomials.

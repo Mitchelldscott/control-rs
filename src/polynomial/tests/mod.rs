@@ -8,4 +8,4 @@ mod basic;
 mod arithmetic;
 
 #[cfg(test)]
-mod utility;
+mod utilities;

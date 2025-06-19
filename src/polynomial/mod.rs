@@ -46,7 +46,7 @@ use nalgebra::{
     allocator::Allocator, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax, DimSub,
     RealField, U1,
 };
-use num_traits::{Num, One, Zero};
+use num_traits::{Float, Num, One, Zero};
 
 // ===============================================================================================
 //      Polynomial Submodules
@@ -724,7 +724,8 @@ where
             + Div<Output = T>
             + PartialOrd
             + fmt::Debug
-            + RealField,
+            + RealField
+            + Float,
         Const<N>: DimSub<U1, Output = Const<M>>,
         Const<M>: DimSub<U1>,
         DefaultAllocator:
