@@ -37,7 +37,7 @@
 //! - [ ] move plotly to plotly helper file (or wait for a nice gui)
 //! - [ ] move FR constructors to FR factory? (configure set of FRs and target outputs without initializing anything)
 
-use core::ops::AddAssign;
+use core::ops::{AddAssign, Sub, Mul, Div};
 use nalgebra::{Complex, ComplexField, RealField};
 use num_traits::Float;
 
@@ -57,6 +57,7 @@ pub trait FrequencyTools<T: Float + RealField, const N: usize, const M: usize> {
 /// * `L` - The number of frequency points per channel
 /// * `N` - The number of input channels
 /// * `M` - The number of output channels
+#[derive(Clone, Debug, PartialEq)]
 pub struct FrequencyResponse<T, const L: usize, const N: usize, const M: usize> {
     /// Frequencies for each input channel
     ///
@@ -180,14 +181,14 @@ impl<T: Float + RealField> FrequencyMargin<T> {
     ///
     /// # Panics
     ///
-    pub fn new<const L: usize>(frequencies: &[T], response: &[Complex<T>]) -> Self {
+    pub fn new<const L: usize>(frequencies: &[T; L], response: &[Complex<T>; L]) -> Self {
         let mut phases = [T::zero(); L];
         let mut magnitudes = [T::zero(); L];
 
         (0..L).for_each(|i| (magnitudes[i], phases[i]) = response[i].to_polar());
 
-        let gain_crossover = first_crossover::<T>(frequencies, &magnitudes, T::one(), L);
-        let phase_crossover = first_crossover::<T>(frequencies, &phases, -T::pi(), L);
+        let gain_crossover = first_crossover(frequencies, &magnitudes, T::one());
+        let phase_crossover = first_crossover(frequencies, &phases, -T::pi());
 
         let gain_margin = phase_crossover.map(|wc| {
             // should be using frequencies.iter().position(|hz| hz == threshold, or change first_crossover to return the index)
@@ -195,7 +196,7 @@ impl<T: Float + RealField> FrequencyMargin<T> {
             // index in the magnitude array
             // TODO: Fix this so there doesn't need to be an unwrap
             let mag_at_crossover =
-                first_crossover::<T>(&magnitudes, frequencies, wc, L).unwrap_or_else(|| T::zero());
+                first_crossover(&magnitudes, frequencies, wc).unwrap_or_else(|| T::zero());
             // TODO: Make a constant for this or something to avoid unwrapping
             T::from(20).unwrap_or_else(|| T::zero()) * -ComplexField::log10(mag_at_crossover)
         });
@@ -204,7 +205,7 @@ impl<T: Float + RealField> FrequencyMargin<T> {
             // unwrap is safe because the crossover frequency exists, meaning there is a corresponding
             // index in the phase array
             let phase_at_crossover =
-                first_crossover::<T>(&phases, frequencies, wc, L).unwrap_or_else(|| T::zero());
+                first_crossover(&phases, frequencies, wc).unwrap_or_else(|| T::zero());
             (-T::pi() - phase_at_crossover).to_degrees()
         });
 
@@ -284,7 +285,6 @@ impl<T: Float + RealField, const N: usize, const M: usize> Margin<T, N, M> {
 /// * `a` - The first array of values (the return value is sampled or interpolated from these)
 /// * `b` - The second array of values (these are the values that may cross the threshold)
 /// * `threshold` - The target threshold for the crossover (e.g., 1.0 for magnitude, -π for phase)
-/// * `samples` - the number of samples in a and b
 ///
 /// # Generic Arguments
 /// * `T` - Scalar type for frequencies and values (e.g., `f32`, `f64`)
@@ -292,24 +292,24 @@ impl<T: Float + RealField, const N: usize, const M: usize> Margin<T, N, M> {
 ///
 /// # Returns
 /// * `Option<T>` - The crossover frequency in rad/s, or `None` if no crossover frequency is found
-fn first_crossover<T>(a: &[T], b: &[T], threshold: T, samples: usize) -> Option<T>
+fn first_crossover<T, const N: usize>(a: &[T; N], b: &[T; N], threshold: T) -> Option<T>
 where
-    T: Float,
+    T: Clone + PartialOrd + Sub<Output = T> + Mul<Output = T> + Div<Output = T>,
 {
-    for i in 0..samples - 1 {
+    for i in 0..N - 1 {
         if b[i] == threshold {
-            return Some(a[i]);
+            return Some(a[i].clone());
         }
         if (b[i] < threshold && b[i + 1] > threshold) || (b[i] > threshold && b[i + 1] < threshold)
         {
-            let slope = (b[i + 1] - b[i]) / (a[i + 1] - a[i]);
-            let intercept = b[i] - slope * a[i];
+            let slope = (b[i + 1].clone() - b[i].clone()) / (a[i + 1].clone() - a[i].clone());
+            let intercept = b[i].clone() - slope.clone() * a[i].clone();
             return Some((threshold - intercept) / slope);
         }
     }
     // need some cleanup here
-    if b[samples - 1] == threshold {
-        return Some(a[samples - 1]);
+    if b[N - 1] == threshold {
+        return Some(a[N - 1].clone());
     }
     None
 }
@@ -505,14 +505,14 @@ mod test_first_crossover {
     use crate::{assert_f32_eq, assert_f64_eq};
 
     #[test]
-    fn test_crossover_detection() {
+    fn crossover_detection() {
         // Test inputs
         let frequencies: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
         let magnitudes: [f64; 6] = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3];
         let threshold = 1.0;
 
         // Trigger edge case where b[i] == threshold
-        let result = first_crossover::<f64>(&frequencies, &magnitudes, threshold, 6);
+        let result = first_crossover(&frequencies, &magnitudes, threshold);
 
         assert!(result.is_some());
         #[allow(clippy::unwrap_used)]
@@ -521,14 +521,14 @@ mod test_first_crossover {
     }
 
     #[test]
-    fn test_crossover_interpolation() {
+    fn crossover_interpolation() {
         // Test inputs
         let frequencies: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
-        let magnitudes: [f64; 6] = [0.8, 0.9, 0.95, 1.05, 1.2, 1.3];
+        let magnitudes: [f64; 6] = [0.8, 0.9, 0.95, 1.05, 1.2, 1.3]; // inconsistent step
         let threshold = 1.0;
 
         // Linear interpolation for crossover
-        let result = first_crossover::<f64>(&frequencies, &magnitudes, threshold, 6);
+        let result = first_crossover(&frequencies, &magnitudes, threshold);
 
         assert!(result.is_some());
         #[allow(clippy::unwrap_used)]
@@ -537,31 +537,60 @@ mod test_first_crossover {
     }
 
     #[test]
-    fn test_no_crossover() {
+    fn no_crossover() {
         // Test inputs with no crossover
         let frequencies: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
         let magnitudes: [f64; 6] = [0.8, 0.85, 0.9, 0.95, 0.98, 0.99];
         let threshold = 1.0;
 
         // No crossover detected
-        let result = first_crossover::<f64>(&frequencies, &magnitudes, threshold, 6);
+        let result = first_crossover(&frequencies, &magnitudes, threshold);
 
         assert!(result.is_none());
     }
 
+    #[allow(clippy::unwrap_used)]
     #[test]
-    fn test_decreasing_crossover() {
+    fn decreasing_crossover() {
         // Test inputs with decreasing crossover
         let frequencies: [f32; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
         let magnitudes: [f32; 6] = [1.2, 1.1, 1.05, 0.95, 0.8, 0.7];
         let threshold = 1.0;
 
         // Linear interpolation for decreasing crossover
-        let result = first_crossover::<f32>(&frequencies, &magnitudes, threshold, 6);
+        let result = first_crossover(&frequencies, &magnitudes, threshold);
 
-        assert!(result.is_some());
-        #[allow(clippy::unwrap_used)]
-        let result = result.unwrap();
-        assert_f32_eq!(result, 1.25, 1e-7); // Interpolated value
+        assert_f32_eq!(result.unwrap(), 1.25, 1e-7); // Interpolated value
+    }
+    #[allow(clippy::unwrap_used)]
+    #[test]
+    fn multiple_threshold_instances() {
+        let frequencies: [usize; 10] = core::array::from_fn(|i| i);
+        let magnitudes: [usize; 10] = core::array::from_fn(|i| if i < 5 {0} else {1});
+        let threshold = 1;
+        // Linear interpolation for decreasing crossover
+        let result = first_crossover(&frequencies, &magnitudes, threshold);
+        assert_eq!(result.unwrap(), 5); // Interpolated value
+    }
+    #[allow(clippy::unwrap_used)]
+    #[test]
+    fn integer_interpolation() {
+        let frequencies: [i32; 10] = core::array::from_fn(|i| i as i32);
+        let magnitudes: [i32; 10] = core::array::from_fn(|i| if i < 5 {5} else {7});
+        let threshold = 6;
+        // Linear interpolation for decreasing crossover
+        let result = first_crossover(&frequencies, &magnitudes, threshold);
+        assert_eq!(result.unwrap(), 4); // Interpolated value
+    }
+
+    #[allow(clippy::unwrap_used)]
+    #[test]
+    fn multiple_crossovers() {
+        let frequencies: [f32; 10] = core::array::from_fn(|i| i as f32);
+        let magnitudes: [f32; 10] = core::array::from_fn(|i| if i % 2 == 0 {1.0} else {3.0});
+        let threshold = 2.0;
+        // Linear interpolation for decreasing crossover
+        let result = first_crossover(&frequencies, &magnitudes, threshold);
+        assert_f32_eq!(result.unwrap(), 0.5); // Interpolated value
     }
 }
