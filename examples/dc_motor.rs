@@ -30,11 +30,17 @@
 ///
 /// ## Plant
 /// <pre> P(s) = Km / ((Js + b)(Ls + R) + Km^2) (rad/sec / V) </pre>
+///
+/// ## Resources
+/// * [DC Motor Control (Lead-Lag)](https://www.mathworks.com/help/sps/ug/dc-motor-control-lead-lag.html)
 use control_rs::{
     integrators::runge_kutta4,
     math::systems::{feedback, DynamicalSystem},
     transfer_function::*,
 };
+#[cfg(feature = "std")]
+use control_rs::frequency_tools::*;
+
 use nalgebra::{Vector1, Vector2};
 
 // Define motor parameters
@@ -107,20 +113,28 @@ fn main() {
     // simulate for 100 steps
     let _sim_data = sim(motor_ss, 0.1, MotorState::new(0.0, 0.0));
 
+    // #[cfg(feature = "std")]
+    // plot(_sim_data);
     #[cfg(feature = "std")]
-    plot(_sim_data);
+    let fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([0.0001], [100.0]);
+    #[cfg(feature = "std")]
+    std::fs::create_dir_all("target/plots").unwrap();
+    #[cfg(feature = "std")]
+    bode("DC Motor Transfer Function", &motor_tf, fr).write_html("target/plots/dc_motor_ol_bode.html");
 
     let cl_motor_tf = feedback(&motor_tf, &1.0, 1.0, -1.0);
     println!("CL {cl_motor_tf:.6}");
     println!("CL System Poles: {:?}", poles(&cl_motor_tf).ok());
 
+    #[cfg(feature = "std")]
+    let fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([0.0001], [100.0]);
+    #[cfg(feature = "std")]
+    bode("DC Motor CL Transfer Function", &cl_motor_tf, fr).write_html("target/plots/dc_motor_cl_bode.html");
+
     // Simulates adding a simple feedforward controller that scales the input by the inverse of the
     // dc_gain, resulting in a new dc_gain = 1. In reality, this drives the motor state to the value
     // of the input voltage. An additional gain can scale the output value to an appropriate speed.
-    let compensated_motor_tf = TransferFunction::new(
-        [Km / dc_gain(&motor_tf)],
-        [J * L, J * R + L * b, (R * b) + (Km * Km)],
-    );
+    let compensated_motor_tf = motor_tf / dc_gain(&motor_tf);
 
     let compensated_motor_ss = tf2ss(&compensated_motor_tf);
     println!("DC Motor with gain compensation {compensated_motor_ss}");

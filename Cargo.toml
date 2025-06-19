@@ -7,10 +7,11 @@ edition = "2021"
 nalgebra = { version = "0.33.0", features = ["libm"] }
 num-traits = { version = "0.2", default-features = false, features = ["libm"]  }
 plotly = { version = "0.12.1", optional = true }
+serde = { version = "1.0.219", optional = true}
 
 [features]
 default = []
-std = ["plotly", "num-traits/std"]
+std = ["plotly", "num-traits/std", "serde"]
 
 [dev-dependencies]
 #csv = "1.3.0"

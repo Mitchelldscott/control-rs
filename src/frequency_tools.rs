@@ -353,149 +353,151 @@ pub fn logspace<T: Float + AddAssign, const N: usize>(a: T, b: T) -> [T; N] {
     result
 }
 
-// #[cfg(feature = "std")]
-// /// Renders a single magnitude and phase plot on subplots
-// fn render_bode_subplot<T>(
-//     plot: &mut plotly::Plot,
-//     frequencies: &[T],
-//     mag: &[T],
-//     phase: &[T],
-//     row: usize,
-//     col: usize,
-//     margins: &FrequencyMargin<T>,
-// ) where
-//     T: 'static + Copy + Float + From<i16>,
-// {
-//     use plotly::common;
-//
-//     let mag_db: Vec<T> = mag
-//         .iter()
-//         .map(|&m| <T as From<i16>>::from(20) * m.log10())
-//         .collect();
-//     let phase_deg: Vec<T> = phase.iter().map(|&p| p.to_degrees()).collect();
-//
-//     // Add magnitude plot
-//     plot.add_trace(
-//         plotly::Scatter::new(frequencies.to_vec(), mag_db)
-//             .mode(common::Mode::Lines)
-//             .name(format!("Magnitude[{row}, {col}]"))
-//             // .x_axis(x_axis_mag.clone())
-//             // .y_axis(y_axis_mag.clone()).color(Rgb::new(0, 0, 255))
-//             .marker(common::Marker::new()),
-//     );
-//
-//     // Add phase plot
-//     plot.add_trace(
-//         plotly::Scatter::new(frequencies.to_vec(), phase_deg)
-//             .mode(common::Mode::Lines)
-//             .name(format!("Phase[{row}, {col}]"))
-//             .x_axis("x2")
-//             .y_axis("y2")
-//             .marker(common::Marker::new()),
-//     );
-//
-//     // Gain margin line
-//     if let (Some(wc), Some(gm)) = (margins.phase_crossover, margins.gain_margin) {
-//         plot.add_trace(
-//             plotly::Scatter::new(vec![wc, wc], vec![-gm, T::zero()])
-//                 .mode(common::Mode::Lines)
-//                 .name(format!("Gain Margin[{row}, {col}]"))
-//                 // .x_axis(x_axis_mag)
-//                 // .y_axis(y_axis_mag)
-//                 .line(
-//                     common::Line::new()
-//                         .dash(common::DashType::Dot)
-//                         .color(plotly::color::Rgb::new(0, 0, 0)),
-//                 ),
-//         );
-//     }
-//
-//     // Phase margin line
-//     if let (Some(wc), Some(pm)) = (margins.gain_crossover, margins.phase_margin) {
-//         plot.add_trace(
-//             plotly::Scatter::new(vec![wc, wc], vec![<T as From<i16>>::from(-180), pm])
-//                 .mode(common::Mode::Lines)
-//                 .name(format!("Phase Margin[{row}, {col}]"))
-//                 .x_axis("x2")
-//                 .y_axis("y2")
-//                 .line(
-//                     common::Line::new()
-//                         .dash(common::DashType::Dot)
-//                         .color(plotly::color::Rgb::new(0, 0, 0)),
-//                 ),
-//         );
-//     }
-// }
-//
-// #[cfg(feature = "std")]
-// /// Renders a Bode plot for an object implementing FrequencyTools
-// pub fn bode<T, F, const L: usize, const N: usize, const M: usize>(
-//     title: &str,
-//     system: F,
-//     mut response: FrequencyResponse<T, L, N, M>,
-// ) -> plotly::Plot
-// where
-//     T: Copy + serde::Serialize + Float + RealField + From<i16>,
-//     F: FrequencyTools<T, N, M>,
-// {
-//     use plotly::Layout;
-//
-//     system.frequency_response::<L>(&mut response);
-//     let margins = Margin::new(&response);
-//
-//     let mut plot = plotly::Plot::new();
-//     plot.set_layout(
-//         Layout::new()
-//             .title(plotly::common::Title::with_text(title))
-//             .x_axis(
-//                 plotly::layout::Axis::new()
-//                     .title(plotly::common::Title::with_text("Frequency (rad/s)"))
-//                     .type_(plotly::layout::AxisType::Log),
-//             )
-//             .y_axis(
-//                 plotly::layout::Axis::new()
-//                     .title(plotly::common::Title::with_text("Magnitude (dB)")),
-//             )
-//             .x_axis2(
-//                 plotly::layout::Axis::new()
-//                     .title(plotly::common::Title::with_text("Frequency (rad/s)"))
-//                     .type_(plotly::layout::AxisType::Log),
-//             )
-//             .y_axis2(
-//                 plotly::layout::Axis::new().title(plotly::common::Title::with_text("Phase (deg)")),
-//             )
-//             .grid(
-//                 plotly::layout::LayoutGrid::new()
-//                     .rows(2)
-//                     .columns(1)
-//                     .pattern(plotly::layout::GridPattern::Independent)
-//                     .row_order(plotly::layout::RowOrder::TopToBottom),
-//             ),
-//     );
-//
-//     // extract each output mag/phase (make a helper in response soon)
-//     for (out_idx, fr) in response.responses.iter().enumerate() {
-//         let mut phases = [T::zero(); L];
-//         let mut magnitudes = [T::zero(); L];
-//
-//         (0..L).for_each(|i| (magnitudes[i], phases[i]) = fr[i].to_polar());
-//
-//         // render the output as the response to each input
-//         for (in_idx, frequency) in response.frequencies.iter().enumerate() {
-//             render_bode_subplot(
-//                 &mut plot,
-//                 frequency,
-//                 &magnitudes,
-//                 &phases,
-//                 in_idx,
-//                 out_idx,
-//                 &margins.0[out_idx][in_idx],
-//             );
-//         }
-//     }
-//
-//     plot
-// }
+#[cfg(feature = "std")]
+/// Renders a single magnitude and phase plot on subplots
+fn render_bode_subplot<T>(
+    plot: &mut plotly::Plot,
+    frequencies: &[T],
+    mag: &[T],
+    phase: &[T],
+    row: usize,
+    col: usize,
+    margins: &FrequencyMargin<T>,
+) where
+    T: 'static + Copy + Float + From<i16> + serde::ser::Serialize,
+{
+    use plotly::common;
+    extern crate std;
+    use std::{vec::Vec, vec, format};
+
+    let mag_db: Vec<T> = mag
+        .iter()
+        .map(|&m| <T as From<i16>>::from(20) * m.log10())
+        .collect();
+    let phase_deg: Vec<T> = phase.iter().map(|&p| p.to_degrees()).collect();
+
+    // Add magnitude plot
+    plot.add_trace(
+        plotly::Scatter::new(frequencies.to_vec(), mag_db)
+            .mode(common::Mode::Lines)
+            .name(format!("Magnitude[{row}, {col}]"))
+            // .x_axis(x_axis_mag.clone())
+            // .y_axis(y_axis_mag.clone()).color(Rgb::new(0, 0, 255))
+            .marker(common::Marker::new()),
+    );
+
+    // Add phase plot
+    plot.add_trace(
+        plotly::Scatter::new(frequencies.to_vec(), phase_deg)
+            .mode(common::Mode::Lines)
+            .name(format!("Phase[{row}, {col}]"))
+            .x_axis("x2")
+            .y_axis("y2")
+            .marker(common::Marker::new()),
+    );
+
+    // Gain margin line
+    if let (Some(wc), Some(gm)) = (margins.phase_crossover, margins.gain_margin) {
+        plot.add_trace(
+            plotly::Scatter::new(vec![wc, wc], vec![-gm, T::zero()])
+                .mode(common::Mode::Lines)
+                .name(format!("Gain Margin[{row}, {col}]"))
+                // .x_axis(x_axis_mag)
+                // .y_axis(y_axis_mag)
+                .line(
+                    common::Line::new()
+                        .dash(common::DashType::Dot)
+                        .color(plotly::color::Rgb::new(0, 0, 0)),
+                ),
+        );
+    }
+
+    // Phase margin line
+    if let (Some(wc), Some(pm)) = (margins.gain_crossover, margins.phase_margin) {
+        plot.add_trace(
+            plotly::Scatter::new(vec![wc, wc], vec![<T as From<i16>>::from(-180), pm])
+                .mode(common::Mode::Lines)
+                .name(format!("Phase Margin[{row}, {col}]"))
+                .x_axis("x2")
+                .y_axis("y2")
+                .line(
+                    common::Line::new()
+                        .dash(common::DashType::Dot)
+                        .color(plotly::color::Rgb::new(0, 0, 0)),
+                ),
+        );
+    }
+}
+
+#[cfg(feature = "std")]
+/// Renders a Bode plot for an object implementing `FrequencyTools`
+pub fn bode<T, F, const L: usize, const N: usize, const M: usize>(
+    title: &str,
+    system: &F,
+    mut response: FrequencyResponse<T, L, N, M>,
+) -> plotly::Plot
+where
+    T: Copy + Float + RealField + From<i16> + serde::ser::Serialize,
+    F: FrequencyTools<T, N, M>,
+{
+    use plotly::Layout;
+
+    system.frequency_response::<L>(&mut response);
+    let margins = Margin::new(&response);
+
+    let mut plot = plotly::Plot::new();
+    plot.set_layout(
+        Layout::new()
+            .title(plotly::common::Title::with_text(title))
+            .x_axis(
+                plotly::layout::Axis::new()
+                    .title(plotly::common::Title::with_text("Frequency (rad/s)"))
+                    .type_(plotly::layout::AxisType::Log),
+            )
+            .y_axis(
+                plotly::layout::Axis::new()
+                    .title(plotly::common::Title::with_text("Magnitude (dB)")),
+            )
+            .x_axis2(
+                plotly::layout::Axis::new()
+                    .title(plotly::common::Title::with_text("Frequency (rad/s)"))
+                    .type_(plotly::layout::AxisType::Log),
+            )
+            .y_axis2(
+                plotly::layout::Axis::new().title(plotly::common::Title::with_text("Phase (deg)")),
+            )
+            .grid(
+                plotly::layout::LayoutGrid::new()
+                    .rows(2)
+                    .columns(1)
+                    .pattern(plotly::layout::GridPattern::Independent)
+                    .row_order(plotly::layout::RowOrder::TopToBottom),
+            ),
+    );
+
+    // extract each output mag/phase (make a helper in response soon)
+    for (out_idx, fr) in response.responses.iter().enumerate() {
+        let mut phases = [T::zero(); L];
+        let mut magnitudes = [T::zero(); L];
+
+        (0..L).for_each(|i| (magnitudes[i], phases[i]) = fr[i].to_polar());
+
+        // render the output as the response to each input
+        for (in_idx, frequency) in response.frequencies.iter().enumerate() {
+            render_bode_subplot(
+                &mut plot,
+                frequency,
+                &magnitudes,
+                &phases,
+                in_idx,
+                out_idx,
+                &margins.0[out_idx][in_idx],
+            );
+        }
+    }
+
+    plot
+}
 
 #[cfg(test)]
 mod test_first_crossover {
