@@ -64,15 +64,8 @@ pub use aliases::{Constant, Cubic, Line, Quadratic, Quartic, Quintic};
 // ===============================================================================================
 //      Polynomial Tests
 // ===============================================================================================
-
 #[cfg(test)]
-mod basic_polynomial_tests;
-
-#[cfg(test)]
-mod polynomial_arithmetic_tests;
-
-#[cfg(test)]
-mod polynomial_utility_tests;
+mod tests;
 
 // ===============================================================================================
 //      Polynomial

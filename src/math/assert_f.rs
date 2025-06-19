@@ -90,7 +90,7 @@ fn compare_with_explicit_eps() {
 }
 
 #[test]
-#[should_panic(expected = "assertion failed: `(left !== right)")]
+#[should_panic(expected = "assertion failed: `(left !== right)` (left: `3.0`, right: `4.0`")]
 fn bad_compare_with_explicit_eps() {
     assert_f64_eq!(3f64, 4f64, 1e-3f64);
 }
@@ -98,13 +98,12 @@ fn bad_compare_with_explicit_eps() {
 // Make sure the value used for epsilon in the assert_eq
 // is the same as the value used in the error message.
 #[test]
-#[should_panic(expected = "assertion failed: `(left !== right)")]
+#[should_panic(expected = "assertion failed: `(left !== right)` (left: `0.0`, right: `1.5`, approx diff: `1.5` > 1.0)")]
 fn should_evaluate_eps_only_once() {
     let mut count = 0_f64;
-
     // `count` will be 1.0 the first time the curly-braced block
     // is evaluated but 2.0 the second time.
-    assert_f64_eq!(0_f64, 100_f64, {
+    assert_f64_eq!(0_f64, 1.5_f64, {
         count += 1_f64;
         count
     });
