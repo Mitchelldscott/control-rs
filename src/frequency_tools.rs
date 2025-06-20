@@ -97,6 +97,7 @@ where
     ///
     /// If there is no frequency response, the magnitude and phase arrays will be zero-filled
     pub fn mag_phase(&self, output_channel: usize) -> ([T; L], [T; L]) {
+        // TODO: remove zero initialization
         let mut mag = [T::zero(); L];
         let mut phase = [T::zero(); L];
         if let Some(responses) = self.responses {
@@ -144,6 +145,7 @@ where
     /// # Returns
     /// * `FrequencyResponse` instance with frequency data for the specified channel and no responses
     pub fn isolated(freq_start: T, freq_stop: T, channel: usize) -> Self {
+        // TODO: remove zero initialization
         let mut frequencies = [[T::zero(); L]; N];
         frequencies[channel] = logspace(freq_start, freq_stop);
         Self {
@@ -200,9 +202,6 @@ impl<T: Float + RealField> FrequencyMargin<T> {
     ///
     /// # Returns
     /// * `FrequencyMargin` - the margins and crossovers of the response
-    ///
-    /// # Panics
-    ///
     pub fn new<const L: usize>(frequencies: &[T; L], response: &[Complex<T>; L]) -> Self {
         let mut phases = [T::zero(); L];
         let mut magnitudes = [T::zero(); L];
@@ -259,9 +258,9 @@ impl<T> Default for FrequencyMargin<T> {
 /// to the stability margins for a specific input-output channel pair.
 ///
 /// # Generic Arguments
-/// - `T`: The numeric type for the stability metrics (e.g., `f32` or `f64`).
-/// - `N`: The number of input channels.
-/// - `M`: The number of output channels.
+/// - `T`: Field type for the stability metrics (e.g., `f32` or `f64`).
+/// - `N`: Dimension of the system's input.
+/// - `M`: Dimension of the system's output.
 pub struct Margin<T, const N: usize, const M: usize>(pub [[FrequencyMargin<T>; N]; M]);
 
 impl<T: Float + RealField, const N: usize, const M: usize> Margin<T, N, M> {
@@ -270,11 +269,12 @@ impl<T: Float + RealField, const N: usize, const M: usize> Margin<T, N, M> {
     /// This function computes the stability margins for all input-output channel pairs in the
     /// provided `FrequencyResponse` object.
     ///
-    /// # Parameters
-    /// * `response` - A reference to a `FrequencyResponse` containing the frequency and response data
+    /// # Arguments
+    /// * `response` - A reference to a `FrequencyResponse` containing the frequency and response
+    ///   data
     ///
     /// # Generic Arguments
-    /// * `L` - The number of frequency points per channel in the `FrequencyResponse`
+    /// * `L` - The number of frequency points per channel
     ///
     /// # Returns
     /// * `Margin` - A new instance containing the calculated margins for all input-output channels
@@ -312,10 +312,11 @@ impl<T: Float + RealField, const N: usize, const M: usize> Margin<T, N, M> {
 ///
 /// # Generic Arguments
 /// * `T` - Scalar type for frequencies and values (e.g., `f32`, `f64`)
-/// * `L` - Number of frequency samples provided
+/// * `N` - Number of frequency samples provided
 ///
 /// # Returns
 /// * `Option<T>` - The crossover frequency in rad/s, or `None` if no crossover frequency is found
+/// TODO: Split this up into a first_crossover -> index and interpolate_arrays -> T
 fn first_crossover<T, const N: usize>(a: &[T; N], b: &[T; N], threshold: T) -> Option<T>
 where
     T: Clone + PartialOrd + Sub<Output = T> + Mul<Output = T> + Div<Output = T>,
