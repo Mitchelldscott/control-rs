@@ -500,6 +500,26 @@ where
 }
 
 #[cfg(test)]
+mod test_log_space {
+    use crate::assert_f32_eq;
+    use super::*;
+    #[test]
+    fn basic() {
+        let ls = logspace::<f32, 10>(1.0, 5.0);
+        assert_f32_eq!(ls[0], 10.0);
+        assert_f32_eq!(ls[1], 30.0);
+        assert_f32_eq!(ls[2], 80.0);
+        assert_f32_eq!(ls[3], 220.0);
+        assert_f32_eq!(ls[4], 600.0);
+        assert_f32_eq!(ls[5], 1670.0);
+        assert_f32_eq!(ls[6], 4640.0, 2.0);
+        assert_f32_eq!(ls[7], 12920.0);
+        assert_f32_eq!(ls[8], 35940.0);
+        assert_f32_eq!(ls[9], 100000.0, 10.0);
+    }
+}
+
+#[cfg(test)]
 mod test_first_crossover {
     use super::*;
     use crate::{assert_f32_eq, assert_f64_eq};

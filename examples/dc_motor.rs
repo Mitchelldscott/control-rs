@@ -114,10 +114,10 @@ fn main() {
 
     // #[cfg(feature = "std")]
     // plot(_sim_data);
-    let fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([0.0001], [50.0]);
+    let _fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([1e-7], [10.0]);
     // println!("{:?}", Margin::new(&fr).0[0][0]);
     #[cfg(feature = "std")]
-    bode("DC Motor Transfer Function", &motor_tf, fr).show(); // .write_html("target/plots/dc_motor_ol_bode.html");
+    bode("DC Motor Transfer Function", &motor_tf, _fr).show(); // .write_html("target/plots/dc_motor_ol_bode.html");
 
     let cl_motor_tf = feedback(&motor_tf, &1.0, 1.0, -1.0);
     println!("CL {cl_motor_tf:.6}");
