@@ -22,10 +22,7 @@ mod frequency_tools_tests {
         let mut response = FrequencyResponse::new([frequencies]);
         tf.frequency_response(&mut response);
 
-        let mut phases = [0.0_f64; 3];
-        let mut magnitudes = [0.0_f64; 3];
-
-        (0..3).for_each(|i| (magnitudes[i], phases[i]) = response.responses[0][i].to_polar());
+        let (magnitudes, phases) = response.mag_phase(0);
 
         // Expected results
         let expected_magnitudes = [

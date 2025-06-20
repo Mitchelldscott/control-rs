@@ -160,14 +160,16 @@ impl<T: Float + RealField, const M: usize, const N: usize> FrequencyTools<T, 1, 
 {
     /// TODO: Doc + Unit Test + Example
     fn frequency_response<const L: usize>(&self, response: &mut FrequencyResponse<T, L, 1, 1>) {
+        let mut responses = [Complex::zero(); L];
         // Evaluate the transfer function at each frequency
         response.frequencies[0]
             .iter()
             .enumerate()
             .for_each(|(i, frequency)| {
                 // s = jω
-                response.responses[0][i] = self.evaluate(&Complex::new(T::zero(), *frequency));
+                responses[i] = self.evaluate(&Complex::new(T::zero(), *frequency));
             });
+        response.responses = Some([responses]);
     }
 }
 

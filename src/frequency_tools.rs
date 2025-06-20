@@ -29,17 +29,16 @@
 //! - Dorf, R. C., & Bishop, R. H. (2016). *Modern Control Systems*.
 //!
 //! ### TODO:
-//! - [ ] docs, docs, docs
-//! - [ ] move [Margin] -> [`FrequencyResponse`], no point in having two structs using the same generics
-//!     - add margins function to FR
-//!     - add `to_polar()` to FR (unrelated but useful, maybe make a `PolarFrequencyResponse`)
+//! - [ ] remove all the unwraps
+//!     - `first_crossover` should get broken up to return the index of the crossover
+//!     - Need a frequency field trait to provide some constants and log fns
 //! - [ ] textbook example of trait productivity
 //! - [ ] move plotly to plotly helper file (or wait for a nice gui)
-//! - [ ] move FR constructors to FR factory? (configure set of FRs and target outputs without initializing anything)
 
-use core::ops::{AddAssign, Sub, Mul, Div};
+use crate::polynomial::utils::array_from_iterator_with_default;
+use core::ops::{AddAssign, Div, Mul, Sub};
 use nalgebra::{Complex, ComplexField, RealField};
-use num_traits::Float;
+use num_traits::{Float, Zero};
 
 /// Standard interface for frequency analysis tools
 pub trait FrequencyTools<T: Float + RealField, const N: usize, const M: usize> {
@@ -49,29 +48,31 @@ pub trait FrequencyTools<T: Float + RealField, const N: usize, const M: usize> {
 
 /// A unified Frequency Response object
 ///
-/// This struct provides constructors and utilities for generating and handling
-/// frequency response data for a system with multiple input and output channels.
+/// This struct provides constructors and utilities for generating and handling frequency response
+/// data for a system with generic input and output dimensions. The number of frequency points is
+/// also configured through a generic parameter to allow easily controlling the resolution.
+///
+/// > A channel is a path from input to output, a system's channels are commonly represented as a
+/// > matrix (with rows = inputs and columns = outputs).
+///
+/// By default, the constructors will set the response to `None` and only fill the frequencies that
+/// will be sampled.
 ///
 /// # Generic Arguments
-/// * `T` - The numeric type for frequencies and responses (e.g., `f32` or `f64`)
-/// * `L` - The number of frequency points per channel
-/// * `N` - The number of input channels
-/// * `M` - The number of output channels
-#[derive(Clone, Debug, PartialEq)]
+/// * `T` - The field type for frequencies and responses
+/// * `L` - The number of frequency points to sample per channel
+/// * `N` - Dimension of the system's input
+/// * `M` - Dimension of the system's output
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrequencyResponse<T, const L: usize, const N: usize, const M: usize> {
-    /// Frequencies for each input channel
-    ///
     /// A 2D array where each row corresponds to the frequency points for a single input channel.
     pub frequencies: [[T; L]; N],
-    /// Response of each output channel for each input frequency
-    ///
-    /// A 2D array where each row corresponds to the complex frequency responses for a single output channel.
-    pub responses: [[Complex<T>; L]; M],
+    /// A 2D array where each row corresponds to the complex frequency responses for a single
+    /// output channel.
+    pub responses: Option<[[Complex<T>; L]; M]>,
 }
 
-impl<T: Float + AddAssign, const L: usize, const N: usize, const M: usize>
-    FrequencyResponse<T, L, N, M>
-{
+impl<T, const L: usize, const N: usize, const M: usize> FrequencyResponse<T, L, N, M> {
     /// Creates a new `FrequencyResponse` with specified frequency data and zeroed responses.
     ///
     /// # Arguments
@@ -80,14 +81,38 @@ impl<T: Float + AddAssign, const L: usize, const N: usize, const M: usize>
     /// # Returns
     /// * `FrequencyResponse` - instance with the provided frequencies and zero-initialized
     ///   responses
-    pub fn new(frequencies: [[T; L]; N]) -> Self {
-        let responses = [[Complex::new(T::zero(), T::zero()); L]; M];
+    pub const fn new(frequencies: [[T; L]; N]) -> Self {
         Self {
             frequencies,
-            responses,
+            responses: None,
         }
     }
+}
 
+impl<T, const L: usize, const N: usize, const M: usize> FrequencyResponse<T, L, N, M>
+where
+    T: Float + Zero,
+{
+    /// Extract the magnitude and phase from a frequency responses output channel
+    ///
+    /// If there is no frequency response, the magnitude and phase arrays will be zero-filled
+    pub fn mag_phase(&self, output_channel: usize) -> ([T; L], [T; L]) {
+        let mut mag = [T::zero(); L];
+        let mut phase = [T::zero(); L];
+        if let Some(responses) = self.responses {
+            responses[output_channel]
+                .iter()
+                .zip(mag.iter_mut().zip(phase.iter_mut()))
+                .for_each(|(response, (mag, phase))| (*mag, *phase) = response.to_polar());
+        }
+        (mag, phase)
+    }
+}
+
+impl<T, const L: usize, const N: usize, const M: usize> FrequencyResponse<T, L, N, M>
+where
+    T: Float + AddAssign,
+{
     /// Creates a new `FrequencyResponse` with logarithmically spaced frequencies.
     ///
     /// # Arguments
@@ -96,14 +121,16 @@ impl<T: Float + AddAssign, const L: usize, const N: usize, const M: usize>
     ///
     /// # Returns
     /// * `FrequencyResponse` - instance with logarithmically spaced frequencies and
-    ///   zero-initialized responses
+    ///   no responses
     pub fn logspace(freq_start: [T; N], freq_stop: [T; N]) -> Self {
-        let mut frequencies = [[T::zero(); L]; N];
-        (0..N).for_each(|i| frequencies[i] = logspace(freq_start[i], freq_stop[i]));
-        let responses = [[Complex::new(T::zero(), T::zero()); L]; M];
+        // use the final logspace array as default to avoid initializing a zero array... seems sketch
+        let frequencies = array_from_iterator_with_default(
+            (0..N - 1).map(|i| logspace(freq_start[i], freq_stop[i])),
+            logspace(freq_start[N - 1], freq_stop[N - 1]),
+        );
         Self {
             frequencies,
-            responses,
+            responses: None,
         }
     }
 
@@ -112,19 +139,16 @@ impl<T: Float + AddAssign, const L: usize, const N: usize, const M: usize>
     /// # Arguments
     /// * `freq_start` - The start frequency for the isolated input channel
     /// * `freq_stop` - The stop frequency for the isolated input channel
-    ///
-    /// # Generic Arguments
-    /// * `IDX` - The index of the input channel to isolate
+    /// * `channel` - The index of the input channel to fill
     ///
     /// # Returns
-    /// * `FrequencyResponse` instance with frequency data for the specified channel and zero-initialized responses
-    pub fn isolated<const IDX: usize>(freq_start: T, freq_stop: T) -> Self {
+    /// * `FrequencyResponse` instance with frequency data for the specified channel and no responses
+    pub fn isolated(freq_start: T, freq_stop: T, channel: usize) -> Self {
         let mut frequencies = [[T::zero(); L]; N];
-        frequencies[IDX] = logspace(freq_start, freq_stop);
-        let responses = [[Complex::new(T::zero(), T::zero()); L]; M];
+        frequencies[channel] = logspace(freq_start, freq_stop);
         Self {
             frequencies,
-            responses,
+            responses: None,
         }
     }
 
@@ -140,11 +164,9 @@ impl<T: Float + AddAssign, const L: usize, const N: usize, const M: usize>
     /// # Returns
     /// * `FrequencyResponse` - instance with shared frequency data across all input channels and zero-initialized responses
     pub fn simultaneous(freq_start: T, freq_stop: T) -> Self {
-        let frequencies = [logspace(freq_start, freq_stop); N];
-        let responses = [[Complex::new(T::zero(), T::zero()); L]; M];
         Self {
-            frequencies,
-            responses,
+            frequencies: [logspace(freq_start, freq_stop); N],
+            responses: None,
         }
     }
 }
@@ -258,9 +280,11 @@ impl<T: Float + RealField, const N: usize, const M: usize> Margin<T, N, M> {
     /// * `Margin` - A new instance containing the calculated margins for all input-output channels
     pub fn new<const L: usize>(response: &FrequencyResponse<T, L, N, M>) -> Self {
         let mut margins = [[FrequencyMargin::default(); N]; M];
-        for (margin_row, res) in margins.iter_mut().zip(response.responses.iter()) {
-            for (margin, frequency) in margin_row.iter_mut().zip(response.frequencies.iter()) {
-                *margin = FrequencyMargin::new::<L>(frequency, res);
+        if let Some(responses) = response.responses {
+            for (margin_row, res) in margins.iter_mut().zip(responses.iter()) {
+                for (margin, frequency) in margin_row.iter_mut().zip(response.frequencies.iter()) {
+                    *margin = FrequencyMargin::new::<L>(frequency, res);
+                }
             }
         }
         Self(margins)
@@ -326,7 +350,7 @@ where
 /// let points = logspace::<f64, 5>(1.0, 3.0);
 /// assert_eq!(points.len(), 5);
 /// ```
-/// TODO: remove unwraps
+/// TODO: remove unwraps + make a 10E struct that impl powf for floats and ints
 /// # Panics
 /// * if 10.0 cannot cast to T
 /// * if N - 1 cannot cast to T
@@ -368,7 +392,7 @@ fn render_bode_subplot<T>(
 {
     use plotly::common;
     extern crate std;
-    use std::{vec::Vec, vec, format};
+    use std::{format, vec, vec::Vec};
 
     let mag_db: Vec<T> = mag
         .iter()
@@ -442,7 +466,9 @@ where
 {
     use plotly::Layout;
 
-    system.frequency_response::<L>(&mut response);
+    if response.responses.is_none() {
+        system.frequency_response(&mut response);
+    }
     let margins = Margin::new(&response);
 
     let mut plot = plotly::Plot::new();
@@ -476,22 +502,19 @@ where
     );
 
     // extract each output mag/phase (make a helper in response soon)
-    for (out_idx, fr) in response.responses.iter().enumerate() {
-        let mut phases = [T::zero(); L];
-        let mut magnitudes = [T::zero(); L];
-
-        (0..L).for_each(|i| (magnitudes[i], phases[i]) = fr[i].to_polar());
+    for out_channel in 0..M {
+        let (magnitudes, phases) = response.mag_phase(out_channel);
 
         // render the output as the response to each input
-        for (in_idx, frequency) in response.frequencies.iter().enumerate() {
+        for (in_channel, frequency) in response.frequencies.iter().enumerate() {
             render_bode_subplot(
                 &mut plot,
                 frequency,
                 &magnitudes,
                 &phases,
-                in_idx,
-                out_idx,
-                &margins.0[out_idx][in_idx],
+                in_channel,
+                out_channel,
+                &margins.0[out_channel][in_channel],
             );
         }
     }
@@ -501,8 +524,8 @@ where
 
 #[cfg(test)]
 mod test_log_space {
-    use crate::assert_f32_eq;
     use super::*;
+    use crate::assert_f32_eq;
     #[test]
     fn basic() {
         let ls = logspace::<f32, 10>(1.0, 5.0);
@@ -515,7 +538,22 @@ mod test_log_space {
         assert_f32_eq!(ls[6], 4640.0, 2.0);
         assert_f32_eq!(ls[7], 12920.0);
         assert_f32_eq!(ls[8], 35940.0);
-        assert_f32_eq!(ls[9], 100000.0, 10.0);
+        assert_f32_eq!(ls[9], 100_000.0, 10.0);
+    }
+
+    #[test]
+    fn ultra_low() {
+        let ls = logspace::<f32, 10>(1.0, 5.0);
+        assert_f32_eq!(ls[0], 10.0);
+        assert_f32_eq!(ls[1], 30.0);
+        assert_f32_eq!(ls[2], 80.0);
+        assert_f32_eq!(ls[3], 220.0);
+        assert_f32_eq!(ls[4], 600.0);
+        assert_f32_eq!(ls[5], 1670.0);
+        assert_f32_eq!(ls[6], 4640.0, 2.0);
+        assert_f32_eq!(ls[7], 12920.0);
+        assert_f32_eq!(ls[8], 35940.0);
+        assert_f32_eq!(ls[9], 100_000.0, 10.0);
     }
 }
 
@@ -586,7 +624,7 @@ mod test_first_crossover {
     #[test]
     fn multiple_threshold_instances() {
         let frequencies: [usize; 10] = core::array::from_fn(|i| i);
-        let magnitudes: [usize; 10] = core::array::from_fn(|i| if i < 5 {0} else {1});
+        let magnitudes: [usize; 10] = core::array::from_fn(|i| if i < 5 { 0 } else { 1 });
         let threshold = 1;
         // Linear interpolation for decreasing crossover
         let result = first_crossover(&frequencies, &magnitudes, threshold);
@@ -596,7 +634,7 @@ mod test_first_crossover {
     #[test]
     fn integer_interpolation() {
         let frequencies: [i32; 10] = core::array::from_fn(|i| i as i32);
-        let magnitudes: [i32; 10] = core::array::from_fn(|i| if i < 5 {5} else {7});
+        let magnitudes: [i32; 10] = core::array::from_fn(|i| if i < 5 { 5 } else { 7 });
         let threshold = 6;
         // Linear interpolation for decreasing crossover
         let result = first_crossover(&frequencies, &magnitudes, threshold);
@@ -607,7 +645,7 @@ mod test_first_crossover {
     #[test]
     fn multiple_crossovers() {
         let frequencies: [f32; 10] = core::array::from_fn(|i| i as f32);
-        let magnitudes: [f32; 10] = core::array::from_fn(|i| if i % 2 == 0 {1.0} else {3.0});
+        let magnitudes: [f32; 10] = core::array::from_fn(|i| if i % 2 == 0 { 1.0 } else { 3.0 });
         let threshold = 2.0;
         // Linear interpolation for decreasing crossover
         let result = first_crossover(&frequencies, &magnitudes, threshold);

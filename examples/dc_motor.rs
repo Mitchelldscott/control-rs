@@ -1,15 +1,18 @@
 /// # DC Motor Position Control with a Lead-Lag Compensator
 ///
-/// This example demonstrates the design of a lead-lag compensator for controlling the
-/// angular position of a DC motor. The primary goal is to improve the transient
+/// This example demonstrates the use of a lead-lag compensator for controlling the
+/// rotational speed of a DC motor. The primary goal is to improve the transient
 /// and steady-state response of the system based on frequency-domain specifications.
+///
+/// The process is based on examples in *Feedback Control of Dynamic Systems*, Franklin et al.,
+/// Ch. 6.7
 ///
 /// ## Problem Description
 ///
-/// We model the DC motor as a second-order transfer function, `G(s)`, which relates the
-/// input voltage to the angular position of the motor shaft. The open-loop system
-/// may exhibit undesirable characteristics such as slow response time, excessive
-/// overshoot, or poor steady-state error.
+/// We model the DC motor as a second-order transfer function, `G(s)`, which relates the input
+/// voltage to the rotational speed of the motor shaft. The open-loop system may exhibit undesirable
+/// characteristics such as slow response time, excessive overshoot, or significant steady-state
+/// error.
 ///
 /// To enhance the performance, we will design a lead-lag compensator, `C(s)`. The
 /// design process involves shaping the open-loop frequency response to meet the
@@ -29,15 +32,17 @@
 /// plant `G(s)` in a standard negative feedback configuration.
 ///
 /// ## Plant
-/// <pre> P(s) = Km / ((Js + b)(Ls + R) + Km^2) (rad/sec / V) </pre>
+/// <pre> G(s) = Km / ((Js + b)(Ls + R) + Km^2) (rad/sec / V) </pre>
 ///
 /// ## Resources
 /// * [DC Motor Control (Lead-Lag)](https://www.mathworks.com/help/sps/ug/dc-motor-control-lead-lag.html)
+///
+/// TODO: simulator + Lag compensator
 use control_rs::{
-    integrators::runge_kutta4,
-    math::systems::{feedback, DynamicalSystem},
+    frequency_tools::*,
+    // integrators::runge_kutta4,
+    math::systems::feedback, // DynamicalSystem},
     transfer_function::*,
-    frequency_tools::*
 };
 
 use nalgebra::{Vector1, Vector2};
@@ -58,19 +63,19 @@ type MotorOutput = Vector1<f64>;
 const SIM_STEPS: usize = 100;
 type SimData = [(f64, f64, f64, f64); SIM_STEPS];
 
-fn sim<M: DynamicalSystem<MotorInput, MotorState, MotorOutput>>(
-    model: M,
-    dt: f64,
-    mut x: MotorState,
-) -> SimData {
-    let mut sim = [(0.0, x[0], x[1], model.output(x, 1.0)[(0, 0)]); SIM_STEPS];
-    for i in 1..SIM_STEPS {
-        x = runge_kutta4(&model, x, 1.0, 0.0, 0.1, 0.01);
-        sim[i] = (i as f64 * dt, x[0], x[1], model.output(x, 1.0)[(0, 0)]);
-    }
-
-    sim
-}
+// fn step<ModelInput, ModelState: Clone + Default, ModelOutput, G: DynamicalSystem<ModelInput, ModelState, ModelOutput>>(
+//     plant: G,
+//     dt: f64,
+// ) -> SimData {
+//     let mut x = ModelState::default();
+//     let mut sim = [(0.0, x[0], x[1], plant.output(x.clone(), 1.0)[(0, 0)]); SIM_STEPS];
+//     for i in 1..SIM_STEPS {
+//         x = runge_kutta4(&plant, x.clone(), 1.0, 0.0, 0.1, 0.01);
+//         sim[i] = (i as f64 * dt, x[0], x[1], plant.output(x.clone(), 1.0)[(0, 0)]);
+//     }
+//
+//     sim
+// }
 
 #[cfg(feature = "std")]
 fn plot(sim: SimData) {
@@ -103,48 +108,54 @@ fn main() {
     // Numerator: [Km]
     // Denominator: JLs^2 + (JR + bL)s + bR + Km^2
     let motor_tf = TransferFunction::new([Km], [J * L, J * R + L * b, (R * b) + (Km * Km)]);
-    let motor_ss = tf2ss(&motor_tf);
     println!("DC Motor {motor_tf}");
     println!("DC Gain: {:?}", dc_gain(&motor_tf));
     println!("System Poles: {:?}", poles(&motor_tf).ok());
-    println!("DC Motor {motor_ss}");
 
-    // simulate for 100 steps
-    let _sim_data = sim(motor_ss, 0.1, MotorState::new(0.0, 0.0));
-
-    // #[cfg(feature = "std")]
-    // plot(_sim_data);
-    let _fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([1e-7], [10.0]);
-    // println!("{:?}", Margin::new(&fr).0[0][0]);
+    let mut fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([-10.0], [5.0]);
+    motor_tf.frequency_response(&mut fr);
     #[cfg(feature = "std")]
-    bode("DC Motor Transfer Function", &motor_tf, _fr).show(); // .write_html("target/plots/dc_motor_ol_bode.html");
-
-    let cl_motor_tf = feedback(&motor_tf, &1.0, 1.0, -1.0);
-    println!("CL {cl_motor_tf:.6}");
-    println!("CL System Poles: {:?}", poles(&cl_motor_tf).ok());
-
-    // #[cfg(feature = "std")]
-    // let fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([0.0001], [100.0]);
-    // #[cfg(feature = "std")]
-    // bode("DC Motor CL Transfer Function", &cl_motor_tf, fr).show(); //.write_html("target/plots/dc_motor_cl_bode.html");
+    std::fs::create_dir_all("target/plots").expect("Failed to creat plots directory");
+    #[cfg(feature = "std")]
+    bode("DC Motor Transfer Function", &motor_tf, fr)
+        .write_html("target/plots/dc_motor_ol_bode.html");
 
     // Simulates adding a simple feedforward controller that scales the input by the inverse of the
     // dc_gain, resulting in a new dc_gain = 1. In reality, this drives the motor state to the value
     // of the input voltage. An additional gain can scale the output value to an appropriate speed.
-    let compensated_motor_tf = motor_tf / dc_gain(&motor_tf);
-
-    let compensated_motor_ss = tf2ss(&compensated_motor_tf);
-    println!("DC Motor with gain compensation {compensated_motor_ss}");
-
-    // simulate for 100 steps
-    let _compensated_sim_data = sim(compensated_motor_ss, 0.1, MotorState::new(0.0, 0.0));
+    let gain_compensated_tf = motor_tf / dc_gain(&motor_tf);
+    assert_eq!(dc_gain(&gain_compensated_tf), 1.0);
 
     #[cfg(feature = "std")]
-    plot(_compensated_sim_data);
+    let fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([-10.0], [5.0]);
+    #[cfg(feature = "std")]
+    bode(
+        "DC Motor gain compensated Transfer Function",
+        &gain_compensated_tf,
+        fr,
+    )
+    .write_html("target/plots/dc_motor_gain_compensated_bode.html");
 
-    // let combined_tf = feedback(motor_tf, 1.0);
+    #[allow(non_snake_case)]
+    let Td = 0.4;
+    let alpha = 0.2;
+    let compensator_tf = TransferFunction::new([Td, 1.0], [alpha * Td, 1.0]);
+    let lead_compensated_tf = gain_compensated_tf * compensator_tf;
 
-    // println!("CL system {motor_tf}");
-    // println!("CL system gain: {:?}", dc_gain(&motor_tf));
-    // println!("CL system Poles: {:?}", poles(&motor_tf));
+    #[cfg(feature = "std")]
+    let fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([-10.0], [5.0]);
+    #[cfg(feature = "std")]
+    bode(
+        "DC Motor lead compensated Transfer Function",
+        &lead_compensated_tf,
+        fr,
+    )
+    .write_html("target/plots/dc_motor_lead_compensated_bode.html");
+
+    // #[cfg(feature = "std")]
+    let cl_motor_tf = feedback(&lead_compensated_tf, &1.0, 1.0, -1.0);
+    println!("Closed loop tf: {cl_motor_tf:.10}");
+    // println!("Closed loop poles: {:?}", poles(&cl_motor_tf).ok()); // hanging
+    // #[cfg(feature = "std")]
+    // plot(step(tf2ss(&cl_motor_tf), 0.1)); // simulation needs to know the state-shape of cl system
 }
