@@ -8,7 +8,7 @@ mod derivative {
     use utils::differentiate;
     #[test]
     fn emtpy() {
-        assert_eq!(differentiate(&[0]), []);
+        assert_eq!(differentiate(&[0_i16]), [0_i16; 0]);
     }
     #[test]
     fn zero() {

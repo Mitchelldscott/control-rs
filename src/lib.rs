@@ -63,17 +63,17 @@
 //! * [Feedback control of Dynamic Systems](https://mrce.in/ebooks/Feedback%20Control%20of%20Dynamic%20Systems%208th%20Ed.pdf)
 #![no_std]
 #![deny(
-    clippy::all
-    clippy::todo
-    clippy::panic
-    clippy::nursery
-    clippy::pedantic
-    clippy::unwrap_used
-    clippy::expect_used
-    clippy::unimplemented
+    clippy::all,
+    clippy::todo,
+    clippy::panic,
+    clippy::nursery,
+    clippy::pedantic,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::unimplemented,
 )]
 #![warn(
-    unused
+    unused,
     missing_docs,
     rust_2018_idioms,
 )]

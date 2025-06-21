@@ -248,7 +248,7 @@ pub fn linear_root<T: Zero + Neg<Output = T> + Div<Output = T>>(m: T, b: T) -> R
 /// # Example
 /// ```
 /// use control_rs::{polynomial::utils::quadratic_roots, assert_f64_eq};
-/// let roots = quadratic_roots(1.0, 0.0, 0.0);
+/// let roots = quadratic_roots(1.0, 0.0, 0.0).expect("failed to compute roots");
 /// assert_f64_eq!(roots[0].re, 0.0, 1.5e-14); // having precision issues...
 /// assert_f64_eq!(roots[1].re, 0.0, 1e-14);
 /// ```
