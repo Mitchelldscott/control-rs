@@ -2,27 +2,46 @@
 
 Rust-native numerical modeling and synthesis library for embedded projects.
 
-The crate is `no_std` by default and supports both fixed-point and floating-point numeric types, making it suitable 
-for deployment on a wide range of microcontrollers. The goal is to provide Cargo project templates to enable a reliable 
-and high performance, open-source foundation for embedded control software.
+The crate is `no_std` by default (but has a `std` feature flag for plotting) and intends to support 
+both fixed-point and floating-point numeric types.
 
-The vision is that users can use the templates to either fabricate their own robot components or integrate the 
-templates into more complex modules.
+The goal is to provide cargo templates for robotic components like ESCs, BMS and odometry systems
+that build off the 
+[awesome embedded rust crates](https://github.com/rust-embedded/awesome-embedded-rust). Hopefully 
+this will enable interactive control and estimation systems to be integrated with robots, 
+enabling high-fidelity system identification and precision control.
 
 This list covers a few projects that are in the works:
 - [ ] DC Motor lead-lag compensator
 - [ ] BLDC ESC (FOC or fancy 6-stage commuter)
 - [ ] LiPo Battery model adaptive estimator
-- [ ] Quadcopter attitude/altitude controller
+- [ ] Quadcopter attitude/altitude controller (3-loop autopilot)
 - [ ] Visual-Inertial Odometry
-- [ ] Orbit Determination/Visual localization (EKF, UKF using Nadir pointing pinhole camera and known landmarks)
 
 ## Features
+### Model Types
 
-* **Modeling**: Support for Polynomial, Transfer Function, State-Space, and custom nonlinear structs
-* **Analysis**: Tools for classical, modern and robust system analysis
-* **Synthesis**: Direct and data-driven methods to construct models
-* **Simulation**: Precision model integration (and in the future time-series/episodic dataset tools)
+* `Polynomial` - Dense univariate polynomial
+* `TransferFunction` - Intended to be a laplace domain input/output model but could potentially be
+    used as a rational function
+* `StateSpace` - Standard linear-algebra representation for a system of differential equations
+* `NLModel` - A trait for custom models that provides a more flexible structure/implementation
+
+### Analysis Tools
+
+* `FrequencyTools` - Classical frequency-response methods
+* `RobustTools` - hopefully coming soon
+
+### Synthesis Tools
+
+* `LeastSquares` - a trait that's still in the works (should be available for the statically sized 
+    models).
+* `GradientDescent` - also in the works but should provide a trait to perform backpropagation of
+    error on models.
+
+### Simulation Tools
+
+* `integrators` - Various types of integration for precision simulations (RK4 + Dormand-Prince)
 
 ## Getting Started
 
