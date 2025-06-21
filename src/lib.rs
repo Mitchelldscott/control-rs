@@ -62,16 +62,21 @@
 //! * [Control Systems Wiki book](https://en.wikibooks.org/wiki/Control_Systems)
 //! * [Feedback control of Dynamic Systems](https://mrce.in/ebooks/Feedback%20Control%20of%20Dynamic%20Systems%208th%20Ed.pdf)
 #![no_std]
-#![deny(clippy::all)]
-#![deny(clippy::pedantic)]
-#![deny(clippy::nursery)]
-#![deny(clippy::unwrap_used)]
-#![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
-#![deny(clippy::todo)]
-#![deny(clippy::unimplemented)]
-#![warn(rust_2018_idioms)]
-#![warn(missing_docs, unused)]
+#![deny(
+    clippy::all
+    clippy::todo
+    clippy::panic
+    clippy::nursery
+    clippy::pedantic
+    clippy::unwrap_used
+    clippy::expect_used
+    clippy::unimplemented
+)]
+#![warn(
+    unused
+    missing_docs,
+    rust_2018_idioms,
+)]
 
 pub mod frequency_tools;
 
