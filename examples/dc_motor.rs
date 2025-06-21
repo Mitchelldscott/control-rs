@@ -137,7 +137,7 @@ fn main() {
     .write_html("target/plots/dc_motor_gain_compensated_bode.html");
 
     #[allow(non_snake_case)]
-    let Td = 0.4;
+    let Td = 0.4; // TODO: use poles + fr to compute these
     let alpha = 0.2;
     let compensator_tf = TransferFunction::new([Td, 1.0], [alpha * Td, 1.0]);
     let lead_compensated_tf = gain_compensated_tf * compensator_tf;

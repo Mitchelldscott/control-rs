@@ -125,9 +125,9 @@ mod tf_frequency_tool_tests {
         let mut response = FrequencyResponse::new([frequencies]);
         tf.frequency_response(&mut response);
 
-        let margins = Margin::new(&response);
+        let margins = FrequencyMargin::new(&response);
 
-        if let FrequencyMargin {
+        if let PhaseGainCrossover {
             phase_crossover: Some(phase_crossover),
             gain_crossover: Some(gain_crossover),
             phase_margin: Some(phase_margin),

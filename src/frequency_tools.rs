@@ -40,6 +40,14 @@ use core::ops::{AddAssign, Div, Mul, Sub};
 use nalgebra::{Complex, ComplexField, RealField};
 use num_traits::{Float, Zero};
 
+// this is not that useful without fixed point support
+// pub trait Frequency {
+//     fn pow(self, exp: Self) -> Self;
+//     fn log10(self) -> Self;
+//     fn mag_to_db(self) -> Self;
+//     fn db_to_mag(self) -> Self;
+// }
+
 /// Standard interface for frequency analysis tools
 pub trait FrequencyTools<T: Float + RealField, const N: usize, const M: usize> {
     /// Calculates the complex response from a set of input frequencies
@@ -97,7 +105,7 @@ where
     ///
     /// If there is no frequency response, the magnitude and phase arrays will be zero-filled
     pub fn mag_phase(&self, output_channel: usize) -> ([T; L], [T; L]) {
-        // TODO: remove zero initialization
+        // TODO: remove zero initialization + move this to general function so Margins can reuse it
         let mut mag = [T::zero(); L];
         let mut phase = [T::zero(); L];
         if let Some(responses) = self.responses {
@@ -145,7 +153,7 @@ where
     /// # Returns
     /// * `FrequencyResponse` instance with frequency data for the specified channel and no responses
     pub fn isolated(freq_start: T, freq_stop: T, channel: usize) -> Self {
-        // TODO: remove zero initialization
+        // TODO: remove zero initialization, or should this whole function get removed
         let mut frequencies = [[T::zero(); L]; N];
         frequencies[channel] = logspace(freq_start, freq_stop);
         Self {
@@ -180,8 +188,9 @@ where
 ///
 /// # Generic Arguments
 /// - `T`: The numeric type for the stability metrics (e.g., `f32` or `f64`).
+/// TODO: This shouldn't need to store the margin, those should be easily extracted from the resp
 #[derive(Copy, Clone, Debug)]
-pub struct FrequencyMargin<T> {
+pub struct PhaseGainCrossover<T> {
     /// The frequency at which the phase crosses -180 degrees
     pub phase_crossover: Option<T>,
     /// The frequency at which the gain crosses 0 dB (unity gain)
@@ -192,7 +201,7 @@ pub struct FrequencyMargin<T> {
     pub gain_margin: Option<T>,
 }
 
-impl<T: Float + RealField> FrequencyMargin<T> {
+impl<T: Float + RealField> PhaseGainCrossover<T> {
     /// Computes both the magnitude and phase crossover frequencies and margins of
     /// a frequency response
     ///
@@ -201,8 +210,9 @@ impl<T: Float + RealField> FrequencyMargin<T> {
     /// * `response` - The array of `Complex<T>` corresponding to the given frequencies
     ///
     /// # Returns
-    /// * `FrequencyMargin` - the margins and crossovers of the response
+    /// * `PhaseGainCrossover` - the margins and crossovers of the response
     pub fn new<const L: usize>(frequencies: &[T; L], response: &[Complex<T>; L]) -> Self {
+        // TODO: Remove duplicate code + see `FrequencyResponse::mag_phase()`
         let mut phases = [T::zero(); L];
         let mut magnitudes = [T::zero(); L];
 
@@ -215,10 +225,10 @@ impl<T: Float + RealField> FrequencyMargin<T> {
             // should be using frequencies.iter().position(|hz| hz == threshold, or change first_crossover to return the index)
             // unwrap is safe because the crossover frequency exists, meaning there is a corresponding
             // index in the magnitude array
-            // TODO: Fix this so there doesn't need to be an unwrap
+            // TODO: Fix this so there doesn't need to be an unwrap (see `first_crossover()` todos)
             let mag_at_crossover =
                 first_crossover(&magnitudes, frequencies, wc).unwrap_or_else(|| T::zero());
-            // TODO: Make a constant for this or something to avoid unwrapping
+            // TODO: Use Frequency trait to do this conversion
             T::from(20).unwrap_or_else(|| T::zero()) * -ComplexField::log10(mag_at_crossover)
         });
 
@@ -238,10 +248,10 @@ impl<T: Float + RealField> FrequencyMargin<T> {
         }
     }
 }
-impl<T> Default for FrequencyMargin<T> {
-    /// Creates a `FrequencyMargin` full of None
+impl<T> Default for PhaseGainCrossover<T> {
+    /// Creates a `PhaseGainCrossover` full of None
     /// # Returns
-    /// * `FrequencyMargin` - with all fields set to `None`
+    /// * `PhaseGainCrossover` - with all fields set to `None`
     fn default() -> Self {
         Self {
             phase_crossover: None,
@@ -254,17 +264,17 @@ impl<T> Default for FrequencyMargin<T> {
 
 /// A structure representing stability margins for every input-output channel of a system
 ///
-/// This struct provides a matrix of `FrequencyMargin` values, where each element corresponds
+/// This struct provides a matrix of `PhaseGainCrossover` values, where each element corresponds
 /// to the stability margins for a specific input-output channel pair.
 ///
 /// # Generic Arguments
 /// - `T`: Field type for the stability metrics (e.g., `f32` or `f64`).
 /// - `N`: Dimension of the system's input.
 /// - `M`: Dimension of the system's output.
-pub struct Margin<T, const N: usize, const M: usize>(pub [[FrequencyMargin<T>; N]; M]);
+pub struct FrequencyMargin<T, const N: usize, const M: usize>(pub [[PhaseGainCrossover<T>; N]; M]);
 
-impl<T: Float + RealField, const N: usize, const M: usize> Margin<T, N, M> {
-    /// Creates a new `Margin` instance from a given `FrequencyResponse`
+impl<T: Float + RealField, const N: usize, const M: usize> FrequencyMargin<T, N, M> {
+    /// Creates a new `FrequencyMargin` instance from a given `FrequencyResponse`
     ///
     /// This function computes the stability margins for all input-output channel pairs in the
     /// provided `FrequencyResponse` object.
@@ -277,13 +287,13 @@ impl<T: Float + RealField, const N: usize, const M: usize> Margin<T, N, M> {
     /// * `L` - The number of frequency points per channel
     ///
     /// # Returns
-    /// * `Margin` - A new instance containing the calculated margins for all input-output channels
+    /// * `FrequencyMargin` - A new instance containing the calculated margins for all input-output channels
     pub fn new<const L: usize>(response: &FrequencyResponse<T, L, N, M>) -> Self {
-        let mut margins = [[FrequencyMargin::default(); N]; M];
+        let mut margins = [[PhaseGainCrossover::default(); N]; M];
         if let Some(responses) = response.responses {
             for (margin_row, res) in margins.iter_mut().zip(responses.iter()) {
                 for (margin, frequency) in margin_row.iter_mut().zip(response.frequencies.iter()) {
-                    *margin = FrequencyMargin::new::<L>(frequency, res);
+                    *margin = PhaseGainCrossover::new::<L>(frequency, res);
                 }
             }
         }
@@ -316,7 +326,8 @@ impl<T: Float + RealField, const N: usize, const M: usize> Margin<T, N, M> {
 ///
 /// # Returns
 /// * `Option<T>` - The crossover frequency in rad/s, or `None` if no crossover frequency is found
-/// TODO: Split this up into a first_crossover -> index and interpolate_arrays -> T
+/// TODO: Split this up into first_crossover(arr, threshold) -> index and
+///     interpolate_arrays(arr_a, arr_b) -> T
 fn first_crossover<T, const N: usize>(a: &[T; N], b: &[T; N], threshold: T) -> Option<T>
 where
     T: Clone + PartialOrd + Sub<Output = T> + Mul<Output = T> + Div<Output = T>,
@@ -387,7 +398,7 @@ fn render_bode_subplot<T>(
     phase: &[T],
     row: usize,
     col: usize,
-    margins: &FrequencyMargin<T>,
+    margins: &PhaseGainCrossover<T>,
 ) where
     T: 'static + Copy + Float + From<i16> + serde::ser::Serialize,
 {
@@ -426,7 +437,7 @@ fn render_bode_subplot<T>(
         plot.add_trace(
             plotly::Scatter::new(vec![wc, wc], vec![-gm, T::zero()])
                 .mode(common::Mode::Lines)
-                .name(format!("Gain Margin[{row}, {col}]"))
+                .name(format!("Gain FrequencyMargin[{row}, {col}]"))
                 // .x_axis(x_axis_mag)
                 // .y_axis(y_axis_mag)
                 .line(
@@ -442,7 +453,7 @@ fn render_bode_subplot<T>(
         plot.add_trace(
             plotly::Scatter::new(vec![wc, wc], vec![<T as From<i16>>::from(-180), pm])
                 .mode(common::Mode::Lines)
-                .name(format!("Phase Margin[{row}, {col}]"))
+                .name(format!("Phase FrequencyMargin[{row}, {col}]"))
                 .x_axis("x2")
                 .y_axis("y2")
                 .line(
@@ -470,7 +481,7 @@ where
     if response.responses.is_none() {
         system.frequency_response(&mut response);
     }
-    let margins = Margin::new(&response);
+    let margins = FrequencyMargin::new(&response);
 
     let mut plot = plotly::Plot::new();
     plot.set_layout(
