@@ -5,11 +5,10 @@ Rust-native numerical modeling and synthesis library for embedded projects.
 The crate is `no_std` by default (but has a `std` feature flag for plotting) and intends to support 
 both fixed-point and floating-point numeric types.
 
-The goal is to provide cargo templates for robotic components like ESCs, BMS and odometry systems
-that build off the 
-[awesome embedded rust crates](https://github.com/rust-embedded/awesome-embedded-rust). Hopefully 
-this will enable interactive control and estimation systems to be integrated with robots, 
-enabling high-fidelity system identification and precision control.
+The goal is to make cargo templates for robotic components like ESCs, BMS and odometry
+systems. These templates will use the
+[awesome embedded rust crates](https://!github.com/rust-embedded/awesome-embedded-rust)
+to provide detailed guides to implementing and operating the components.
 
 This list covers a few projects that are in the works:
 - [ ] DC Motor lead-lag compensator
