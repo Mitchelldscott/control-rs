@@ -22,7 +22,7 @@ This list covers a few projects that are in the works:
 
 * `Polynomial` - Dense univariate polynomial
 * `TransferFunction` - Intended to be a laplace domain input/output model but could potentially be
-    used as a rational function
+  used as a rational function
 * `StateSpace` - Standard linear-algebra representation for a system of differential equations
 * `NLModel` - A trait for custom models that provides a more flexible structure/implementation
 
@@ -33,14 +33,15 @@ This list covers a few projects that are in the works:
 
 ### Synthesis Tools
 
-* `LeastSquares` - a trait that's still in the works (should be available for the statically sized 
-    models).
+* `LeastSquares` - a trait that's still in the works (should be available for statically sized 
+  models).
 * `GradientDescent` - also in the works but should provide a trait to perform backpropagation of
-    error on models.
+  error on models.
 
 ### Simulation Tools
 
 * `integrators` - Various types of integration for precision simulations (RK4 + Dormand-Prince)
+* `response` - Classic system response implementations: step, ramp, sine, impulse...
 
 ## Getting Started
 
@@ -68,7 +69,7 @@ use control_rs::transfer_function::{TransferFunction, linear_tools::dc_gain};
 
 fn main() {
     let dt = 0.1;
-    // create a transfer function 1 / s
+    // create a transfer function 1 / s(s + 0.1)
     let mut tf = Transferfunction::new([1.0], [1.0, 0.1, 0.0]);
     println!("{tf}");
     println!("DC Gain of TF: {}", dc_gain(tf));

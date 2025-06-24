@@ -127,9 +127,10 @@ mod companion {
 
 mod roots {
     use super::*;
-    use crate::assert_f32_eq;
-    use crate::polynomial::utils::NoRoots;
-    use utils::roots;
+    use crate::{
+        assert_f32_eq, assert_f64_eq,
+        polynomial::utils::{NoRoots, roots}
+    };
 
     #[test]
     fn zero() {
@@ -144,6 +145,7 @@ mod roots {
     fn line() {
         assert_eq!(roots(&[0.0, 1.0]), Ok([Complex::new(0.0, 0.0)]));
     }
+
 
     #[test]
     fn quadratic_real() {
@@ -184,5 +186,66 @@ mod roots {
         let complex2 = complex2.unwrap();
         assert_f32_eq!(complex1.re, complex2.re);
         assert_f32_eq!(complex1.im, complex2.im.neg());
+    }
+    #[allow(clippy::expect_used)]
+    #[test]
+    fn quartic_monomial() {
+        let roots = roots(&[0.0, 0.0, 0.0, 0.0, 1.0]);
+        for root in roots.expect("failed to compute roots") {
+            assert_f64_eq!(root.re, 0.0);
+            assert_f64_eq!(root.im, 0.0);
+        }
+    }
+    #[allow(clippy::expect_used)]
+    #[test]
+    fn line_with_leading_zeros() {
+        let roots = roots(&[0.0, 1.0, 0.0, 0.0]).expect("failed to compute roots");
+        assert_f32_eq!(roots[0].re, 0.0);
+        assert_f32_eq!(roots[0].im, 0.0);
+        assert!(roots[1].re.is_nan());
+        assert!(roots[1].im.is_nan());
+        assert!(roots[2].re.is_nan());
+        assert!(roots[2].im.is_nan());
+    }
+    #[allow(clippy::expect_used)]
+    #[test]
+    fn cubic_with_zero_constant() {
+        let roots = roots(&[0.0, 1.0, 1.0, 1.0]).expect("failed to compute roots");
+        assert_f32_eq!(roots[0].re, -0.5);
+        assert_f32_eq!(roots[0].im, 0.866_025_4);
+        assert_f32_eq!(roots[1].re, -0.5);
+        assert_f32_eq!(roots[1].im, -0.866_025_4);
+        assert_f32_eq!(roots[2].re, 0.0);
+        assert_f32_eq!(roots[2].im, 0.0);
+    }
+    #[allow(clippy::expect_used)]
+    #[test]
+    fn sixth_order_zero_constant() {
+        let roots = roots(&[
+            0.0,
+            0.000_027_940_1,
+            0.000_028_772_7,
+            0.000_009_786_5,
+            0.000_001_341_6,
+            0.000_000_078_2,
+            0.000_000_001_6,
+            0.0 // incorrect companion if leading zero
+        ]).expect("failed to compute roots");
+        assert_f32_eq!(roots[0].re, -20.7682, 0.03);
+        assert_f32_eq!(roots[1].re, -13.0648, 0.05);
+        assert_f32_eq!(roots[2].re, -9.7396, 0.02);
+        assert_f32_eq!(roots[3].re, -3.3001, 0.00025);
+        assert_f32_eq!(roots[4].re, -2.0024, 1e-4);
+        assert_f32_eq!(roots[5].re, 0.0);
+        // assert!(roots[6].re.is_nan() && roots[6].im.is_nan());
+        assert_f32_eq!(
+            roots[0].im
+            + roots[1].im
+            + roots[2].im
+            + roots[3].im
+            + roots[4].im
+            + roots[5].im,
+            0.0
+        );
     }
 }

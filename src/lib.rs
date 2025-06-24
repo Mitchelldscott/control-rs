@@ -13,7 +13,7 @@
 //! This list covers a few projects that are in the works:
 //! - [ ] DC Motor lead-lag compensator
 //! - [ ] BLDC ESC (FOC or fancy 6-stage commuter)
-//! - [ ] LiPo Battery model adaptive estimator
+//! - [ ] Lipo Battery model adaptive estimator
 //! - [ ] Quadcopter attitude/altitude controller (3-loop autopilot)
 //! - [ ] Visual-Inertial Odometry
 //!
@@ -21,26 +21,27 @@
 //! ### Model Types
 //!
 //! * [Polynomial] - Dense univariate polynomial.
-//! * [TransferFunction] - Intended to be a laplace domain input/output model but could potentially
-//!     be used as a rational function.
-//! * [StateSpace] - Standard linear-algebra representation for a system of differential equations.
-//! * [NLModel] - A trait for custom models that provides a more flexible structure/implementation.
+//! * [`TransferFunction`] - Intended to be a laplace domain input/output model but could potentially
+//!   be used as a rational function.
+//! * [`StateSpace`] - Standard linear-algebra representation for a system of differential equations.
+//! * [`NLModel`] - A trait for custom models that provides a more flexible structure/implementation.
 //!
 //! ### Analysis Tools
 //!
-//! * [FrequencyTools] - Classical frequency-response methods
+//! * [`FrequencyTools`] - Classical frequency-response methods
 //! * `RobustTools` - Hopefully coming soon
 //!
 //! ### Synthesis Tools
 //!
 //! * `LeastSquares` - Trait that's still in the works (should be available for the statically
-//!     sized models).
+//!   sized models).
 //! * `GradientDescent` - Also in the works but should provide a trait to perform backpropagation of
-//!     error on models.
+//!   error on models.
 //!
 //! ### Simulation Tools
 //!
 //! * [integrators] - Various types of integration for precision simulations (RK4 + Dormand-Prince)
+//! * `response` - Classic system response implementations: step, ramp, sine, impulse...
 //!
 //! # Example
 //! ```

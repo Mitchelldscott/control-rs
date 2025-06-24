@@ -43,6 +43,9 @@ pub const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
 /// The safety relies on:
 /// - Fully initializing all elements of the `[MaybeUninit<T>; N]` array before calling `read()`
 /// - Not reading from or dropping uninitialized memory
+///
+/// TODO:
+///   * Move to a specific array_init module
 pub(crate) fn array_from_iterator_with_default<I, T, const N: usize>(
     iterator: I,
     default: T,
@@ -116,7 +119,7 @@ pub fn largest_nonzero_index<T: Zero>(coefficients: &[T]) -> Option<usize> {
 /// # Examples
 /// ```
 /// use control_rs::polynomial::utils::differentiate;
-/// assert_eq!(differentiate(&[1]), []); // d/dt(1) = 0 base case is an empty array
+/// assert_eq!(differentiate(&[1u8]), [0u8; 0]); // d/dt(1) = 0 base case is an empty array
 /// assert_eq!(differentiate(&[1, 2]), [2]); // d/dt(2x + 1) = 2
 /// assert_eq!(differentiate(&[1, 1, 1]), [1, 2]); // d/dt(x^2 + x + 1) = 2x + 1
 /// ```
@@ -179,12 +182,12 @@ where
 ///
 /// <pre>
 /// companion(a_n * x^n + ... + a_1 * x + a_0) =
-///     |  -a_(n-1)/a_n  -a_(n-2)/a_n  -a_(n-3)/a_n  ...  -a_1/a_0  -a_0/a_n |
-///     |     1             0             0          ...     0         0     |
-///     |     0             1             0          ...     0         0     |
-///     |     0             0             1          ...     0         0     |
-///     |    ...           ...           ...         ...    ...       ...    |
-///     |     0             0             0          ...     1         0     |
+///     |   -a_0/a_n   -a_1/a_n   -a_2/a_n  ...  -a_(n-2)/a_0  -a_(n-1)/a_n |
+///     |     1          0          0       ...     0            0          |
+///     |     0          1          0       ...     0            0          |
+///     |     0          0          1       ...     0            0          |
+///     |    ...        ...        ...      ...    ...          ...         |
+///     |     0          0          0       ...     1            0          |
 /// </pre>
 ///
 /// # Example
@@ -203,17 +206,17 @@ where
     // SAFETY: `M` is a valid index because Const<N> impl DimSub<U1, Output = Const<M>> so `N > 0`
     // and `N - 1 = M`
     let leading_coefficient_neg = unsafe { coefficients.get_unchecked(M).clone().neg() };
-    if !leading_coefficient_neg.is_zero() {
         let mut companion_iter = companion.iter_mut();
         if let Some(row) = companion_iter.next() {
-            for (companion_i, coefficient) in row.iter_mut().rev().zip(coefficients.iter()) {
-                *companion_i = coefficient.clone() / leading_coefficient_neg.clone();
+            if !leading_coefficient_neg.is_zero() {
+                for (companion_i, coefficient) in row.iter_mut().rev().zip(coefficients.iter()) {
+                    *companion_i = coefficient.clone() / leading_coefficient_neg.clone();
+                }
             }
             for (i, row) in companion_iter.enumerate() {
                 row[i] = T::one();
             }
         }
-    }
     companion
 }
 
@@ -252,7 +255,7 @@ pub fn linear_root<T: Zero + Neg<Output = T> + Div<Output = T>>(m: T, b: T) -> R
 /// assert_f64_eq!(roots[0].re, 0.0, 1.5e-14); // having precision issues...
 /// assert_f64_eq!(roots[1].re, 0.0, 1e-14);
 /// ```
-/// TODO: Integer support
+/// TODO: Fixed Point support
 pub fn quadratic_roots<T>(a: T, b: T, c: T) -> Result<[Complex<T>; 2], NoRoots>
 where
     T: Clone
@@ -315,7 +318,7 @@ where
 /// assert_f64_eq!(roots[1].re, 2.0, 1e-14);
 /// assert_f64_eq!(roots[2].re, 1.0);
 /// ```
-/// TODO: Integer support + Return type upgrade
+/// TODO: fixed point support
 pub fn roots<T, const N: usize, const M: usize>(
     coefficients: &[T; N],
 ) -> Result<[Complex<T>; M], NoRoots>
@@ -357,7 +360,12 @@ where
             *root = q_root;
         }
     } else {
-        let matrix = SMatrix::from_data(ArrayStorage(companion::<T, N, M>(coefficients)));
+        // TODO:
+        //  * Edge-case where coefficients represent a monomial
+        //  * Edge-case where polynomial has no constant (root at zero, can deflate)
+        //  * Edge-case where polynomial has a leading zero, companion will be zero filled
+        // let trimmed_coefficients: [T; degree] = array_from_iterator_with_default(coefficients.into_iter().take(degree).cloned(), T::zero());
+        let matrix = SMatrix::from_data(ArrayStorage(companion(coefficients)));
         for (eigenvalue, root) in matrix
             .complex_eigenvalues()
             .into_iter()
@@ -456,7 +464,7 @@ where
 /// use control_rs::polynomial::utils::long_division;
 /// let p1 = [1i32; 2];
 /// let p2 = [1i32; 2];
-/// assert_eq!(long_division(p1, p2), [1i32, 0i32], "wrong division result");
+/// assert_eq!(long_division(p1, &p2), [1i32, 0i32], "wrong division result");
 /// ```
 ///
 /// # Algorithm
@@ -468,7 +476,7 @@ where
 ///     r ← r − t × d
 /// return (q, r)
 ///</pre>
-pub fn long_division<T, const N: usize, const M: usize>(dividend: [T; N], divisor: [T; M]) -> [T; N]
+pub fn long_division<T, const N: usize, const M: usize>(dividend: [T; N], divisor: &[T; M]) -> [T; N]
 where
     T: Clone + Zero + Div<Output = T> + Mul<Output = T> + AddAssign + SubAssign,
     Const<N>: DimMax<Const<M>, Output = Const<N>>,
@@ -476,7 +484,7 @@ where
     let mut quotient = array::from_fn(|_| T::zero());
     // Find actual degrees
     let dividend_order = largest_nonzero_index(&dividend);
-    let divisor_order = largest_nonzero_index(&divisor);
+    let divisor_order = largest_nonzero_index(divisor);
 
     // degree of self and rhs exists
     if let Some(dividend_order) = dividend_order {

@@ -76,13 +76,10 @@ pub fn dc_gain<T: Float, const M: usize, const N: usize>(tf: &TransferFunction<T
 /// use control_rs::transfer_function::{TransferFunction, poles};
 /// // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
 /// let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
-/// let poles = poles(&tf); // contains 1 more element than it should
+/// let poles = poles(&tf);
 /// ```
 /// # Errors
 /// * `NoRoots` - the function was not able to find any roots for the denominator
-///
-/// ## References
-/// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
 pub fn poles<T, const M: usize, const N: usize, const L: usize>(
     tf: &TransferFunction<T, M, N>,
 ) -> Result<[Complex<T>; L], crate::polynomial::utils::NoRoots>
@@ -101,7 +98,48 @@ where
     Const<L>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
 {
-    crate::polynomial::utils::roots::<T, N, L>(&tf.denominator)
+    crate::polynomial::utils::roots(&tf.denominator)
+}
+
+/// Compute the roots of the transfer function's numerator
+///
+/// Calculates the eigen values of a companion matrix constructed from the numerator.
+///
+/// # Arguments
+///  * `tf` - the transfer function to check the zeros of
+///
+/// # Returns
+///  * `[complex<T>; N]` - zeros of the tf
+///
+/// # Example
+///
+/// ```rust
+/// use control_rs::transfer_function::{TransferFunction, zeros};
+/// // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
+/// let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
+/// let zeros = zeros(&tf);
+/// ```
+/// # Errors
+/// * `NoRoots` - the function was not able to find any roots for the denominator
+pub fn zeros<T, const M: usize, const N: usize, const L: usize>(
+    tf: &TransferFunction<T, M, N>,
+) -> Result<[Complex<T>; L], crate::polynomial::utils::NoRoots>
+where
+    T: Copy
+    + Zero
+    + One
+    + Neg<Output = T>
+    + Sub<Output = T>
+    + Div<Output = T>
+    + PartialOrd
+    + fmt::Debug
+    + RealField
+    + Float,
+    Const<M>: DimSub<U1, Output = Const<L>>,
+    Const<L>: DimSub<U1>,
+    DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
+{
+    crate::polynomial::utils::roots(&tf.numerator)
 }
 
 /// Check if the system's poles lie on the left-half plane (LHP), a condition for stability.

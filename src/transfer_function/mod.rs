@@ -34,19 +34,7 @@ use crate::{
 // ===============================================================================================
 
 #[cfg(test)]
-mod basic_tf_tests;
-
-#[cfg(test)]
-mod tf_edge_case_tests;
-
-#[cfg(test)]
-mod tf_frequency_tests;
-
-#[cfg(test)]
-mod tf_scalar_arithmetic_tests;
-
-#[cfg(test)]
-mod tf_arithmetic_tests;
+mod tests;
 
 // ===============================================================================================
 //      TransferFunction Sub-modules
@@ -530,12 +518,17 @@ impl fmt::Write for FmtLengthCounter {
     }
 }
 
-fn formatted_length<T: fmt::Display>(value: &T, f: &fmt::Formatter<'_>) -> usize {
+fn formatted_length<T: fmt::Display>(value: &T, f: &fmt::Formatter<'_>) -> Result<usize, fmt::Error> {
     use fmt::Write;
-    let precision = f.precision().unwrap_or(crate::math::DEFAULT_PRECISION);
     let mut counter = FmtLengthCounter { length: 0 };
-    write!(&mut counter, "{value:precision$}").unwrap();
-    counter.length
+    if let Some(precision) = f.precision() {
+        write!(&mut counter, "{value:precision$}")?;
+    }
+    else {
+        write!(&mut counter, "{value}")?;
+    }
+
+    Ok(counter.length)
 }
 
 /// TODO: Fix formating
@@ -546,9 +539,8 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let num = crate::Polynomial::from_data(self.numerator);
         let den = crate::Polynomial::from_data(self.denominator);
-        let num_len = formatted_length(&num, f);
-        let den_len = formatted_length(&den, f);
-        let precision = f.precision().unwrap_or(crate::math::DEFAULT_PRECISION);
+        let num_len = formatted_length(&num, f)?;
+        let den_len = formatted_length(&den, f)?;
 
         let (n_align, d_align, bar_len) = if den_len > num_len {
             ((den_len - num_len) / 2, 0, den_len)
@@ -562,7 +554,12 @@ where
         for _ in 0..n_align {
             write!(f, " ")?;
         }
-        writeln!(f, "{num:.precision$}")?;
+        if let Some(precision) = f.precision() {
+            writeln!(f, "{num:.precision$}")?;
+        }
+        else {
+            writeln!(f, "{num}")?;
+        }
 
         // Write division bar
         for _ in 0..bar_len {
@@ -574,7 +571,13 @@ where
         for _ in 0..d_align {
             write!(f, " ")?;
         }
-        writeln!(f, "{den:.precision$}")?;
+        if let Some(precision) = f.precision() {
+            writeln!(f, "{den:.precision$}")?;
+        }
+        else {
+            writeln!(f, "{den}")?;
+        }
+
 
         Ok(())
     }

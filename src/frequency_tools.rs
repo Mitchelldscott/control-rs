@@ -188,6 +188,7 @@ where
 ///
 /// # Generic Arguments
 /// - `T`: The numeric type for the stability metrics (e.g., `f32` or `f64`).
+/// 
 /// TODO: This shouldn't need to store the margin, those should be easily extracted from the resp
 #[derive(Copy, Clone, Debug)]
 pub struct PhaseGainCrossover<T> {
@@ -326,8 +327,10 @@ impl<T: Float + RealField, const N: usize, const M: usize> FrequencyMargin<T, N,
 ///
 /// # Returns
 /// * `Option<T>` - The crossover frequency in rad/s, or `None` if no crossover frequency is found
-/// TODO: Split this up into first_crossover(arr, threshold) -> index and
-///     interpolate_arrays(arr_a, arr_b) -> T
+/// 
+/// TODO: 
+///   * Split this up into `first_crossover(arr, threshold) -> index` and
+///     `interpolate_arrays(arr_a, arr_b) -> T`
 fn first_crossover<T, const N: usize>(a: &[T; N], b: &[T; N], threshold: T) -> Option<T>
 where
     T: Clone + PartialOrd + Sub<Output = T> + Mul<Output = T> + Div<Output = T>,
@@ -362,10 +365,11 @@ where
 /// let points = logspace::<f64, 5>(1.0, 3.0);
 /// assert_eq!(points.len(), 5);
 /// ```
-/// TODO: remove unwraps + make a 10E struct that impl powf for floats and ints
 /// # Panics
 /// * if 10.0 cannot cast to T
 /// * if N - 1 cannot cast to T
+/// 
+/// TODO: remove unwraps + make a 10E struct that impl powf for floats and ints
 pub fn logspace<T: Float + AddAssign, const N: usize>(a: T, b: T) -> [T; N] {
     let mut result = [T::zero(); N];
     #[allow(clippy::unwrap_used)]

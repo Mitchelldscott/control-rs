@@ -141,6 +141,8 @@ fn main() {
     let alpha = 0.2;
     let compensator_tf = TransferFunction::new([Td, 1.0], [alpha * Td, 1.0]);
     let lead_compensated_tf = gain_compensated_tf * compensator_tf;
+    println!("Compensated System Zeros: {:?}", zeros(&lead_compensated_tf).ok());
+    println!("Compensated System Poles: {:?}", poles(&lead_compensated_tf).ok());
 
     #[cfg(feature = "std")]
     let fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([-10.0], [5.0]);
@@ -154,7 +156,7 @@ fn main() {
 
     // #[cfg(feature = "std")]
     let cl_motor_tf = feedback(&lead_compensated_tf, &1.0, 1.0, -1.0);
-    println!("Closed loop tf: {cl_motor_tf:.10}");
+    // println!("Closed loop tf: {cl_motor_tf}");
     // println!("Closed loop poles: {:?}", poles(&cl_motor_tf).ok()); // hanging
     // #[cfg(feature = "std")]
     // plot(step(tf2ss(&cl_motor_tf), 0.1)); // simulation needs to know the state-shape of cl system
