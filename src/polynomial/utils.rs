@@ -182,12 +182,12 @@ where
 ///
 /// <pre>
 /// companion(a_n * x^n + ... + a_1 * x + a_0) =
-///     |   -a_0/a_n   -a_1/a_n   -a_2/a_n  ...  -a_(n-2)/a_0  -a_(n-1)/a_n |
-///     |     1          0          0       ...     0            0          |
-///     |     0          1          0       ...     0            0          |
-///     |     0          0          1       ...     0            0          |
-///     |    ...        ...        ...      ...    ...          ...         |
-///     |     0          0          0       ...     1            0          |
+///     |  -a_(n-1)/a_n -a_(n-2)/a_n -a_(n-3)/a_n ...  -a_1/a_0  -a_0/a_n |
+///     |    1            0            0          ...     0         0     |
+///     |    0            1            0          ...     0         0     |
+///     |    0            0            1          ...     0         0     |
+///     |   ...          ...          ...         ...    ...       ...    |
+///     |    0            0            0          ...     1         0     |
 /// </pre>
 ///
 /// # Example
@@ -206,17 +206,17 @@ where
     // SAFETY: `M` is a valid index because Const<N> impl DimSub<U1, Output = Const<M>> so `N > 0`
     // and `N - 1 = M`
     let leading_coefficient_neg = unsafe { coefficients.get_unchecked(M).clone().neg() };
-        let mut companion_iter = companion.iter_mut();
-        if let Some(row) = companion_iter.next() {
-            if !leading_coefficient_neg.is_zero() {
-                for (companion_i, coefficient) in row.iter_mut().rev().zip(coefficients.iter()) {
-                    *companion_i = coefficient.clone() / leading_coefficient_neg.clone();
-                }
-            }
-            for (i, row) in companion_iter.enumerate() {
-                row[i] = T::one();
+    let mut companion_row_iter = companion.iter_mut();
+    if let Some(first_row) = companion_row_iter.next() {
+        if !leading_coefficient_neg.is_zero() {
+            for (companion_i, coefficient) in first_row.iter_mut().rev().zip(coefficients.iter()) {
+                *companion_i = coefficient.clone() / leading_coefficient_neg.clone();
             }
         }
+        for (i, row) in companion_row_iter.enumerate() {
+            row[i] = T::one();
+        }
+    }
     companion
 }
 
@@ -364,7 +364,6 @@ where
         //  * Edge-case where coefficients represent a monomial
         //  * Edge-case where polynomial has no constant (root at zero, can deflate)
         //  * Edge-case where polynomial has a leading zero, companion will be zero filled
-        // let trimmed_coefficients: [T; degree] = array_from_iterator_with_default(coefficients.into_iter().take(degree).cloned(), T::zero());
         let matrix = SMatrix::from_data(ArrayStorage(companion(coefficients)));
         for (eigenvalue, root) in matrix
             .complex_eigenvalues()
