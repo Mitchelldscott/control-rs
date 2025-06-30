@@ -5,79 +5,15 @@
 
 use core::{
     array, fmt, iter,
-    mem::MaybeUninit,
     ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign},
 };
 use nalgebra::{
     allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax,
     DimSub, RealField, SMatrix, U1,
 };
-use num_traits::{One, Zero};
+use num_traits::{Float, One, Zero};
 
-/// Helper function to reverse arrays given to `Polynomial::new()`
-#[inline]
-pub const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
-    let mut output = input;
-    let mut i = 0;
-    while i < N / 2 {
-        let tmp = output[i];
-        output[i] = output[N - 1 - i];
-        output[N - 1 - i] = tmp;
-        i += 1;
-    }
-
-    output
-}
-
-/// Initialize an array from an iterator.
-///
-/// # Arguments
-/// * `iterator` - An [Iterator] over a collection of `T`.
-/// * `default` - the default value to use if the iterator is not long enough.
-///
-/// # Returns
-/// * `initialized_array` - An array with all elements initialized
-///
-/// # Safety
-/// This function uses `MaybeUninit` and raw pointer casting to avoid requiring `T: Default + Copy`.
-/// The safety relies on:
-/// - Fully initializing all elements of the `[MaybeUninit<T>; N]` array before calling `read()`
-/// - Not reading from or dropping uninitialized memory
-pub(super) fn array_from_iterator_with_default<I, T, const N: usize>(
-    iterator: I,
-    default: T,
-) -> [T; N]
-where
-    T: Clone,
-    I: IntoIterator<Item = T>,
-{
-    // SAFETY: `[MaybeUninit<T>; N]` is valid.
-    let mut uninit_array: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
-    let mut count = 0;
-
-    // zip() will only iterate over `N.min(iterator_len)` items so no OOB access will occur.
-    for (c, d) in uninit_array.iter_mut().zip(iterator.into_iter()) {
-        *c = MaybeUninit::new(d);
-        count += 1;
-    }
-
-    // `T: Clone`, and we are initializing all remaining uninitialized slots.
-    for c in uninit_array.iter_mut().skip(count) {
-        *c = MaybeUninit::new(default.clone());
-    }
-
-    // SAFETY:
-    // * All `N` elements of `uninit_array` have been initialized.
-    // * `MaybeUninit<T>` and T are guaranteed to have the same layout.
-    // * `MaybeUninit` does not drop, so there are no double-frees.
-    unsafe {
-        // Get a pointer to the `uninit_array` array.
-        // Cast it to a pointer to an array of `T`.
-        // Then `read()` the value from that pointer.
-        // This is equivalent to transmute from `[MaybeUninit<T>; N]` to `[T; N]`.
-        uninit_array.as_ptr().cast::<[T; N]>().read()
-    }
-}
+use crate::static_storage::{array_from_iterator, array_from_iterator_with_default};
 
 /// Finds the **last** non-zero value in an array.
 ///
@@ -111,10 +47,12 @@ pub fn largest_nonzero_index<T: Zero>(coefficients: &[T]) -> Option<usize> {
 /// It iterates through the coefficients, effectively shifting them to a lower exponent
 /// and multiplying by the original exponent.
 ///
+/// > **Note**: if `N == 1` the result will be an empty array, in some cases this may be unexpected
+///
 /// # Examples
 /// ```
 /// use control_rs::polynomial::utils::differentiate;
-/// assert_eq!(differentiate(&[0]), []); // d/dt(1) = 0 base case is an empty array
+/// assert_eq!(differentiate(&[1u8]), [0u8; 0]); // d/dt(1) = 0 base case is an empty array
 /// assert_eq!(differentiate(&[1, 2]), [2]); // d/dt(2x + 1) = 2
 /// assert_eq!(differentiate(&[1, 1, 1]), [1, 2]); // d/dt(x^2 + x + 1) = 2x + 1
 /// ```
@@ -125,13 +63,16 @@ where
     Const<N>: DimSub<U1, Output = Const<M>>,
 {
     let mut exponent = T::zero();
-    array_from_iterator_with_default(
-        coefficients.iter().skip(1).map(|a_i| {
-            exponent += T::one();
-            a_i.clone() * exponent.clone()
-        }),
-        T::zero(),
-    )
+    // Safety: the iterator will have 1 less element than coefficients, which has more than 0
+    // elements
+    unsafe {
+        array_from_iterator(
+            coefficients.iter().skip(1).map(|a_i| {
+                exponent += T::one();
+                a_i.clone() * exponent.clone()
+            }),
+        )
+    }
 }
 
 /// Computes the indefinite integral of a polynomial.
@@ -158,13 +99,15 @@ where
     Const<N>: DimAdd<U1, Output = Const<M>>,
 {
     let mut exponent = T::zero();
-    array_from_iterator_with_default(
-        iter::once(constant).chain(coefficients.iter().map(|a_i| {
-            exponent += T::one();
-            a_i.clone() / exponent.clone()
-        })),
-        T::zero(),
-    )
+    // Safety: the iterator will have 1 more element than coefficients
+    unsafe {
+        array_from_iterator(
+            iter::once(constant).chain(coefficients.iter().map(|a_i| {
+                exponent += T::one();
+                a_i.clone() / exponent.clone()
+            })),
+        )
+    }
 }
 
 /// Computes the Frobenius companion matrix of a polynomial.
@@ -173,16 +116,16 @@ where
 /// It is constructed from an identity matrix, a zero column and a row of the polynomial's
 /// coefficients scaled by the highest term.
 ///
-/// **Note**: if the leading coefficient is zero, the result will be incorrect.
+/// > **Note**: if the leading coefficient is zero, the result will be incorrect.
 ///
 /// <pre>
 /// companion(a_n * x^n + ... + a_1 * x + a_0) =
-///     |  -a_(n-1)/a_n  -a_(n-2)/a_n  -a_(n-3)/a_n  ...  -a_1/a_0  -a_0/a_n |
-///     |     1             0             0          ...     0         0     |
-///     |     0             1             0          ...     0         0     |
-///     |     0             0             1          ...     0         0     |
-///     |    ...           ...           ...         ...    ...       ...    |
-///     |     0             0             0          ...     1         0     |
+///     |  -a_(n-1)/a_n -a_(n-2)/a_n -a_(n-3)/a_n ...  -a_1/a_0  -a_0/a_n |
+///     |    1            0            0          ...     0         0     |
+///     |    0            1            0          ...     0         0     |
+///     |    0            0            1          ...     0         0     |
+///     |   ...          ...          ...         ...    ...       ...    |
+///     |    0            0            0          ...     1         0     |
 /// </pre>
 ///
 /// # Example
@@ -196,21 +139,20 @@ where
     T: Clone + Zero + One + Neg<Output = T> + Div<Output = T>,
     Const<N>: DimSub<U1, Output = Const<M>>,
 {
-    // assert!(coefficients.len() == M+1, "M is not a valid index to coefficients");
     let mut companion = array::from_fn(|_| array::from_fn(|_| T::zero()));
 
     // SAFETY: `M` is a valid index because Const<N> impl DimSub<U1, Output = Const<M>> so `N > 0`
     // and `N - 1 = M`
     let leading_coefficient_neg = unsafe { coefficients.get_unchecked(M).clone().neg() };
-    if !leading_coefficient_neg.is_zero() {
-        let mut companion_iter = companion.iter_mut();
-        if let Some(row) = companion_iter.next() {
-            for (companion_i, coefficient) in row.iter_mut().rev().zip(coefficients.iter()) {
+    let mut companion_row_iter = companion.iter_mut();
+    if let Some(first_row) = companion_row_iter.next() {
+        if !leading_coefficient_neg.is_zero() {
+            for (companion_i, coefficient) in first_row.iter_mut().rev().zip(coefficients.iter()) {
                 *companion_i = coefficient.clone() / leading_coefficient_neg.clone();
             }
-            for (i, row) in companion_iter.enumerate() {
-                row[i] = T::one();
-            }
+        }
+        for (i, row) in companion_row_iter.enumerate() {
+            row[i] = T::one();
         }
     }
     companion
@@ -221,7 +163,86 @@ where
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub struct NoRoots;
 
+/// Computes the root of a line.
+///
+/// # Errors
+/// * `NoRoots` - the function was not able to compute a solution for the line
+///
+/// # Example
+/// ```
+/// use control_rs::{polynomial::utils::linear_root, assert_f64_eq};
+/// assert_eq!(linear_root(1, 0), Ok(0));
+/// ```
+pub fn linear_root<T: Zero + Neg<Output = T> + Div<Output = T>>(m: T, b: T) -> Result<T, NoRoots> {
+    if m.is_zero() {
+        return Err(NoRoots);
+    }
+
+    Ok(b.neg() / m)
+}
+
+/// Computes the root of a quadratic.
+///
+/// # Errors
+/// * `NoRoots` - the function was not able to compute a solution for the quadratic
+///
+/// # Example
+/// ```
+/// use control_rs::{polynomial::utils::quadratic_roots, assert_f64_eq};
+/// let roots = quadratic_roots(1.0, 0.0, 0.0).expect("failed to compute roots");
+/// assert_f64_eq!(roots[0].re, 0.0, 1.5e-14); // having precision issues...
+/// assert_f64_eq!(roots[1].re, 0.0, 1e-14);
+/// ```
+/// TODO: Fixed Point support
+pub fn quadratic_roots<T>(a: T, b: T, c: T) -> Result<[Complex<T>; 2], NoRoots>
+where
+    T: Clone
+        + PartialOrd
+        + Zero
+        + Sub<Output = T>
+        + Div<Output = T>
+        + Mul<Output = T>
+        + Neg<Output = T>
+        + RealField,
+{
+    let ac = a.clone() * c;
+    let discriminant = (b.clone() * b.clone()) - (ac.clone() + ac.clone() + ac.clone() + ac);
+    let two_a = a.clone() + a;
+    let b_neg = b.neg();
+    if discriminant < T::zero() {
+        let real_part = b_neg / two_a.clone();
+        let imag_part = (-discriminant).sqrt() / two_a;
+        Ok([
+            Complex {
+                re: real_part.clone(),
+                im: imag_part.clone(),
+            },
+            Complex {
+                re: real_part,
+                im: imag_part.neg(),
+            },
+        ])
+    } else {
+        let discriminant_sqrt = discriminant.sqrt();
+        Ok([
+            Complex {
+                re: (b_neg.clone() + discriminant_sqrt.clone()) / two_a.clone(),
+                im: T::zero(),
+            },
+            Complex {
+                re: (b_neg - discriminant_sqrt) / two_a,
+                im: T::zero(),
+            },
+        ])
+    }
+}
+
 /// Computes the roots of the polynomial.
+///
+/// This function returns an array of `Complex<T>` that may have a larger capacity than the
+/// polynomial has roots. By default elements of the returned array have a real and imaginary part
+/// set to NaN. This prevents the function from being available for integer types.
+///
 /// # Errors
 /// * `NoRoots` - the function was not able to compute roots for the given polynomial
 ///
@@ -235,7 +256,7 @@ pub struct NoRoots;
 /// assert_f64_eq!(roots[1].re, 2.0, 1e-14);
 /// assert_f64_eq!(roots[2].re, 1.0);
 /// ```
-/// TODO: Docs + Unit Tests + better return object + use recursion for leading zero cases
+/// TODO: fixed point support
 pub fn roots<T, const N: usize, const M: usize>(
     coefficients: &[T; N],
 ) -> Result<[Complex<T>; M], NoRoots>
@@ -248,97 +269,95 @@ where
         + Div<Output = T>
         + PartialOrd
         + fmt::Debug
-        + RealField,
+        + RealField
+        + Float,
     Const<N>: DimSub<U1, Output = Const<M>>,
     Const<M>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<M>, DimDiff<Const<M>, U1>> + Allocator<DimDiff<Const<M>, U1>>,
 {
-    if let Some(degree) = largest_nonzero_index(coefficients) {
-        let mut roots = array::from_fn(|_| Complex::zero());
-        if degree == 0 {
-            return Err(NoRoots);
-        } else if degree == 1 {
-            if coefficients[1].is_zero() {
-                return Err(NoRoots);
-            }
-            roots[0].re = coefficients[0].clone().neg() / coefficients[1].clone();
-        } else if degree == 2 {
-            let a = coefficients[2].clone();
-            if a.is_zero() {
-                if coefficients[1].is_zero() {
-                    return Err(NoRoots);
-                }
-                roots[0].re = coefficients[0].clone().neg() / coefficients[1].clone();
-            }
-            let b = coefficients[1].clone();
-            let ac = coefficients[0].clone() * a.clone();
-            let discriminant = b.clone().powi(2) - (ac.clone() + ac.clone() + ac.clone() + ac);
-            let two_a = a.clone() + a;
-            let b_neg = b.neg();
-            if discriminant < T::zero() {
-                let real_part = b_neg / two_a.clone();
-                let imag_part = (-discriminant).sqrt() / two_a;
-                roots[0] = Complex {
-                    re: real_part.clone(),
-                    im: imag_part.clone(),
-                };
-                roots[1] = Complex {
-                    re: real_part,
-                    im: imag_part.neg(),
-                };
-            } else {
-                let discriminant_sqrt = discriminant.sqrt();
-                roots[0].re = (b_neg.clone() + discriminant_sqrt.clone()) / two_a.clone();
-                roots[1].re = (b_neg - discriminant_sqrt) / two_a;
-            }
+    let Some(degree) = largest_nonzero_index(coefficients) else {
+        return Err(NoRoots);
+    };
+
+    let mut roots = array::from_fn(|_| Complex::new(T::nan(), T::nan()));
+
+    if degree == 0 {
+        return Err(NoRoots);
+    } else if degree == 1 {
+        roots[0].re = linear_root(coefficients[1], coefficients[0])?;
+        roots[0].im = T::zero();
+    } else if degree == 2 {
+        let a = coefficients[2];
+        if a.is_zero() {
+            roots[0].re = linear_root(coefficients[1], coefficients[0])?;
         } else {
-            let matrix = SMatrix::from_data(ArrayStorage(companion::<T, N, M>(coefficients)));
-            for (eigenvalue, root) in matrix
-                .complex_eigenvalues()
+            for (q_root, root) in quadratic_roots(a, coefficients[1], coefficients[0])?
                 .into_iter()
                 .zip(roots.iter_mut())
             {
-                *root = eigenvalue.clone();
+                *root = q_root;
             }
         }
-        Ok(roots)
     } else {
-        Err(NoRoots)
+        // TODO:
+        //  * Edge-case where coefficients represent a monomial
+        //  * Edge-case where polynomial has no constant (root at zero, can deflate)
+        //  * Edge-case where polynomial has a leading zero, companion will have a row of zeros
+        let companion = if degree == M {
+            companion(coefficients)
+        }
+        else {
+            let mut shifted_coefficients = [T::zero(); N];
+            for i in 0..=degree {
+                shifted_coefficients[M-i] = coefficients[degree-i];
+            }
+            companion(&shifted_coefficients)
+        };
+        let matrix = SMatrix::from_data(ArrayStorage(companion));
+        for (eigenvalue, root) in matrix
+            .complex_eigenvalues()
+            .into_iter()
+            .zip(roots.iter_mut())
+            .take(degree)
+        {
+            *root = *eigenvalue;
+        }
     }
+    Ok(roots)
 }
 
 /// Adds two polynomials.
 ///
-/// This function does not put any requirements on the shape of the inputs and outputs
+/// This function takes ownership of the given arrays
 pub fn add_generic<T, const N: usize, const M: usize, const L: usize>(
-    lhs: &[T; N],
-    rhs: &[T; M],
+    lhs: [T; N],
+    rhs: [T; M],
 ) -> [T; L]
 where
     T: Clone + Add<Output = T> + Zero,
     Const<N>: DimMax<Const<M>, Output = Const<L>>,
 {
-    let mut result: [T; L] = array_from_iterator_with_default(lhs.iter().cloned(), T::zero());
-    for (a, b) in result.iter_mut().zip(rhs.iter()) {
-        *a = a.clone() + b.clone();
+    let mut result: [T; L] = array_from_iterator_with_default(lhs, T::zero());
+    for (a, b) in result.iter_mut().zip(rhs.into_iter()) {
+        *a = a.clone().add(b);
     }
     result
 }
 
 /// Subtracts two polynomials
 ///
-/// This function does not put any requirements on the shape of the inputs and outputs
+/// This function takes ownership of the given arrays
 pub fn sub_generic<T, const N: usize, const M: usize, const L: usize>(
-    lhs: &[T; N],
-    rhs: &[T; M],
+    lhs: [T; N],
+    rhs: [T; M],
 ) -> [T; L]
 where
     T: Clone + Sub<Output = T> + Zero,
     Const<N>: DimMax<Const<M>, Output = Const<L>>,
 {
-    let mut result: [T; L] = array_from_iterator_with_default(lhs.iter().cloned(), T::zero());
-    for (a, b) in result.iter_mut().zip(rhs.iter()) {
-        *a = a.clone() - b.clone();
+    let mut result: [T; L] = array_from_iterator_with_default(lhs, T::zero());
+    for (a, b) in result.iter_mut().zip(rhs.into_iter()) {
+        *a = a.clone().sub(b);
     }
     result
 }
@@ -394,7 +413,7 @@ where
 /// use control_rs::polynomial::utils::long_division;
 /// let p1 = [1i32; 2];
 /// let p2 = [1i32; 2];
-/// assert_eq!(long_division(&p1, &p2), [1i32, 0i32], "wrong division result");
+/// assert_eq!(long_division(p1, &p2), [1i32, 0i32], "wrong division result");
 /// ```
 ///
 /// # Algorithm
@@ -406,23 +425,20 @@ where
 ///     r ← r − t × d
 /// return (q, r)
 ///</pre>
-pub fn long_division<T, const N: usize, const M: usize>(
-    dividend: &[T; N],
-    divisor: &[T; M],
-) -> [T; N]
+pub fn long_division<T, const N: usize, const M: usize>(dividend: [T; N], divisor: &[T; M]) -> [T; N]
 where
     T: Clone + Zero + Div<Output = T> + Mul<Output = T> + AddAssign + SubAssign,
     Const<N>: DimMax<Const<M>, Output = Const<N>>,
 {
     let mut quotient = array::from_fn(|_| T::zero());
     // Find actual degrees
-    let dividend_order = largest_nonzero_index(dividend);
+    let dividend_order = largest_nonzero_index(&dividend);
     let divisor_order = largest_nonzero_index(divisor);
 
     // degree of self and rhs exists
     if let Some(dividend_order) = dividend_order {
         if let Some(divisor_order) = divisor_order {
-            let mut remainder = dividend.clone();
+            let mut remainder = dividend;
             // SAFETY: divisor_order is less than the capacity of divisor
             let leading_divisor = unsafe { divisor.get_unchecked(divisor_order) };
 

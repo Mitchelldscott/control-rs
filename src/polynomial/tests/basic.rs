@@ -61,7 +61,7 @@ mod coefficient_accessors {
         assert!(!p.is_monic(), "monic");
         assert_eq!(p.coefficient(0), None, "coefficient(0) not none");
         assert_eq!(p.coefficient(1), None, "coefficient(1) not none");
-        assert_eq!(p.constant(), None, "constant not none");
+        // assert_eq!(p.constant(), None, "constant not none");
         assert_eq!(
             p.leading_coefficient(),
             None,
@@ -85,7 +85,7 @@ mod coefficient_accessors {
             None,
             "coefficient_mut(1) not none"
         );
-        assert_eq!(p_mut.constant_mut(), None, "constant_mut not none");
+        // assert_eq!(p_mut.constant_mut(), None, "constant_mut not none");
         assert_eq!(
             p_mut.leading_coefficient_mut(),
             None,
@@ -100,7 +100,7 @@ mod coefficient_accessors {
         assert!(!p.is_monic(), "monic");
         assert_eq!(p.coefficient(0), Some(&10), "coefficient(0)");
         assert_eq!(p.coefficient(1), None, "coefficient(1) not none");
-        assert_eq!(p.constant(), Some(&10), "constant");
+        assert_eq!(p.constant(), &10, "constant");
         assert_eq!(p.leading_coefficient(), Some(&10), "leading_coefficient");
     }
     #[test]
@@ -119,7 +119,7 @@ mod coefficient_accessors {
             None,
             "coefficient_mut(1) not none"
         );
-        assert_eq!(p_mut.constant_mut(), Some(&mut 10), "constant_mut");
+        assert_eq!(p_mut.constant_mut(), &mut 10, "constant_mut");
         assert_eq!(
             p_mut.leading_coefficient_mut(),
             Some(&mut 10),
@@ -135,7 +135,7 @@ mod coefficient_accessors {
         assert_eq!(p.coefficient(0), Some(&1), "coefficient(0)");
         assert_eq!(p.coefficient(1), Some(&1), "coefficient(1)");
         assert_eq!(p.coefficient(2), None, "coefficient(2)");
-        assert_eq!(p.constant(), Some(&1), "constant");
+        assert_eq!(p.constant(), &1, "constant");
         assert_eq!(p.leading_coefficient(), Some(&1), "leading_coefficient");
     }
     #[test]
@@ -151,7 +151,7 @@ mod coefficient_accessors {
             None,
             "coefficient_mut(2) not none"
         );
-        assert_eq!(p_mut.constant_mut(), Some(&mut 1), "constant_mut");
+        assert_eq!(p_mut.constant_mut(), &mut 1, "constant_mut");
         assert_eq!(
             p_mut.leading_coefficient_mut(),
             Some(&mut 2),
@@ -169,7 +169,7 @@ mod coefficient_accessors {
         assert_eq!(p.coefficient(2), Some(&1.0), "coefficient(2)");
         assert_eq!(p.coefficient(23), Some(&1.0), "coefficient(23)");
         assert_eq!(p.coefficient(24), None, "coefficient(24)");
-        assert_eq!(p.constant(), Some(&1.0), "constant");
+        assert_eq!(p.constant(), &1.0, "constant");
         assert_eq!(p.leading_coefficient(), Some(&1.0), "leading_coefficient");
     }
     #[test]
@@ -199,7 +199,7 @@ mod coefficient_accessors {
             "coefficient_mut(15)"
         );
         assert_eq!(p_mut.coefficient_mut(16), None, "coefficient_mut(16)");
-        assert_eq!(p_mut.constant_mut(), Some(&mut 1.0), "constant_mut");
+        assert_eq!(p_mut.constant_mut(), &mut 1.0, "constant_mut");
         assert_eq!(
             p_mut.leading_coefficient_mut(),
             Some(&mut 1.0),

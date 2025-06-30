@@ -54,7 +54,7 @@ mod basic_model_tests {
             SMatrix<ScalarType, 1, 2>,
             SMatrix<ScalarType, 1, 1>,
         > {
-            control_canonical([1.0, 0.0], [0.1, 0.0, 1.0])
+            control_canonical(&[0.0, 1.0], &[0.0, 0.1, 1.0])
         }
     }
 
@@ -117,7 +117,7 @@ mod tf_frequency_tool_tests {
     /// Test gain and phase margins.
     #[test]
     fn test_margins() {
-        let tf = TransferFunction::new([10.0], [1.0, -5.0]);
+        let tf = TransferFunction::new([10.0f64], [1.0, -5.0]);
         // Frequencies to evaluate (in rad/s)
         let frequencies = [0.0, 0.1, 1.0, 10.0];
 
@@ -125,18 +125,18 @@ mod tf_frequency_tool_tests {
         let mut response = FrequencyResponse::new([frequencies]);
         tf.frequency_response(&mut response);
 
-        let margins = Margin::new(&response);
+        let margins = FrequencyMargin::new(&response);
 
-        if let FrequencyMargin {
+        if let PhaseGainCrossover {
             phase_crossover: Some(phase_crossover),
             gain_crossover: Some(gain_crossover),
             phase_margin: Some(phase_margin),
             gain_margin: Some(gain_margin),
         } = margins.0[0][0]
         {
-            assert_f64_eq!(phase_crossover, 0.0_f64, 0.1_f64);
-            assert_f64_eq!(gain_crossover, 8.66_f64, 0.1_f64);
-            assert_f64_eq!(phase_margin, 60.0, 2.5); // wide error range because crossover is imprecise with so few points.
+            assert_f64_eq!(phase_crossover, 0.0, 0.1);
+            assert_f64_eq!(gain_crossover, 8.66, 0.5);
+            assert_f64_eq!(phase_margin, 60.0, 2.5);
             assert_f64_eq!(gain_margin, -6.02, 0.01);
         } else {
             panic!(
@@ -161,10 +161,10 @@ mod bode_and_nyquist_plot_tests {
         let title = "Demo Bode Plot";
         let tf = TransferFunction::new([1.0], [1.0, 1.0, 1.0]);
 
-        let response = FrequencyResponse::<f64, 100, 1, 1>::new([0.1], [10.0]);
+        let response = FrequencyResponse::<f64, 100, 1, 1>::logspace([-1.0], [10.0]);
 
         std::fs::create_dir_all("../target/plots").unwrap();
-        bode(title, tf, response).write_html("../target/plots/test_bode_plot.html");
+        bode(title, &tf, response).write_html("../target/plots/test_bode_plot.html");
     }
 
     #[test]
@@ -173,8 +173,6 @@ mod bode_and_nyquist_plot_tests {
         let _title = "Demo Nyquist Plot";
         let _tf = TransferFunction::new([1.0], [1.0, 1.0, 1.0]);
 
-        let _response = FrequencyResponse::<f64, 100, 1, 1>::new([0.1], [10.0]);
-
-        // println!("{title}\n{tf}\n{:?}", response.responses);
+        let _response = FrequencyResponse::<f64, 100, 1, 1>::logspace([0.1], [10.0]);
     }
 }

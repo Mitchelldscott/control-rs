@@ -11,6 +11,7 @@ use nalgebra::{
 };
 use num_traits::{Float, One, Zero};
 
+use crate::polynomial::utils::largest_nonzero_index;
 use crate::{state_space::utils::control_canonical, StateSpace, TransferFunction};
 
 /// Computes the DC gain of a continuous transfer function.
@@ -47,10 +48,10 @@ use crate::{state_space::utils::control_canonical, StateSpace, TransferFunction}
 /// ```
 pub fn dc_gain<T: Float, const M: usize, const N: usize>(tf: &TransferFunction<T, M, N>) -> T {
     if N > 0 {
-        if tf.denominator[N - 1].is_zero() {
+        if tf.denominator[0].is_zero() {
             T::infinity()
         } else if M > 0 {
-            tf.numerator[M - 1] / tf.denominator[N - 1]
+            tf.numerator[0] / tf.denominator[0]
         } else {
             T::nan()
         }
@@ -75,13 +76,10 @@ pub fn dc_gain<T: Float, const M: usize, const N: usize>(tf: &TransferFunction<T
 /// use control_rs::transfer_function::{TransferFunction, poles};
 /// // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
 /// let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
-/// let poles = poles(&tf); // contains 1 more element than it should
+/// let poles = poles(&tf);
 /// ```
 /// # Errors
 /// * `NoRoots` - the function was not able to find any roots for the denominator
-///
-/// ## References
-/// - *Feedback Control of Dynamic Systems*, Franklin et al., Ch. 5: Stability Criteria
 pub fn poles<T, const M: usize, const N: usize, const L: usize>(
     tf: &TransferFunction<T, M, N>,
 ) -> Result<[Complex<T>; L], crate::polynomial::utils::NoRoots>
@@ -94,14 +92,54 @@ where
         + Div<Output = T>
         + PartialOrd
         + fmt::Debug
-        + RealField,
+        + RealField
+        + Float,
     Const<N>: DimSub<U1, Output = Const<L>>,
     Const<L>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
 {
-    crate::polynomial::utils::roots::<T, N, L>(&crate::polynomial::utils::reverse_array(
-        tf.denominator,
-    ))
+    crate::polynomial::utils::roots(&tf.denominator)
+}
+
+/// Compute the roots of the transfer function's numerator
+///
+/// Calculates the eigen values of a companion matrix constructed from the numerator.
+///
+/// # Arguments
+///  * `tf` - the transfer function to check the zeros of
+///
+/// # Returns
+///  * `[complex<T>; N]` - zeros of the tf
+///
+/// # Example
+///
+/// ```rust
+/// use control_rs::transfer_function::{TransferFunction, zeros};
+/// // Transfer function: G(s) = (2s + 4) / (s^2 + 3s + 2)
+/// let tf = TransferFunction::new([2.0, 4.0], [1.0, 3.0, 2.0]);
+/// let zeros = zeros(&tf);
+/// ```
+/// # Errors
+/// * `NoRoots` - the function was not able to find any roots for the denominator
+pub fn zeros<T, const M: usize, const N: usize, const L: usize>(
+    tf: &TransferFunction<T, M, N>,
+) -> Result<[Complex<T>; L], crate::polynomial::utils::NoRoots>
+where
+    T: Copy
+    + Zero
+    + One
+    + Neg<Output = T>
+    + Sub<Output = T>
+    + Div<Output = T>
+    + PartialOrd
+    + fmt::Debug
+    + RealField
+    + Float,
+    Const<M>: DimSub<U1, Output = Const<L>>,
+    Const<L>: DimSub<U1>,
+    DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
+{
+    crate::polynomial::utils::roots(&tf.numerator)
 }
 
 /// Check if the system's poles lie on the left-half plane (LHP), a condition for stability.
@@ -166,30 +204,31 @@ where
 /// * `TransferFunction` - transfer function scaled by `self.denominator[0]`
 ///
 /// # Example
-///
 /// ```
 /// use control_rs::{assert_f64_eq, transfer_function::{TransferFunction, as_monic}};
 /// let tf = TransferFunction::new([2.0, 1.0], [3.0, 1.0, 1.0]);
 /// let monic_tf = as_monic(&tf);
-/// assert_f64_eq!(monic_tf.numerator[0], 2.0 / 3.0);
+/// assert_f64_eq!(monic_tf.numerator[1], 2.0 / 3.0);
 /// ```
+///
+/// TODO: move to polynomial utils
 pub fn as_monic<T, const M: usize, const N: usize>(
     tf: &TransferFunction<T, M, N>,
 ) -> TransferFunction<T, M, N>
 where
-    T: Clone + Zero + Float,
+    T: Clone + Zero + Sub<Output = T> + Div<Output = T> + PartialOrd,
 {
-    let mut numerator = tf.numerator;
-    let mut denominator = tf.denominator;
+    let mut numerator = tf.numerator.clone();
+    let mut denominator = tf.denominator.clone();
 
-    if N > 0 && !denominator[0].is_zero() {
-        let leading_denominator = denominator[0];
+    if let Some(den_deg) = largest_nonzero_index(&denominator) {
+        let leading_denominator = denominator[den_deg].clone();
         numerator
             .iter_mut()
-            .for_each(|b_i| *b_i = *b_i / leading_denominator);
+            .for_each(|b_i| *b_i = b_i.clone() / leading_denominator.clone());
         denominator
             .iter_mut()
-            .for_each(|a_i| *a_i = *a_i / leading_denominator);
+            .for_each(|a_i| *a_i = a_i.clone() / leading_denominator.clone());
     }
 
     TransferFunction {
@@ -202,12 +241,19 @@ where
 ///
 ///
 pub fn tf2ss<T, const N: usize, const M: usize, const L: usize>(
-    tf: TransferFunction<T, M, L>,
+    tf: &TransferFunction<T, M, L>,
 ) -> StateSpace<SMatrix<T, N, N>, SMatrix<T, N, 1>, SMatrix<T, 1, N>, SMatrix<T, 1, 1>>
 where
-    T: Float + Scalar,
+    T: Scalar
+        + Clone
+        + Zero
+        + One
+        + Neg<Output = T>
+        + Div<Output = T>
+        + Sub<Output = T>
+        + PartialOrd,
     Const<L>: DimSub<U1, Output = Const<N>>,
 {
-    let tf_as_monic = as_monic(&tf);
-    control_canonical(tf_as_monic.numerator, tf_as_monic.denominator)
+    let tf_as_monic = as_monic(tf);
+    control_canonical(&tf_as_monic.numerator, &tf_as_monic.denominator)
 }

@@ -7,12 +7,21 @@ edition = "2021"
 nalgebra = { version = "0.33.0", features = ["libm"] }
 num-traits = { version = "0.2", default-features = false, features = ["libm"]  }
 plotly = { version = "0.12.1", optional = true }
+serde = { version = "1.0.219", optional = true}
 
 [features]
 default = []
-std = ["plotly", "num-traits/std"]
+std = ["plotly", "num-traits/std", "serde"]
 
 [dev-dependencies]
 #csv = "1.3.0"
 #rand = "0.9.1"
 #rand_distr = "0.5.1"
+
+[profile.release]
+# Enable Link Time Optimization (LTO)
+lto = "fat" # or true for a simpler LTO, "fat" is more aggressive
+# Set the optimization level to 3 (highest for speed)
+opt-level = 3
+# Set the number of code generation units to 1 for maximum inter-procedural optimization
+codegen-units = 1

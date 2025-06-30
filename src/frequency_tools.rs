@@ -29,17 +29,24 @@
 //! - Dorf, R. C., & Bishop, R. H. (2016). *Modern Control Systems*.
 //!
 //! ### TODO:
-//! - [ ] docs, docs, docs
-//! - [ ] move [Margin] -> [`FrequencyResponse`], no point in having two structs using the same generics
-//!     - add margins function to FR
-//!     - add `to_polar()` to FR (unrelated but useful, maybe make a `PolarFrequencyResponse`)
+//! - [ ] remove all the unwraps
+//!     - `first_crossover` should get broken up to return the index of the crossover
+//!     - Need a frequency field trait to provide some constants and log fns
 //! - [ ] textbook example of trait productivity
 //! - [ ] move plotly to plotly helper file (or wait for a nice gui)
-//! - [ ] move FR constructors to FR factory? (configure set of FRs and target outputs without initializing anything)
 
-use core::ops::AddAssign;
+use crate::static_storage::array_from_iterator;
+use core::ops::{AddAssign, Div, Mul, Sub};
 use nalgebra::{Complex, ComplexField, RealField};
-use num_traits::Float;
+use num_traits::{Float, Zero};
+
+// this is not that useful without fixed point support
+// pub trait Frequency {
+//     fn pow(self, exp: Self) -> Self;
+//     fn log10(self) -> Self;
+//     fn mag_to_db(self) -> Self;
+//     fn db_to_mag(self) -> Self;
+// }
 
 /// Standard interface for frequency analysis tools
 pub trait FrequencyTools<T: Float + RealField, const N: usize, const M: usize> {
@@ -49,28 +56,31 @@ pub trait FrequencyTools<T: Float + RealField, const N: usize, const M: usize> {
 
 /// A unified Frequency Response object
 ///
-/// This struct provides constructors and utilities for generating and handling
-/// frequency response data for a system with multiple input and output channels.
+/// This struct provides constructors and utilities for generating and handling frequency response
+/// data for a system with generic input and output dimensions. The number of frequency points is
+/// also configured through a generic parameter to allow easily controlling the resolution.
+///
+/// > A channel is a path from input to output, a system's channels are commonly represented as a
+/// > matrix (with rows = inputs and columns = outputs).
+///
+/// By default, the constructors will set the response to `None` and only fill the frequencies that
+/// will be sampled.
 ///
 /// # Generic Arguments
-/// * `T` - The numeric type for frequencies and responses (e.g., `f32` or `f64`)
-/// * `L` - The number of frequency points per channel
-/// * `N` - The number of input channels
-/// * `M` - The number of output channels
+/// * `T` - The field type for frequencies and responses
+/// * `L` - The number of frequency points to sample per channel
+/// * `N` - Dimension of the system's input
+/// * `M` - Dimension of the system's output
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrequencyResponse<T, const L: usize, const N: usize, const M: usize> {
-    /// Frequencies for each input channel
-    ///
     /// A 2D array where each row corresponds to the frequency points for a single input channel.
     pub frequencies: [[T; L]; N],
-    /// Response of each output channel for each input frequency
-    ///
-    /// A 2D array where each row corresponds to the complex frequency responses for a single output channel.
-    pub responses: [[Complex<T>; L]; M],
+    /// A 2D array where each row corresponds to the complex frequency responses for a single
+    /// output channel.
+    pub responses: Option<[[Complex<T>; L]; M]>,
 }
 
-impl<T: Float + AddAssign, const L: usize, const N: usize, const M: usize>
-    FrequencyResponse<T, L, N, M>
-{
+impl<T, const L: usize, const N: usize, const M: usize> FrequencyResponse<T, L, N, M> {
     /// Creates a new `FrequencyResponse` with specified frequency data and zeroed responses.
     ///
     /// # Arguments
@@ -79,14 +89,39 @@ impl<T: Float + AddAssign, const L: usize, const N: usize, const M: usize>
     /// # Returns
     /// * `FrequencyResponse` - instance with the provided frequencies and zero-initialized
     ///   responses
-    pub fn new(frequencies: [[T; L]; N]) -> Self {
-        let responses = [[Complex::new(T::zero(), T::zero()); L]; M];
+    pub const fn new(frequencies: [[T; L]; N]) -> Self {
         Self {
             frequencies,
-            responses,
+            responses: None,
         }
     }
+}
 
+impl<T, const L: usize, const N: usize, const M: usize> FrequencyResponse<T, L, N, M>
+where
+    T: Float + Zero,
+{
+    /// Extract the magnitude and phase from a frequency responses output channel
+    ///
+    /// If there is no frequency response, the magnitude and phase arrays will be zero-filled
+    pub fn mag_phase(&self, output_channel: usize) -> ([T; L], [T; L]) {
+        // TODO: remove zero initialization + move this to general function so Margins can reuse it
+        let mut mag = [T::zero(); L];
+        let mut phase = [T::zero(); L];
+        if let Some(responses) = self.responses {
+            responses[output_channel]
+                .iter()
+                .zip(mag.iter_mut().zip(phase.iter_mut()))
+                .for_each(|(response, (mag, phase))| (*mag, *phase) = response.to_polar());
+        }
+        (mag, phase)
+    }
+}
+
+impl<T, const L: usize, const N: usize, const M: usize> FrequencyResponse<T, L, N, M>
+where
+    T: Float + AddAssign,
+{
     /// Creates a new `FrequencyResponse` with logarithmically spaced frequencies.
     ///
     /// # Arguments
@@ -95,14 +130,17 @@ impl<T: Float + AddAssign, const L: usize, const N: usize, const M: usize>
     ///
     /// # Returns
     /// * `FrequencyResponse` - instance with logarithmically spaced frequencies and
-    ///   zero-initialized responses
+    ///   no responses
     pub fn logspace(freq_start: [T; N], freq_stop: [T; N]) -> Self {
-        let mut frequencies = [[T::zero(); L]; N];
-        (0..N).for_each(|i| frequencies[i] = logspace(freq_start[i], freq_stop[i]));
-        let responses = [[Complex::new(T::zero(), T::zero()); L]; M];
+        // Safety: There will be N arrays of L log spaced values
+        let frequencies = unsafe {
+            array_from_iterator(
+                (0..N).map(|i| logspace::<T, L>(freq_start[i], freq_stop[i])),
+            )
+        };
         Self {
             frequencies,
-            responses,
+            responses: None,
         }
     }
 
@@ -111,19 +149,17 @@ impl<T: Float + AddAssign, const L: usize, const N: usize, const M: usize>
     /// # Arguments
     /// * `freq_start` - The start frequency for the isolated input channel
     /// * `freq_stop` - The stop frequency for the isolated input channel
-    ///
-    /// # Generic Arguments
-    /// * `IDX` - The index of the input channel to isolate
+    /// * `channel` - The index of the input channel to fill
     ///
     /// # Returns
-    /// * `FrequencyResponse` instance with frequency data for the specified channel and zero-initialized responses
-    pub fn isolated<const IDX: usize>(freq_start: T, freq_stop: T) -> Self {
+    /// * `FrequencyResponse` instance with frequency data for the specified channel and no responses
+    pub fn isolated(freq_start: T, freq_stop: T, channel: usize) -> Self {
+        // TODO: remove zero initialization, or should this whole function get removed
         let mut frequencies = [[T::zero(); L]; N];
-        frequencies[IDX] = logspace(freq_start, freq_stop);
-        let responses = [[Complex::new(T::zero(), T::zero()); L]; M];
+        frequencies[channel] = logspace(freq_start, freq_stop);
         Self {
             frequencies,
-            responses,
+            responses: None,
         }
     }
 
@@ -139,11 +175,9 @@ impl<T: Float + AddAssign, const L: usize, const N: usize, const M: usize>
     /// # Returns
     /// * `FrequencyResponse` - instance with shared frequency data across all input channels and zero-initialized responses
     pub fn simultaneous(freq_start: T, freq_stop: T) -> Self {
-        let frequencies = [logspace(freq_start, freq_stop); N];
-        let responses = [[Complex::new(T::zero(), T::zero()); L]; M];
         Self {
-            frequencies,
-            responses,
+            frequencies: [logspace(freq_start, freq_stop); N],
+            responses: None,
         }
     }
 }
@@ -155,8 +189,10 @@ impl<T: Float + AddAssign, const L: usize, const N: usize, const M: usize>
 ///
 /// # Generic Arguments
 /// - `T`: The numeric type for the stability metrics (e.g., `f32` or `f64`).
+/// 
+/// TODO: This shouldn't need to store the margin, those should be easily extracted from the resp
 #[derive(Copy, Clone, Debug)]
-pub struct FrequencyMargin<T> {
+pub struct PhaseGainCrossover<T> {
     /// The frequency at which the phase crosses -180 degrees
     pub phase_crossover: Option<T>,
     /// The frequency at which the gain crosses 0 dB (unity gain)
@@ -167,7 +203,7 @@ pub struct FrequencyMargin<T> {
     pub gain_margin: Option<T>,
 }
 
-impl<T: Float + RealField> FrequencyMargin<T> {
+impl<T: Float + RealField> PhaseGainCrossover<T> {
     /// Computes both the magnitude and phase crossover frequencies and margins of
     /// a frequency response
     ///
@@ -176,27 +212,25 @@ impl<T: Float + RealField> FrequencyMargin<T> {
     /// * `response` - The array of `Complex<T>` corresponding to the given frequencies
     ///
     /// # Returns
-    /// * `FrequencyMargin` - the margins and crossovers of the response
-    ///
-    /// # Panics
-    ///
-    pub fn new<const L: usize>(frequencies: &[T], response: &[Complex<T>]) -> Self {
+    /// * `PhaseGainCrossover` - the margins and crossovers of the response
+    pub fn new<const L: usize>(frequencies: &[T; L], response: &[Complex<T>; L]) -> Self {
+        // TODO: Remove duplicate code + see `FrequencyResponse::mag_phase()`
         let mut phases = [T::zero(); L];
         let mut magnitudes = [T::zero(); L];
 
         (0..L).for_each(|i| (magnitudes[i], phases[i]) = response[i].to_polar());
 
-        let gain_crossover = first_crossover::<T>(frequencies, &magnitudes, T::one(), L);
-        let phase_crossover = first_crossover::<T>(frequencies, &phases, -T::pi(), L);
+        let gain_crossover = first_crossover(frequencies, &magnitudes, T::one());
+        let phase_crossover = first_crossover(frequencies, &phases, -T::pi());
 
         let gain_margin = phase_crossover.map(|wc| {
             // should be using frequencies.iter().position(|hz| hz == threshold, or change first_crossover to return the index)
             // unwrap is safe because the crossover frequency exists, meaning there is a corresponding
             // index in the magnitude array
-            // TODO: Fix this so there doesn't need to be an unwrap
+            // TODO: Fix this so there doesn't need to be an unwrap (see `first_crossover()` todos)
             let mag_at_crossover =
-                first_crossover::<T>(&magnitudes, frequencies, wc, L).unwrap_or_else(|| T::zero());
-            // TODO: Make a constant for this or something to avoid unwrapping
+                first_crossover(&magnitudes, frequencies, wc).unwrap_or_else(|| T::zero());
+            // TODO: Use Frequency trait to do this conversion
             T::from(20).unwrap_or_else(|| T::zero()) * -ComplexField::log10(mag_at_crossover)
         });
 
@@ -204,8 +238,8 @@ impl<T: Float + RealField> FrequencyMargin<T> {
             // unwrap is safe because the crossover frequency exists, meaning there is a corresponding
             // index in the phase array
             let phase_at_crossover =
-                first_crossover::<T>(&phases, frequencies, wc, L).unwrap_or_else(|| T::zero());
-            (-T::pi() - phase_at_crossover).to_degrees()
+                first_crossover(&phases, frequencies, wc).unwrap_or_else(|| T::zero());
+            (phase_at_crossover + T::pi()).to_degrees()
         });
 
         Self {
@@ -216,10 +250,10 @@ impl<T: Float + RealField> FrequencyMargin<T> {
         }
     }
 }
-impl<T> Default for FrequencyMargin<T> {
-    /// Creates a `FrequencyMargin` full of None
+impl<T> Default for PhaseGainCrossover<T> {
+    /// Creates a `PhaseGainCrossover` full of None
     /// # Returns
-    /// * `FrequencyMargin` - with all fields set to `None`
+    /// * `PhaseGainCrossover` - with all fields set to `None`
     fn default() -> Self {
         Self {
             phase_crossover: None,
@@ -232,34 +266,37 @@ impl<T> Default for FrequencyMargin<T> {
 
 /// A structure representing stability margins for every input-output channel of a system
 ///
-/// This struct provides a matrix of `FrequencyMargin` values, where each element corresponds
+/// This struct provides a matrix of `PhaseGainCrossover` values, where each element corresponds
 /// to the stability margins for a specific input-output channel pair.
 ///
 /// # Generic Arguments
-/// - `T`: The numeric type for the stability metrics (e.g., `f32` or `f64`).
-/// - `N`: The number of input channels.
-/// - `M`: The number of output channels.
-pub struct Margin<T, const N: usize, const M: usize>(pub [[FrequencyMargin<T>; N]; M]);
+/// - `T`: Field type for the stability metrics (e.g., `f32` or `f64`).
+/// - `N`: Dimension of the system's input.
+/// - `M`: Dimension of the system's output.
+pub struct FrequencyMargin<T, const N: usize, const M: usize>(pub [[PhaseGainCrossover<T>; N]; M]);
 
-impl<T: Float + RealField, const N: usize, const M: usize> Margin<T, N, M> {
-    /// Creates a new `Margin` instance from a given `FrequencyResponse`
+impl<T: Float + RealField, const N: usize, const M: usize> FrequencyMargin<T, N, M> {
+    /// Creates a new `FrequencyMargin` instance from a given `FrequencyResponse`
     ///
     /// This function computes the stability margins for all input-output channel pairs in the
     /// provided `FrequencyResponse` object.
     ///
-    /// # Parameters
-    /// * `response` - A reference to a `FrequencyResponse` containing the frequency and response data
+    /// # Arguments
+    /// * `response` - A reference to a `FrequencyResponse` containing the frequency and response
+    ///   data
     ///
     /// # Generic Arguments
-    /// * `L` - The number of frequency points per channel in the `FrequencyResponse`
+    /// * `L` - The number of frequency points per channel
     ///
     /// # Returns
-    /// * `Margin` - A new instance containing the calculated margins for all input-output channels
+    /// * `FrequencyMargin` - A new instance containing the calculated margins for all input-output channels
     pub fn new<const L: usize>(response: &FrequencyResponse<T, L, N, M>) -> Self {
-        let mut margins = [[FrequencyMargin::default(); N]; M];
-        for (margin_row, res) in margins.iter_mut().zip(response.responses.iter()) {
-            for (margin, frequency) in margin_row.iter_mut().zip(response.frequencies.iter()) {
-                *margin = FrequencyMargin::new::<L>(frequency, res);
+        let mut margins = [[PhaseGainCrossover::default(); N]; M];
+        if let Some(responses) = response.responses {
+            for (margin_row, res) in margins.iter_mut().zip(responses.iter()) {
+                for (margin, frequency) in margin_row.iter_mut().zip(response.frequencies.iter()) {
+                    *margin = PhaseGainCrossover::new::<L>(frequency, res);
+                }
             }
         }
         Self(margins)
@@ -284,32 +321,35 @@ impl<T: Float + RealField, const N: usize, const M: usize> Margin<T, N, M> {
 /// * `a` - The first array of values (the return value is sampled or interpolated from these)
 /// * `b` - The second array of values (these are the values that may cross the threshold)
 /// * `threshold` - The target threshold for the crossover (e.g., 1.0 for magnitude, -π for phase)
-/// * `samples` - the number of samples in a and b
 ///
 /// # Generic Arguments
 /// * `T` - Scalar type for frequencies and values (e.g., `f32`, `f64`)
-/// * `L` - Number of frequency samples provided
+/// * `N` - Number of frequency samples provided
 ///
 /// # Returns
 /// * `Option<T>` - The crossover frequency in rad/s, or `None` if no crossover frequency is found
-fn first_crossover<T>(a: &[T], b: &[T], threshold: T, samples: usize) -> Option<T>
+/// 
+/// TODO: 
+///   * Split this up into `first_crossover(arr, threshold) -> index` and
+///     `interpolate_arrays(arr_a, arr_b) -> T`
+fn first_crossover<T, const N: usize>(a: &[T; N], b: &[T; N], threshold: T) -> Option<T>
 where
-    T: Float,
+    T: Clone + PartialOrd + Sub<Output = T> + Mul<Output = T> + Div<Output = T>,
 {
-    for i in 0..samples - 1 {
+    for i in 0..N - 1 {
         if b[i] == threshold {
-            return Some(a[i]);
+            return Some(a[i].clone());
         }
         if (b[i] < threshold && b[i + 1] > threshold) || (b[i] > threshold && b[i + 1] < threshold)
         {
-            let slope = (b[i + 1] - b[i]) / (a[i + 1] - a[i]);
-            let intercept = b[i] - slope * a[i];
+            let slope = (b[i + 1].clone() - b[i].clone()) / (a[i + 1].clone() - a[i].clone());
+            let intercept = b[i].clone() - slope.clone() * a[i].clone();
             return Some((threshold - intercept) / slope);
         }
     }
     // need some cleanup here
-    if b[samples - 1] == threshold {
-        return Some(a[samples - 1]);
+    if b[N - 1] == threshold {
+        return Some(a[N - 1].clone());
     }
     None
 }
@@ -326,10 +366,11 @@ where
 /// let points = logspace::<f64, 5>(1.0, 3.0);
 /// assert_eq!(points.len(), 5);
 /// ```
-/// TODO: remove unwraps
 /// # Panics
 /// * if 10.0 cannot cast to T
 /// * if N - 1 cannot cast to T
+/// 
+/// TODO: remove unwraps + make a 10E struct that impl powf for floats and ints
 pub fn logspace<T: Float + AddAssign, const N: usize>(a: T, b: T) -> [T; N] {
     let mut result = [T::zero(); N];
     #[allow(clippy::unwrap_used)]
@@ -353,149 +394,172 @@ pub fn logspace<T: Float + AddAssign, const N: usize>(a: T, b: T) -> [T; N] {
     result
 }
 
-// #[cfg(feature = "std")]
-// /// Renders a single magnitude and phase plot on subplots
-// fn render_bode_subplot<T>(
-//     plot: &mut plotly::Plot,
-//     frequencies: &[T],
-//     mag: &[T],
-//     phase: &[T],
-//     row: usize,
-//     col: usize,
-//     margins: &FrequencyMargin<T>,
-// ) where
-//     T: 'static + Copy + Float + From<i16>,
-// {
-//     use plotly::common;
-//
-//     let mag_db: Vec<T> = mag
-//         .iter()
-//         .map(|&m| <T as From<i16>>::from(20) * m.log10())
-//         .collect();
-//     let phase_deg: Vec<T> = phase.iter().map(|&p| p.to_degrees()).collect();
-//
-//     // Add magnitude plot
-//     plot.add_trace(
-//         plotly::Scatter::new(frequencies.to_vec(), mag_db)
-//             .mode(common::Mode::Lines)
-//             .name(format!("Magnitude[{row}, {col}]"))
-//             // .x_axis(x_axis_mag.clone())
-//             // .y_axis(y_axis_mag.clone()).color(Rgb::new(0, 0, 255))
-//             .marker(common::Marker::new()),
-//     );
-//
-//     // Add phase plot
-//     plot.add_trace(
-//         plotly::Scatter::new(frequencies.to_vec(), phase_deg)
-//             .mode(common::Mode::Lines)
-//             .name(format!("Phase[{row}, {col}]"))
-//             .x_axis("x2")
-//             .y_axis("y2")
-//             .marker(common::Marker::new()),
-//     );
-//
-//     // Gain margin line
-//     if let (Some(wc), Some(gm)) = (margins.phase_crossover, margins.gain_margin) {
-//         plot.add_trace(
-//             plotly::Scatter::new(vec![wc, wc], vec![-gm, T::zero()])
-//                 .mode(common::Mode::Lines)
-//                 .name(format!("Gain Margin[{row}, {col}]"))
-//                 // .x_axis(x_axis_mag)
-//                 // .y_axis(y_axis_mag)
-//                 .line(
-//                     common::Line::new()
-//                         .dash(common::DashType::Dot)
-//                         .color(plotly::color::Rgb::new(0, 0, 0)),
-//                 ),
-//         );
-//     }
-//
-//     // Phase margin line
-//     if let (Some(wc), Some(pm)) = (margins.gain_crossover, margins.phase_margin) {
-//         plot.add_trace(
-//             plotly::Scatter::new(vec![wc, wc], vec![<T as From<i16>>::from(-180), pm])
-//                 .mode(common::Mode::Lines)
-//                 .name(format!("Phase Margin[{row}, {col}]"))
-//                 .x_axis("x2")
-//                 .y_axis("y2")
-//                 .line(
-//                     common::Line::new()
-//                         .dash(common::DashType::Dot)
-//                         .color(plotly::color::Rgb::new(0, 0, 0)),
-//                 ),
-//         );
-//     }
-// }
-//
-// #[cfg(feature = "std")]
-// /// Renders a Bode plot for an object implementing FrequencyTools
-// pub fn bode<T, F, const L: usize, const N: usize, const M: usize>(
-//     title: &str,
-//     system: F,
-//     mut response: FrequencyResponse<T, L, N, M>,
-// ) -> plotly::Plot
-// where
-//     T: Copy + serde::Serialize + Float + RealField + From<i16>,
-//     F: FrequencyTools<T, N, M>,
-// {
-//     use plotly::Layout;
-//
-//     system.frequency_response::<L>(&mut response);
-//     let margins = Margin::new(&response);
-//
-//     let mut plot = plotly::Plot::new();
-//     plot.set_layout(
-//         Layout::new()
-//             .title(plotly::common::Title::with_text(title))
-//             .x_axis(
-//                 plotly::layout::Axis::new()
-//                     .title(plotly::common::Title::with_text("Frequency (rad/s)"))
-//                     .type_(plotly::layout::AxisType::Log),
-//             )
-//             .y_axis(
-//                 plotly::layout::Axis::new()
-//                     .title(plotly::common::Title::with_text("Magnitude (dB)")),
-//             )
-//             .x_axis2(
-//                 plotly::layout::Axis::new()
-//                     .title(plotly::common::Title::with_text("Frequency (rad/s)"))
-//                     .type_(plotly::layout::AxisType::Log),
-//             )
-//             .y_axis2(
-//                 plotly::layout::Axis::new().title(plotly::common::Title::with_text("Phase (deg)")),
-//             )
-//             .grid(
-//                 plotly::layout::LayoutGrid::new()
-//                     .rows(2)
-//                     .columns(1)
-//                     .pattern(plotly::layout::GridPattern::Independent)
-//                     .row_order(plotly::layout::RowOrder::TopToBottom),
-//             ),
-//     );
-//
-//     // extract each output mag/phase (make a helper in response soon)
-//     for (out_idx, fr) in response.responses.iter().enumerate() {
-//         let mut phases = [T::zero(); L];
-//         let mut magnitudes = [T::zero(); L];
-//
-//         (0..L).for_each(|i| (magnitudes[i], phases[i]) = fr[i].to_polar());
-//
-//         // render the output as the response to each input
-//         for (in_idx, frequency) in response.frequencies.iter().enumerate() {
-//             render_bode_subplot(
-//                 &mut plot,
-//                 frequency,
-//                 &magnitudes,
-//                 &phases,
-//                 in_idx,
-//                 out_idx,
-//                 &margins.0[out_idx][in_idx],
-//             );
-//         }
-//     }
-//
-//     plot
-// }
+#[cfg(feature = "std")]
+/// Renders a single magnitude and phase plot on subplots
+fn render_bode_subplot<T>(
+    plot: &mut plotly::Plot,
+    frequencies: &[T],
+    mag: &[T],
+    phase: &[T],
+    row: usize,
+    col: usize,
+    margins: &PhaseGainCrossover<T>,
+) where
+    T: 'static + Copy + Float + From<i16> + serde::ser::Serialize,
+{
+    use plotly::common;
+    extern crate std;
+    use std::{format, vec, vec::Vec};
+
+    let mag_db: Vec<T> = mag
+        .iter()
+        .map(|&m| <T as From<i16>>::from(20) * m.log10())
+        .collect();
+    let phase_deg: Vec<T> = phase.iter().map(|&p| p.to_degrees()).collect();
+
+    // Add magnitude plot
+    plot.add_trace(
+        plotly::Scatter::new(frequencies.to_vec(), mag_db)
+            .mode(common::Mode::Lines)
+            .name(format!("Magnitude[{row}, {col}]"))
+            // .x_axis(x_axis_mag.clone())
+            // .y_axis(y_axis_mag.clone()).color(Rgb::new(0, 0, 255))
+            .marker(common::Marker::new()),
+    );
+
+    // Add phase plot
+    plot.add_trace(
+        plotly::Scatter::new(frequencies.to_vec(), phase_deg)
+            .mode(common::Mode::Lines)
+            .name(format!("Phase[{row}, {col}]"))
+            .x_axis("x2")
+            .y_axis("y2")
+            .marker(common::Marker::new()),
+    );
+
+    // Gain margin line
+    if let (Some(wc), Some(gm)) = (margins.phase_crossover, margins.gain_margin) {
+        plot.add_trace(
+            plotly::Scatter::new(vec![wc, wc], vec![-gm, T::zero()])
+                .mode(common::Mode::Lines)
+                .name(format!("Gain FrequencyMargin[{row}, {col}]"))
+                // .x_axis(x_axis_mag)
+                // .y_axis(y_axis_mag)
+                .line(
+                    common::Line::new()
+                        .dash(common::DashType::Dot)
+                        .color(plotly::color::Rgb::new(0, 0, 0)),
+                ),
+        );
+    }
+
+    // Phase margin line
+    if let (Some(wc), Some(pm)) = (margins.gain_crossover, margins.phase_margin) {
+        plot.add_trace(
+            plotly::Scatter::new(vec![wc, wc], vec![<T as From<i16>>::from(-180), pm])
+                .mode(common::Mode::Lines)
+                .name(format!("Phase FrequencyMargin[{row}, {col}]"))
+                .x_axis("x2")
+                .y_axis("y2")
+                .line(
+                    common::Line::new()
+                        .dash(common::DashType::Dot)
+                        .color(plotly::color::Rgb::new(0, 0, 0)),
+                ),
+        );
+    }
+}
+
+#[cfg(feature = "std")]
+/// Renders a Bode plot for an object implementing `FrequencyTools`
+pub fn bode<T, F, const L: usize, const N: usize, const M: usize>(
+    title: &str,
+    system: &F,
+    mut response: FrequencyResponse<T, L, N, M>,
+) -> plotly::Plot
+where
+    T: Copy + Float + RealField + From<i16> + serde::ser::Serialize,
+    F: FrequencyTools<T, N, M>,
+{
+    use plotly::Layout;
+
+    if response.responses.is_none() {
+        system.frequency_response(&mut response);
+    }
+    let margins = FrequencyMargin::new(&response);
+
+    let mut plot = plotly::Plot::new();
+    plot.set_layout(
+        Layout::new()
+            .title(plotly::common::Title::with_text(title))
+            .x_axis(
+                plotly::layout::Axis::new()
+                    .title(plotly::common::Title::with_text("Frequency (rad/s)"))
+                    .type_(plotly::layout::AxisType::Log),
+            )
+            .y_axis(
+                plotly::layout::Axis::new()
+                    .title(plotly::common::Title::with_text("Magnitude (dB)")),
+            )
+            .x_axis2(
+                plotly::layout::Axis::new()
+                    .title(plotly::common::Title::with_text("Frequency (rad/s)"))
+                    .type_(plotly::layout::AxisType::Log),
+            )
+            .y_axis2(
+                plotly::layout::Axis::new().title(plotly::common::Title::with_text("Phase (deg)")),
+            )
+            .grid(
+                plotly::layout::LayoutGrid::new()
+                    .rows(2)
+                    .columns(1)
+                    .pattern(plotly::layout::GridPattern::Independent)
+                    .row_order(plotly::layout::RowOrder::TopToBottom),
+            ),
+    );
+
+    // extract each output mag/phase (make a helper in response soon)
+    for out_channel in 0..M {
+        let (magnitudes, phases) = response.mag_phase(out_channel);
+
+        // render the output as the response to each input
+        for (in_channel, frequency) in response.frequencies.iter().enumerate() {
+            render_bode_subplot(
+                &mut plot,
+                frequency,
+                &magnitudes,
+                &phases,
+                in_channel,
+                out_channel,
+                &margins.0[out_channel][in_channel],
+            );
+        }
+    }
+
+    plot
+}
+
+#[cfg(test)]
+mod test_log_space {
+    use super::*;
+    use crate::assert_f32_eq;
+
+    #[allow(clippy::cognitive_complexity)]
+    #[test]
+    fn basic() {
+        let ls = logspace::<f32, 10>(1.0, 5.0);
+        assert_f32_eq!(ls[0], 10.0);
+        assert_f32_eq!(ls[1], 30.0, 4.0);
+        assert_f32_eq!(ls[2], 80.0, 4.0);
+        assert_f32_eq!(ls[3], 220.0, 5.0);
+        assert_f32_eq!(ls[4], 600.0, 1.0);
+        assert_f32_eq!(ls[5], 1670.0, 2.0);
+        assert_f32_eq!(ls[6], 4640.0, 2.0);
+        assert_f32_eq!(ls[7], 12920.0, 5.0);
+        assert_f32_eq!(ls[8], 35940.0, 2.0);
+        assert_f32_eq!(ls[9], 100_000.0, 10.0);
+    }
+}
 
 #[cfg(test)]
 mod test_first_crossover {
@@ -503,14 +567,14 @@ mod test_first_crossover {
     use crate::{assert_f32_eq, assert_f64_eq};
 
     #[test]
-    fn test_crossover_detection() {
+    fn crossover_detection() {
         // Test inputs
         let frequencies: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
         let magnitudes: [f64; 6] = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3];
         let threshold = 1.0;
 
         // Trigger edge case where b[i] == threshold
-        let result = first_crossover::<f64>(&frequencies, &magnitudes, threshold, 6);
+        let result = first_crossover(&frequencies, &magnitudes, threshold);
 
         assert!(result.is_some());
         #[allow(clippy::unwrap_used)]
@@ -519,14 +583,14 @@ mod test_first_crossover {
     }
 
     #[test]
-    fn test_crossover_interpolation() {
+    fn crossover_interpolation() {
         // Test inputs
         let frequencies: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
-        let magnitudes: [f64; 6] = [0.8, 0.9, 0.95, 1.05, 1.2, 1.3];
+        let magnitudes: [f64; 6] = [0.8, 0.9, 0.95, 1.05, 1.2, 1.3]; // inconsistent step
         let threshold = 1.0;
 
         // Linear interpolation for crossover
-        let result = first_crossover::<f64>(&frequencies, &magnitudes, threshold, 6);
+        let result = first_crossover(&frequencies, &magnitudes, threshold);
 
         assert!(result.is_some());
         #[allow(clippy::unwrap_used)]
@@ -535,31 +599,60 @@ mod test_first_crossover {
     }
 
     #[test]
-    fn test_no_crossover() {
+    fn no_crossover() {
         // Test inputs with no crossover
         let frequencies: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
         let magnitudes: [f64; 6] = [0.8, 0.85, 0.9, 0.95, 0.98, 0.99];
         let threshold = 1.0;
 
         // No crossover detected
-        let result = first_crossover::<f64>(&frequencies, &magnitudes, threshold, 6);
+        let result = first_crossover(&frequencies, &magnitudes, threshold);
 
         assert!(result.is_none());
     }
 
+    #[allow(clippy::unwrap_used)]
     #[test]
-    fn test_decreasing_crossover() {
+    fn decreasing_crossover() {
         // Test inputs with decreasing crossover
         let frequencies: [f32; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
         let magnitudes: [f32; 6] = [1.2, 1.1, 1.05, 0.95, 0.8, 0.7];
         let threshold = 1.0;
 
         // Linear interpolation for decreasing crossover
-        let result = first_crossover::<f32>(&frequencies, &magnitudes, threshold, 6);
+        let result = first_crossover(&frequencies, &magnitudes, threshold);
 
-        assert!(result.is_some());
-        #[allow(clippy::unwrap_used)]
-        let result = result.unwrap();
-        assert_f32_eq!(result, 1.25, 1e-7); // Interpolated value
+        assert_f32_eq!(result.unwrap(), 1.25, 1.2e-7); // Interpolated value
+    }
+    #[allow(clippy::unwrap_used)]
+    #[test]
+    fn multiple_threshold_instances() {
+        let frequencies: [usize; 10] = core::array::from_fn(|i| i);
+        let magnitudes: [usize; 10] = core::array::from_fn(|i| (i >= 5).into());
+        let threshold = 1;
+        // Linear interpolation for decreasing crossover
+        let result = first_crossover(&frequencies, &magnitudes, threshold);
+        assert_eq!(result.unwrap(), 5); // Interpolated value
+    }
+    #[allow(clippy::unwrap_used, clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+    #[test]
+    fn integer_interpolation() {
+        let frequencies: [i32; 10] = core::array::from_fn(|i| i as i32);
+        let magnitudes: [i32; 10] = core::array::from_fn(|i| if i < 5 { 5 } else { 7 });
+        let threshold = 6;
+        // Linear interpolation for decreasing crossover
+        let result = first_crossover(&frequencies, &magnitudes, threshold);
+        assert_eq!(result.unwrap(), 4); // Interpolated value
+    }
+
+    #[allow(clippy::unwrap_used, clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+    #[test]
+    fn multiple_crossovers() {
+        let frequencies: [f32; 10] = core::array::from_fn(|i| i as f32);
+        let magnitudes: [f32; 10] = core::array::from_fn(|i| if i % 2 == 0 { 1.0 } else { 3.0 });
+        let threshold = 2.0;
+        // Linear interpolation for decreasing crossover
+        let result = first_crossover(&frequencies, &magnitudes, threshold);
+        assert_f32_eq!(result.unwrap(), 0.5); // Interpolated value
     }
 }

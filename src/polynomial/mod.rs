@@ -1,8 +1,9 @@
 //! Array-based univariate-polynomial
 //!
-//! This module contains a base implementation of a generic array polynomial. To guarantee safe and
-//! deterministic implementations of all arithmetic, some implementations are only available for
-//! certain specializations.
+//! This module contains a base implementation of a generic array polynomial. Many of the methods
+//! are not available for the empty polynomial case `N == 0`. Handling the empty case would add a
+//! decent amount of logic and complicate the return types. This implementation was chosen because
+//! it is fast and clean (I also couldn't think of a good reason to support empty polynomials).
 //!
 //! # Examples
 //!
@@ -18,6 +19,14 @@
 //! assert_eq!(line.leading_coefficient(), Some(&1.0));
 //! ```
 //!
+//! # References
+//! For an introduction to polynomial functions, see:
+//! - [Paul's Online Notes – Polynomials](https://tutorial.math.lamar.edu/Classes/Alg/Polynomials.aspx)
+//! - [OpenStax Precalculus – Polynomial Functions](https://openstax.org/books/precalculus/pages/3-introduction-to-polynomial-and-rational-functions)
+//!
+//! For polynomial evaluation and efficient algorithms like Horner’s method:
+//! - [Numerical Recipes – Polynomial Evaluation](https://numerical.recipes/)
+//!
 // TODO:
 //  * calculus
 //      * `compose(f: Polynomial, g: Polynomial) -> Polynomial`
@@ -25,13 +34,8 @@
 //      * `from_complex_roots(&mut self, roots: &[Complex<T>]) -> Result<(), Polynomial>`
 //      * `roots(p: Polynomial, roots: &mut [T]) -> Result<(), PolynomialError>`
 //      * `complex_roots(p: Polynomial, roots: &mut [Complex<T>]) -> Result<(), PolynomialError>`
-//  * formatting
-//      * Display precision option
-//      * Latex / symbolic formatter
 //  * Move internal function to separate files (keep private) so other mods can use them without polynomial
-//      * roots
-//      * derivative/integral
-//      * from_array_initializers
+//      * string formatter with variable as argument
 
 use core::{
     array, fmt,
@@ -42,7 +46,7 @@ use nalgebra::{
     allocator::Allocator, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax, DimSub,
     RealField, U1,
 };
-use num_traits::{Num, One, Zero};
+use num_traits::{Float, Num, One, Zero};
 
 // ===============================================================================================
 //      Polynomial Submodules
@@ -55,22 +59,19 @@ pub mod utils;
 // ===============================================================================================
 
 mod aliases;
+use crate::{systems::System, static_storage::{array_from_iterator_with_default, reverse_array}};
 pub use aliases::{Constant, Cubic, Line, Quadratic, Quartic, Quintic};
-
 // ===============================================================================================
 //      Polynomial Tests
 // ===============================================================================================
-
 #[cfg(test)]
-mod basic_tests;
+mod tests;
 
-#[cfg(test)]
-mod arithmetic_tests;
 // ===============================================================================================
 //      Polynomial
 // ===============================================================================================
 
-/// Statically sized univariate polynomial
+/// Statically sized univariate polynomial.
 ///
 /// This struct stores the coefficients of a polynomial a(x):
 /// <pre>
@@ -78,8 +79,8 @@ mod arithmetic_tests;
 /// </pre>
 /// where `n` is the degree of the polynomial.
 ///
-/// The coefficients are stored in degree-minor order: `[a_0, a_1 ... a_n]` (index 0 is the lowest degree
-/// or constant term, index n is the highest degree term).
+/// The coefficients are stored in degree-minor order: `[a_0, a_1 ... a_n]` (index 0 is the lowest
+/// degree or constant term, index n is the highest degree or leading coefficient).
 ///
 /// # Generic Arguments
 /// * `T` - Type of the coefficients in the polynomial.
@@ -149,7 +150,7 @@ impl<T, const N: usize> Polynomial<T, N> {
         Self::from_data(array::from_fn(cb))
     }
 
-    /// Checks if the capacity is zero
+    /// Checks if the capacity is zero.
     ///
     /// # Returns
     /// * `bool` - true if the capacity is zero.
@@ -169,13 +170,24 @@ impl<T, const N: usize> Polynomial<T, N> {
     }
 
     /// Access the coefficients as a slice iter
+    #[inline]
     fn iter(&self) -> slice::Iter<'_, T> {
         self.coefficients.iter()
     }
 
     /// Access the coefficients as a mutable slice iter
+    #[inline]
     pub fn iter_mut(&mut self) -> slice::IterMut<'_, T> {
         self.coefficients.iter_mut()
+    }
+}
+
+impl<T, const N: usize> IntoIterator for Polynomial<T, N> {
+    type Item = T;
+    type IntoIter = array::IntoIter<T, N>;
+    /// Access the coefficients as an array iter. This consumes the polynomial
+    fn into_iter(self) -> Self::IntoIter {
+        self.coefficients.into_iter()
     }
 }
 
@@ -189,11 +201,11 @@ impl<'a, T, const N: usize> IntoIterator for &'a Polynomial<T, N> {
 }
 
 impl<'a, T, const N: usize> IntoIterator for &'a mut Polynomial<T, N> {
-    type Item = &'a T;
-    type IntoIter = slice::Iter<'a, T>;
+    type Item = &'a mut T;
+    type IntoIter = slice::IterMut<'a, T>;
     /// Access the coefficients as a slice iter
     fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+        self.iter_mut()
     }
 }
 
@@ -221,7 +233,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     where
         I: IntoIterator<Item = T>,
     {
-        Self::from_data(utils::array_from_iterator_with_default(iterator, T::zero()))
+        Self::from_data(array_from_iterator_with_default(iterator, T::zero()))
     }
 
     /// Create a polynomial from another polynomial with a different capacity.
@@ -245,8 +257,8 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// ```
     /// TODO: Unit Test
     #[inline]
-    pub fn resize<const M: usize>(&self) -> Polynomial<T, M> {
-        Polynomial::<T, M>::from_iterator(self.coefficients.clone())
+    pub fn resize<const M: usize>(self) -> Polynomial<T, M> {
+        Polynomial::<T, M>::from_iterator(self)
     }
 
     /// Creates a monomial from a given coefficient.
@@ -271,7 +283,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
 }
 
 impl<T: Copy, const N: usize> Polynomial<T, N> {
-    /// Creates a new polynomial with all coefficients set to the same element
+    /// Creates a new polynomial with all coefficients set to the same element.
     ///
     /// # Arguments
     /// * `element` - The value to be copied into the coefficient array.
@@ -307,10 +319,9 @@ impl<T: Copy, const N: usize> Polynomial<T, N> {
     /// assert_eq!(Polynomial::new([1, 2, 3]), Polynomial::from_data([3, 2, 1])); // x^2 + 2x + 3
     /// assert_eq!(Polynomial::new([0.0, 1.0, 2.0]), Polynomial::from_iterator([2.0, 1.0])); // x + 2
     /// ```
-    /// TODO: Unit Test
     #[inline]
     pub const fn new(coefficients: [T; N]) -> Self {
-        Self::from_data(utils::reverse_array(coefficients))
+        Self::from_data(reverse_array(coefficients))
     }
 }
 
@@ -322,7 +333,7 @@ impl<T: Default, const N: usize> Default for Polynomial<T, N> {
 }
 
 impl<T: Zero, const N: usize> Polynomial<T, N> {
-    /// Returns the degree of the polynomial
+    /// Returns the degree of the polynomial.
     ///
     /// The degree is found by iterating through the array of coefficients, from N to 0, and
     /// returning the power of the first non-zero term. This is slow for polynomials with
@@ -335,7 +346,8 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     /// # Example
     /// ```
     /// use control_rs::Polynomial;
-    /// assert_eq!(Polynomial::new([1, 1]).degree(), Some(1));
+    /// assert_eq!(Polynomial::new([1, 1]).degree(), Some(1)); // x + 1
+    /// assert_eq!(Polynomial::new([0, 0, 1]).degree(), Some(0)); // 1
     /// ```
     #[inline]
     pub fn degree(&self) -> Option<usize> {
@@ -370,7 +382,7 @@ impl<T: Clone, const N: usize> Polynomial<T, N> {
 }
 
 impl<T: PartialEq + One + Zero, const N: usize> Polynomial<T, N> {
-    /// Checks if a polynomial is monic
+    /// Checks if a polynomial is monic.
     ///
     /// # Returns
     /// * `bool` - true if the leading coefficient is one, false otherwise
@@ -439,7 +451,12 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///     * `Some(coefficient)` - when N > degree
     ///     * `None` - when N <= degree
     ///
-    /// TODO: Unit Test
+    /// # Example
+    /// ```
+    /// use control_rs::Polynomial;
+    /// let p = Polynomial::new([1, 2, 3]);
+    /// assert_eq!(p.constant(), p.coefficient(0).unwrap());
+    /// ```
     #[inline]
     #[must_use]
     pub fn coefficient(&self, degree: usize) -> Option<&T> {
@@ -449,18 +466,6 @@ impl<T, const N: usize> Polynomial<T, N> {
         } else {
             None
         }
-    }
-
-    /// Returns the constant term of the polynomial
-    ///
-    /// # Returns
-    /// * `Option<&T>`
-    ///     * `Some(constant)` - when N > 0
-    ///     * `None` - when N == 0
-    #[inline]
-    #[must_use]
-    pub fn constant(&self) -> Option<&T> {
-        self.coefficient(0)
     }
 
     /// Returns a coefficient of the polynomial
@@ -473,7 +478,12 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///     * `Some(coefficient)` - when N > degree
     ///     * `None` - when N <= degree
     ///
-    /// TODO: Unit Test + Example
+    /// ```
+    /// use control_rs::Polynomial;
+    /// let mut p = Polynomial::new([0, 2, 3]);
+    /// *p.coefficient_mut(2).unwrap() += 1;
+    /// assert_eq!(p, Polynomial::new([1, 2, 3]));
+    /// ```
     #[inline]
     #[must_use]
     pub fn coefficient_mut(&mut self, degree: usize) -> Option<&mut T> {
@@ -483,20 +493,6 @@ impl<T, const N: usize> Polynomial<T, N> {
         } else {
             None
         }
-    }
-
-    /// Returns the constant term of the polynomial
-    ///
-    /// # Returns
-    /// * `Option<&mut T>`
-    ///     * `Some(constant)` - when N > 0
-    ///     * `None` - when N == 0
-    ///
-    /// TODO: Unit Test + Example
-    #[inline]
-    #[must_use]
-    pub fn constant_mut(&mut self) -> Option<&mut T> {
-        self.coefficient_mut(0)
     }
 }
 
@@ -510,7 +506,12 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     ///     * `Some(leading_coefficient)` - when N > 0
     ///     * `None` - when N == 0
     ///
-    /// TODO: Unit Test
+    /// # Example
+    /// ```
+    /// use control_rs::Polynomial;
+    /// let p = Polynomial::new([0, 0, 1]);
+    /// assert_eq!(p.constant(), p.leading_coefficient().unwrap());
+    /// ```
     #[inline]
     #[must_use]
     pub fn leading_coefficient(&self) -> Option<&T> {
@@ -528,7 +529,14 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     ///     * `Some(leading_coefficient)` - when N > 0
     ///     * `None` - when N == 0
     ///
-    /// TODO: Unit Test + Example
+    ///
+    /// # Example
+    /// ```
+    /// use control_rs::Polynomial;
+    /// let mut p = Polynomial::new([0, 0, 1]);
+    /// *p.leading_coefficient_mut().unwrap() += 1;
+    /// assert_eq!(p, Polynomial::new([0, 0, 2]));
+    /// ```
     #[inline]
     #[must_use]
     pub fn leading_coefficient_mut(&mut self) -> Option<&mut T> {
@@ -538,9 +546,66 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     }
 }
 
+impl<T, const N: usize> Polynomial<T, N>
+where
+    Const<N>: DimSub<U1>,
+{
+    /// Returns the constant term of the polynomial.
+    ///
+    /// Only available for polynomials that have a constant term (i.e. `N > 0`).
+    ///
+    /// # Returns
+    /// * `Option<&T>`
+    ///     * `Some(constant)` - when N > 0
+    ///     * `None` - when N == 0
+    ///
+    /// # Example
+    /// ```
+    /// use control_rs::Polynomial;
+    /// let p = Polynomial::new([1]);
+    /// assert_eq!(p.constant(), &1);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn constant(&self) -> &T {
+        // SAFETY: `N > 0` so this is valid
+        unsafe { self.get_unchecked(0) }
+    }
+
+    /// Returns the constant term of the polynomial.
+    ///
+    /// # Returns
+    /// * `Option<&mut T>`
+    ///     * `Some(constant)` - when N > 0
+    ///     * `None` - when N == 0
+    ///
+    /// # Example
+    /// ```
+    /// use control_rs::Polynomial;
+    /// let mut p = Polynomial::new([1, 0, 0]);
+    /// *p.constant_mut() += 1;
+    /// assert_eq!(p, Polynomial::new([1, 0, 1]));
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn constant_mut(&mut self) -> &mut T {
+        // SAFETY: `N > 0` so this is valid
+        unsafe { self.get_unchecked_mut(0) }
+    }
+}
+
 // ===============================================================================================
 //      Calculus
 // ===============================================================================================
+
+/// Represents the base cases of polynomial differentiation
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum DerivativeEdgeCase {
+    /// The polynomial has no non-zero coefficients
+    DerivativeOfZero,
+    /// Only the polynomial's constant term is non-zero (degree = 0)
+    Zero,
+}
 
 impl<T: Clone + AddAssign + Zero + One, const N: usize> Polynomial<T, N> {
     /// Computes the derivative of a polynomial.
@@ -548,25 +613,43 @@ impl<T: Clone + AddAssign + Zero + One, const N: usize> Polynomial<T, N> {
     /// See [`utils::differentiate()`] for more.
     ///
     /// # Returns
-    /// * `Polynomial` - a polynomial with capacity `N - 1`
+    /// *`Polynomial` - a polynomial with capacity `N - 1`
+    ///
+    /// # Errors
+    /// * `Zero` - The polynomial's degree is zero, this replaces returning an empty polynomial
+    /// * `DerivativeOfZero` - The polynomial has no non-zero terms
     ///
     /// # Examples
     /// ```
     /// use control_rs::polynomial::Polynomial;
     /// let p1 = Polynomial::new([3_i32, 2_i32, 1_i32]); // Represents 3x^2 + 2x + 1
     /// assert_eq!(
-    ///     p1.derivative(),
+    ///     p1.derivative().expect("Incorrect derivative"),
     ///     Polynomial::from_data([2_i32, 6_i32]), // 6x + 2
-    ///     "Incorrect polynomial derivative"
+    ///     "Incorrect derivative"
     /// );
     /// ```
-    // TODO: Unit test
     #[inline]
-    pub fn derivative<const M: usize>(&self) -> Polynomial<T, M>
+    pub fn derivative<const M: usize>(&self) -> Result<Polynomial<T, M>, DerivativeEdgeCase>
     where
-        Const<N>: DimSub<U1, Output = Const<M>> + nalgebra::ToTypenum,
+        Const<N>: DimSub<U1, Output = Const<M>>, // `N > 0`, successful derivative is `N-1` items
     {
-        Polynomial::from_data(utils::differentiate(&self.coefficients))
+        self.degree().map_or_else(
+            || Err(DerivativeEdgeCase::DerivativeOfZero),
+            |degree| match degree {
+                0 => Err(DerivativeEdgeCase::Zero), // derivative of constant is zero, `N > 0`
+                1 => {
+                    // derivative of a line is a constant, the constant is not zero
+                    // this case avoids a few additions but might not boost performance by much
+                    // SAFETY: degree is 1, so 1 is a valid index
+                    let constant = unsafe { self.get_unchecked(1).clone() };
+                    Ok(Polynomial::from_iterator([constant]))
+                }
+                _ => Ok(Polynomial::from_data(utils::differentiate(
+                    &self.coefficients,
+                ))),
+            },
+        )
     }
 }
 
@@ -588,7 +671,6 @@ impl<T: Clone + Zero + One + AddAssign + Div<Output = T>, const N: usize> Polyno
     ///     "Incorrect polynomial integral"
     /// );
     /// ```
-    // TODO: Unit test
     #[inline]
     pub fn integral<const M: usize>(&self, constant: T) -> Polynomial<T, M>
     where
@@ -608,7 +690,6 @@ impl<T: Copy + Zero + One + Neg<Output = T> + Div<Output = T>, const N: usize> P
     /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]); // x^3 - 6x^2 + 11x - 6
     /// assert_eq!(p.companion(), [[6.0, -11.0, 6.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], "incorrect companion");
     /// ```
-    // TODO: Unit test
     pub fn companion<const M: usize>(&self) -> [[T; M]; M]
     where
         Const<N>: DimSub<U1, Output = Const<M>>,
@@ -631,7 +712,8 @@ where
     /// ```
     /// # Errors
     /// * `NoRoots` - the polynomial has no roots, or the function could not compute them
-    // TODO: Unit test
+    ///
+    /// TODO: Review return cases
     pub fn roots<const M: usize>(&self) -> Result<[Complex<T>; M], utils::NoRoots>
     where
         T: Copy
@@ -642,7 +724,8 @@ where
             + Div<Output = T>
             + PartialOrd
             + fmt::Debug
-            + RealField,
+            + RealField
+            + Float,
         Const<N>: DimSub<U1, Output = Const<M>>,
         Const<M>: DimSub<U1>,
         DefaultAllocator:
@@ -653,17 +736,34 @@ where
 }
 
 // ===============================================================================================
+//      Polynomial System traits
+// ===============================================================================================
+
+impl<T, const N: usize> System for Polynomial<T, N>
+where
+    T: Copy + Clone + Zero + One,
+{
+    fn zero() -> Self {
+        Self::from_element(T::zero())
+    }
+
+    fn identity() -> Self {
+        Self::from_iterator([T::one()])
+    }
+}
+
+// ===============================================================================================
 //      Polynomial-Scalar Arithmetic
 // ===============================================================================================
 
-/// # -Polynomial<T, N>
+/// Negates the coefficients of a polynomial.
 ///
 /// # Example
 /// ```
 /// use control_rs::Polynomial;
 /// let p1 = Polynomial::new([1, 2, 3]);
 /// let p2 = -p1; // Negate p1
-/// assert_eq!(*p2.constant().unwrap(), -3);
+/// assert_eq!(p2.constant(), &-3);
 /// assert_eq!(*p2.leading_coefficient().unwrap(), -1);
 /// ```
 impl<T: Clone + Neg<Output = T>, const N: usize> Neg for Polynomial<T, N> {
@@ -672,21 +772,24 @@ impl<T: Clone + Neg<Output = T>, const N: usize> Neg for Polynomial<T, N> {
     /// Negates all coefficients in the polynomial
     #[inline]
     fn neg(self) -> Self::Output {
-        Self::from_fn(|i| {
-            // SAFETY: The index is usize (>= 0) and less than N
-            unsafe { self.get_unchecked(i).clone().neg() }
-        })
+        let mut neg_self = self;
+        for a in &mut neg_self.coefficients {
+            *a = a.clone().neg();
+        }
+        neg_self
     }
 }
 
-/// # Polynomial<T, N> + T
+/// Adds a constant to a polynomial.
+///
+/// Only available for polynomials that have a constant term (i.e., `N > 0`).
 ///
 /// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([0]);
 /// let p2 = p1 + 1;
-/// assert_eq!(*p2.constant().unwrap(), 1);
+/// assert_eq!(p2.constant(), &1);
 /// ```
 impl<T: Clone + Add<Output = T>, const N: usize> Add<T> for Polynomial<T, N>
 where
@@ -696,23 +799,23 @@ where
 
     #[inline]
     fn add(self, rhs: T) -> Self::Output {
-        let mut result = self.clone();
+        let mut result = self;
         // SAFETY: `N > 0` so the index is valid
         unsafe {
-            *result.get_unchecked_mut(0) = self.get_unchecked(0).clone() + rhs;
+            *result.get_unchecked_mut(0) = result.get_unchecked(0).clone().add(rhs);
         }
         result
     }
 }
 
-/// # Polynomial<T, N> += T
+/// Adds a constant to a polynomial and assigns the result to the original polynomial.
 ///
 /// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([0]);
 /// p1 += 1;
-/// assert_eq!(*p1.constant().unwrap(), 1);
+/// assert_eq!(p1.constant(), &1);
 /// ```
 impl<T: AddAssign, const N: usize> AddAssign<T> for Polynomial<T, N>
 where
@@ -720,21 +823,21 @@ where
 {
     #[inline]
     fn add_assign(&mut self, rhs: T) {
-        // SAFETY: `N > 0` so the index is always valid
+        // SAFETY: `N > 0` so the index is valid
         unsafe {
-            *self.get_unchecked_mut(0) += rhs;
+            self.get_unchecked_mut(0).add_assign(rhs);
         }
     }
 }
 
-/// # Polynomial<T, N> - T
+/// Subtracts a constant from a polynomial.
 ///
 /// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([0]);
 /// let p2 = p1 - 1;
-/// assert_eq!(*p2.constant().unwrap(), -1);
+/// assert_eq!(p2.constant(), &-1);
 /// ```
 impl<T: Clone + Sub<Output = T>, const N: usize> Sub<T> for Polynomial<T, N>
 where
@@ -744,23 +847,23 @@ where
 
     #[inline]
     fn sub(self, rhs: T) -> Self::Output {
-        let mut result = self.clone();
+        let mut result = self;
         // SAFETY: `N > 0` so the index is valid
         unsafe {
-            *result.get_unchecked_mut(0) = self.get_unchecked(0).clone() - rhs;
+            *result.get_unchecked_mut(0) = result.get_unchecked(0).clone().sub(rhs);
         }
         result
     }
 }
 
-/// # Polynomial<T, N> -= T
+/// Subtracts a constant from a polynomial and assigns the result to the original polynomial.
 ///
 /// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([0]);
 /// p1 -= 1;
-/// assert_eq!(*p1.constant().unwrap(), -1);
+/// assert_eq!(p1.constant(), &-1);
 /// ```
 impl<T: SubAssign, const N: usize> SubAssign<T> for Polynomial<T, N>
 where
@@ -770,19 +873,19 @@ where
     fn sub_assign(&mut self, rhs: T) {
         // SAFETY: `N > 0` so the index is valid
         unsafe {
-            *self.get_unchecked_mut(0) -= rhs;
+            self.get_unchecked_mut(0).sub_assign(rhs);
         }
     }
 }
 
-/// # Polynomial<T, N> * T
+/// Multiplies a polynomial by its field type.
 ///
 /// # Example
 /// ```
 /// use control_rs::{Polynomial, polynomial::Quadratic};
 /// let p1 = Polynomial::new([0i32]);
 /// let p2 = p1 * 1;
-/// assert_eq!(p2.constant(), Some(&0));
+/// assert_eq!(p2.constant(), &0);
 /// let p3 = Quadratic::<i32>::from_element(1);
 /// assert_eq!(p3 * 2, Quadratic::<i32>::from_element(2));
 /// ```
@@ -795,21 +898,22 @@ where
     /// Returns a new polynomial with all coefficients scaled by rhs
     #[inline]
     fn mul(self, rhs: T) -> Self::Output {
-        Self::Output::from_fn(|i| {
-            // SAFETY: The index is usize (>= 0) and less than N
-            unsafe { self.get_unchecked(i).clone() * rhs.clone() }
-        })
+        let mut product = self;
+        for a in &mut product {
+            *a = a.clone().mul(rhs.clone());
+        }
+        product
     }
 }
 
-/// # Polynomial<T, N> *= T
+/// Multiplies a polynomial by its field type and assigns the result to the original polynomial.
 ///
 /// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let mut p1 = Polynomial::new([1]);
 /// p1 *= 2;
-/// assert_eq!(p1.constant(), Some(&2));
+/// assert_eq!(p1.constant(), &2);
 /// ```
 impl<T: Clone + MulAssign, const N: usize> MulAssign<T> for Polynomial<T, N>
 where
@@ -817,12 +921,12 @@ where
 {
     fn mul_assign(&mut self, rhs: T) {
         for a_i in self.iter_mut() {
-            *a_i *= rhs.clone();
+            a_i.mul_assign(rhs.clone());
         }
     }
 }
 
-/// # Polynomial<T, N> / T
+/// Divides a polynomial by its field type.
 ///
 /// # Example
 /// ```
@@ -840,14 +944,15 @@ where
     /// Returns a new polynomial with all coefficients scaled by 1 / rhs
     #[inline]
     fn div(self, rhs: T) -> Self::Output {
-        Self::Output::from_fn(|i| {
-            // SAFETY: The index is usize (>= 0) and less than N
-            unsafe { self.get_unchecked(i).clone() / rhs.clone() }
-        })
+        let mut quotient = self;
+        for a in &mut quotient {
+            *a = a.clone().div(rhs.clone());
+        }
+        quotient
     }
 }
 
-/// # Polynomial<T, N> /= T
+/// Divides a polynomial by its field type and assigns the result to the original polynomial.
 ///
 /// # Example
 /// ```
@@ -861,20 +966,19 @@ where
     Const<N>: DimSub<U1>,
 {
     fn div_assign(&mut self, rhs: T) {
-        for a_i in self.iter_mut() {
-            *a_i /= rhs.clone();
+        for a_i in &mut self.coefficients {
+            a_i.div_assign(rhs.clone());
         }
     }
 }
 
-/// # Polynomial<T, N> % T
+/// Computes the remainder of a polynomial divided by its field type.
 ///
 /// # Example
 /// ```
 /// use control_rs::polynomial::Polynomial;
 /// let p1 = Polynomial::new([1, 2, 3]);
-/// let p2 = p1 % 2;
-/// assert_eq!(p2, Polynomial::new([1, 0, 1]));
+/// assert_eq!(p1 % 2, Polynomial::new([1, 0, 1]));
 /// ```
 /// TODO: Unit Test
 impl<T: Clone + Rem<Output = T>, const N: usize> Rem<T> for Polynomial<T, N>
@@ -884,15 +988,16 @@ where
     type Output = Self;
 
     fn rem(self, rhs: T) -> Self::Output {
-        Self::from_fn(|i|
-            // SAFETY: The index is usize (>= 0) and less than N
-            unsafe {
-                self.get_unchecked(i).clone() % rhs.clone()
-            })
+        let mut remainder = self;
+        for a in &mut remainder {
+            *a = a.clone().rem(rhs.clone());
+        }
+        remainder
     }
 }
 
-/// # Polynomial<T, N> %= T
+/// Computes the remainder of polynomial divided by its field type and assigns the result to the
+/// original polynomial.
 ///
 /// # Example
 /// ```
@@ -908,7 +1013,7 @@ where
 {
     fn rem_assign(&mut self, rhs: T) {
         for a_i in self.iter_mut() {
-            *a_i %= rhs.clone();
+            a_i.rem_assign(rhs.clone());
         }
     }
 }
@@ -923,7 +1028,7 @@ macro_rules! impl_left_scalar_ops {
                 type Output = Polynomial<$scalar, N>;
                 #[inline(always)]
                 fn add(self, rhs: Polynomial<$scalar, N>) -> Self::Output {
-                    rhs + self.clone()
+                    rhs.add(self)
                 }
             }
             impl<const N: usize> Sub<Polynomial<$scalar, N>> for $scalar
@@ -933,9 +1038,9 @@ macro_rules! impl_left_scalar_ops {
                 type Output = Polynomial<$scalar, N>;
                 #[inline(always)]
                 fn sub(self, rhs: Polynomial<$scalar, N>) -> Self::Output {
-                    let mut result = Self::Output::from_iterator([self.clone()]);
+                    let mut result = Self::Output::from_iterator([self]);
                     for (a, b) in result.iter_mut().zip(rhs.iter()) {
-                        *a = a.clone() - b.clone();
+                        *a = a.clone().sub(b.clone());
                     }
                     result
                 }
@@ -947,7 +1052,7 @@ macro_rules! impl_left_scalar_ops {
                 type Output = Polynomial<$scalar, N>;
                 #[inline(always)]
                 fn mul(self, rhs: Polynomial<$scalar, N>) -> Self::Output {
-                    rhs.clone() * self.clone()
+                    rhs.mul(self)
                 }
             }
             impl<const N: usize> Div<Polynomial<$scalar, N>> for $scalar
@@ -957,9 +1062,9 @@ macro_rules! impl_left_scalar_ops {
                 type Output = Polynomial<$scalar, N>;
                 #[inline(always)]
                 fn div(self, rhs: Polynomial<$scalar, N>) -> Self::Output {
-                    let mut result = rhs.clone();
+                    let mut result = rhs;
                     for a_i in result.iter_mut() {
-                        *a_i = self.clone() / a_i.clone();
+                        *a_i = self.clone().div(a_i.clone());
                     }
                     result
                 }
@@ -974,7 +1079,7 @@ impl_left_scalar_ops!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
 //      Polynomial-Polynomial Arithmetic
 // ===============================================================================================
 
-/// # Polynomial<T, N> + Polynomial<T, M>
+/// Add two polynomials.
 ///
 /// # Example
 /// ```
@@ -993,7 +1098,7 @@ where
     /// Adds the coefficients of a polynomial together
     #[inline]
     fn add(self, rhs: Polynomial<T, M>) -> Self::Output {
-        Polynomial::<T, L>::from_data(utils::add_generic(&self.coefficients, &rhs.coefficients))
+        Polynomial::from_data(utils::add_generic(self.coefficients, rhs.coefficients))
     }
 }
 
@@ -1042,7 +1147,7 @@ where
     /// Subtracts the coefficients of a polynomial from each other
     #[inline]
     fn sub(self, rhs: Polynomial<T, M>) -> Self::Output {
-        Polynomial::<T, L>::from_data(utils::sub_generic(&self.coefficients, &rhs.coefficients))
+        Polynomial::from_data(utils::sub_generic(self.coefficients, rhs.coefficients))
     }
 }
 
@@ -1092,7 +1197,7 @@ where
     /// Multiplies the coefficients of a polynomial, also known as a convolution
     #[inline]
     fn mul(self, rhs: Polynomial<T, M>) -> Self::Output {
-        Polynomial::<T, L>::from_data(utils::convolution(&self.coefficients, &rhs.coefficients))
+        Polynomial::from_data(utils::convolution(&self.coefficients, &rhs.coefficients))
     }
 }
 
@@ -1116,7 +1221,7 @@ where
     #[inline]
     fn div(self, divisor: Polynomial<T, M>) -> Self::Output {
         Self::from_data(utils::long_division(
-            &self.coefficients,
+            self.coefficients,
             &divisor.coefficients,
         ))
     }
@@ -1131,7 +1236,7 @@ where
     T: Clone + Zero + One + PartialOrd + Neg<Output = T> + fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let precision = f.precision().unwrap_or(crate::math::DEFAULT_PRECISION);
+
         let mut n = N;
         for (i, a_i) in self.iter().enumerate().rev() {
             if a_i.is_zero() {
@@ -1149,7 +1254,12 @@ where
                 a_i.clone()
             };
             if !abs_a_i.is_one() || i == 0 {
-                write!(f, "{abs_a_i:.precision$}")?;
+                if let Some(precision) = f.precision() {
+                    write!(f, "{abs_a_i:.precision$}")?;
+                }
+                else {
+                    write!(f, "{abs_a_i}")?;
+                }
             }
             if i > 0 {
                 write!(f, "x")?;

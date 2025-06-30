@@ -1,23 +1,51 @@
 # Control-rs
 
-`control-rs` is a Rust library for control system modeling and design, built for real-time embedded applications. It 
-offers a familiar interface, inspired by MATLAB’s Control System Toolbox, while embracing Rust’s compile-time safety 
-guarantees and memory model. All data structures are statically sized, with dimensionality and type constraints 
-enforced at compile time—eliminating the need for heap allocation and enabling deterministic behavior. 
+Rust-native numerical modeling and synthesis library for embedded projects.
 
-The crate is `no_std` compatible and supports both fixed-point and floating-point numeric types, making it suitable 
-for deployment on a wide range of microcontrollers. In the future `control-rs` hopes to provide template projects for 
-components like motor controllers, battery management systems, and autonomous navigation logic. The goal is to provide 
-a reliable and high performance, open-source foundation for embedded control software in robotics and aerospace.
+The crate is `no_std` by default (but has a `std` feature flag for plotting) and intends to support 
+both fixed-point and floating-point numeric types.
+
+The goal is to make cargo templates for robotic components like ESCs, BMS and odometry
+systems. These templates will use the
+[awesome embedded rust crates](https://!github.com/rust-embedded/awesome-embedded-rust)
+to provide detailed guides to implementing and operating the components.
+
+This list covers a few projects that are in the works:
+- [ ] DC Motor lead-lag compensator
+- [ ] BLDC ESC (FOC or fancy 6-stage commuter)
+- [ ] LiPo Battery model adaptive estimator
+- [ ] Quadcopter attitude/altitude controller (3-loop autopilot)
+- [ ] Visual-Inertial Odometry
 
 ## Features
+### Model Types
 
-* **Modeling**: Support for Polynomial, Transfer Function, State-Space, and custom nonlinear structs
-* **Analysis**: Tools for classical, modern and robust system analysis
-* **Synthesis**: Direct and data-driven methods to create models
-* **Simulation**: Easy model integration and data visualization
+* `Polynomial` - Dense univariate polynomial
+* `TransferFunction` - Intended to be a laplace domain input/output model but could potentially be
+  used as a rational function
+* `StateSpace` - Standard linear-algebra representation for a system of differential equations
+* `NLModel` - A trait for custom models that provides a more flexible structure/implementation
 
-## Installation (Not Supported... haven't published the crate yet, clone this repo instead)
+### Analysis Tools
+
+* `FrequencyTools` - Classical frequency-response methods
+* `RobustTools` - hopefully coming soon
+
+### Synthesis Tools
+
+* `LeastSquares` - a trait that's still in the works (should be available for statically sized 
+  models).
+* `GradientDescent` - also in the works but should provide a trait to perform backpropagation of
+  error on models.
+
+### Simulation Tools
+
+* `integrators` - Various types of integration for precision simulations (RK4 + Dormand-Prince)
+* `response` - Classic system response implementations: step, ramp, sine, impulse...
+
+## Getting Started
+
+### Installation (Not Supported... haven't published the crate yet, clone this repo instead)
 
 Add this to your `Cargo.toml`:
 
@@ -32,7 +60,7 @@ or run
 cargo add control-rs
 ```
 
-## Usage
+### Example
 
 Here's a simple example to get you started:
 
@@ -40,30 +68,19 @@ Here's a simple example to get you started:
 use control_rs::transfer_function::{TransferFunction, linear_tools::dc_gain};
 
 fn main() {
-  // create a transfer function 1 / s
-    let mut tf = Transferfunction::new([1.0], [1.0, 0.0]);
+    let dt = 0.1;
+    // create a transfer function 1 / s(s + 0.1)
+    let mut tf = Transferfunction::new([1.0], [1.0, 0.1, 0.0]);
+    println!("{tf}");
     println!("DC Gain of TF: {}", dc_gain(tf));
+    let ss = zoh(tf2ss(tf), dt);
+    println!("{ss}");
+    let mut x = nalgebra::Vector2(0.0, 0.0);
+    for i in 0..100 {
+        x = ss.dynamics(x, 1.0);
+    }
 }
 ```
-
-```rust
-use control_rs::{TransferFunction, transferfunction::linear_tools::tf2ss};
-
-fn main() {
-    let tf = TransferFunction::new([2.0, 4.0], [1.0, 1.0, 4.0, 0.0, 0.0]);
-    let ss = tf2ss(tf);
-}
-```
-
-## Examples
-
-Examples are either based on a textbook problem or demo a practical application. This list covers a few examples that
-are in the works:
-- [ ] DC Motor lead-lag compensator
-- [ ] BLDC ESC (FOC or fancy 6-stage commuter)
-- [ ] LiPo Battery model adaptive estimator
-- [ ] Orbit Determination (EKF, UKF using Nadir pointing pinhole camera and known landmarks)
-- [ ] Visual-Inertial Odometry
 
 ## Testing
 
@@ -94,9 +111,15 @@ double as useful examples and a basic functionality check.
 
 The documentation provides theoretical references and specific user guidance. Each module should include:
 
-* A concise conceptual description (similar to [MathWorks TransferFunction docs](https://www.mathworks.com/help/control/ug/transfer-functions.html))
-* Links to theoretical references
-* Examples
+* A conceptual description of the module (similar to [MathWorks TransferFunction docs](https://www.mathworks.com/help/control/ug/transfer-functions.html))
+* Links to theoretical references for more in-depth understanding
+* Example of how to use the module
+
+## Project Templates
+
+In addition to providing the foundational blocks for implementing control systems, `control-rs` should have templates
+that integrate control systems with crates from the embedded rust community. These templates can then provide users a
+starting point for developing their own products.
 
 ## Book
 
@@ -114,3 +137,9 @@ functions you need so `control-rs` can be your one-stop-shop solution for design
 This project should have a license, but vscode kept complaining. I'll bring it back soon.
 
 Thank you for using `control-rs`!
+
+## Acknowledgements
+
+This project is heavily inspired by the MATLab Control Systems Toolbox, many of the functions were written to have the
+same call signatures. Also, the core models are almost an exact copy of `nalgebra`'s matrix and many of the trait bounds 
+wouldn't be possible without their crate.

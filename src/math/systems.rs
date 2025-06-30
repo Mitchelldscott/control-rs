@@ -1,7 +1,7 @@
 //! higher level traits for numerical models
 
 use crate::state_space::StateSpace;
-
+use core::ops::{Add, Div, Mul};
 use num_traits::{One, Zero};
 
 /// # Dynamical System
@@ -63,18 +63,36 @@ pub trait System: Clone {
     fn identity() -> Self;
 }
 
-use crate::Polynomial;
-
-impl<T, const N: usize> System for Polynomial<T, N>
+/// Feedback of two systems
+///
+/// This function implements the feedback of two systems.
+///
+/// # Generic Arguments
+/// * `T` - Type of the input variable(s)
+pub fn feedback<T, G, H, GH, GH2, CL>(sys1: &G, sys2: &H, sign_in: T, sign_feedback: T) -> CL
 where
-    T: Copy + Clone + Zero + One,
+    T: Clone + Zero + One + Mul<G, Output = G> + Mul<GH, Output = GH>,
+    G: System + Mul<H, Output = GH> + Div<GH2, Output = CL>,
+    GH: System + Add<Output = GH2>,
+    H: System,
 {
-    fn zero() -> Self {
-        Self::from_element(T::zero())
-    }
+    sign_in * sys1.clone() / (GH::identity() + sign_feedback * sys1.clone() * sys2.clone())
+}
 
+impl System for f32 {
+    fn zero() -> Self {
+        0.0f32
+    }
     fn identity() -> Self {
-        Self::from_iterator([T::one()])
+        1.0f32
+    }
+}
+impl System for f64 {
+    fn zero() -> Self {
+        0.0f64
+    }
+    fn identity() -> Self {
+        1.0f64
     }
 }
 
@@ -82,31 +100,12 @@ where
 mod feedback_test {
     use super::*;
 
-    use core::ops::{Add, Div, Mul};
-
-    use crate::polynomial::Constant;
-
-    /// Feedback of two systems
-    ///
-    /// This function implements the feedback of two systems.
-    ///
-    /// # Generic Arguments
-    /// * `T` - Type of the input variable(s)
-    fn feedback<T, G, H, GH, CL>(sys1: &G, sys2: &H, sign_in: T, sign_feedback: T) -> CL
-    where
-        T: Clone + Zero + One + Mul<G, Output = G> + Mul<GH, Output = GH>,
-        G: System + Mul<H, Output = GH> + Div<GH, Output = CL>,
-        GH: System + Add<Output = GH>,
-        H: System,
-    {
-        sign_in.clone() * sys1.clone()
-            / (GH::identity() + sign_feedback.clone() * sys1.clone() * sys2.clone())
-    }
+    use crate::{assert_f32_eq, polynomial::Constant, TransferFunction};
 
     #[test]
     fn zero_constant() {
-        let p1 = Polynomial::zero();
-        let p2 = Polynomial::new([2.0]);
+        let p1 = Constant::zero();
+        let p2 = Constant::new([2.0]);
         let p3: Constant<f64> = feedback(&p1, &p2, 1.0, -1.0);
         assert_eq!(
             p3.coefficient(0),
@@ -118,13 +117,25 @@ mod feedback_test {
     #[test]
     fn constant_constant() {
         // x = r - m where, m = p2(p1(x)) and r is an arbitrary input to the system
-        let p1 = Polynomial::new([1.0]);
-        let p2 = Polynomial::new([2.0]);
+        let p1 = Constant::new([1.0]);
+        let p2 = Constant::new([2.0]);
         let p3 = feedback(&p1, &p2, 1.0, -1.0);
         assert_eq!(
             p3.coefficient(0),
             Some(&-1.0),
             "incorrect feedback polynomial {p3}"
         );
+    }
+
+    #[test]
+    fn tf_closed_loop() {
+        let tf = TransferFunction::new([1.0], [1.0, 1.0]);
+        let cl_tf = feedback(&tf, &1.0, 1.0, -1.0);
+        assert_f32_eq!(cl_tf.numerator[0], 1.0);
+        assert_f32_eq!(cl_tf.numerator[1], 1.0);
+        assert_f32_eq!(cl_tf.numerator[2], 0.0);
+        assert_f32_eq!(cl_tf.denominator[0], 0.0);
+        assert_f32_eq!(cl_tf.denominator[1], 1.0);
+        assert_f32_eq!(cl_tf.denominator[2], 1.0);
     }
 }
