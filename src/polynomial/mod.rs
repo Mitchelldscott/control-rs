@@ -59,7 +59,7 @@ pub mod utils;
 // ===============================================================================================
 
 mod aliases;
-use crate::systems::System;
+use crate::{systems::System, static_storage::{array_from_iterator_with_default, reverse_array}};
 pub use aliases::{Constant, Cubic, Line, Quadratic, Quartic, Quintic};
 // ===============================================================================================
 //      Polynomial Tests
@@ -233,7 +233,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     where
         I: IntoIterator<Item = T>,
     {
-        Self::from_data(utils::array_from_iterator_with_default(iterator, T::zero()))
+        Self::from_data(array_from_iterator_with_default(iterator, T::zero()))
     }
 
     /// Create a polynomial from another polynomial with a different capacity.
@@ -321,7 +321,7 @@ impl<T: Copy, const N: usize> Polynomial<T, N> {
     /// ```
     #[inline]
     pub const fn new(coefficients: [T; N]) -> Self {
-        Self::from_data(utils::reverse_array(coefficients))
+        Self::from_data(reverse_array(coefficients))
     }
 }
 

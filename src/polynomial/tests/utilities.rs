@@ -62,15 +62,15 @@ mod integrals {
     }
     #[test]
     fn one() {
-        assert_eq!(integrate(&[1, 0, 0], 1), [1, 1, 0, 0])
+        assert_eq!(integrate(&[1, 0, 0], 1), [1, 1, 0, 0]);
     }
     #[test]
     fn quadratic() {
-        assert_eq!(integrate(&[0, 0, 3], 1), [1, 0, 0, 1])
+        assert_eq!(integrate(&[0, 0, 3], 1), [1, 0, 0, 1]);
     }
     #[test]
     fn cubic() {
-        assert_eq!(integrate(&[1, 2, 3, 4], 0), [0, 1, 1, 1, 1])
+        assert_eq!(integrate(&[1, 2, 3, 4], 0), [0, 1, 1, 1, 1]);
     }
 }
 
@@ -114,7 +114,7 @@ mod companion {
     fn leading_zero() {
         // Polynomial: 0x^2 + 2x + 3 (Effectively 2x + 3)
         // Coefficients: [3.0, 2.0, 0.0] -> N = 3, M = 2
-        assert_eq!(companion(&[3.0, 2.0, 0.0]), [[0.0, 0.0], [0.0, 0.0]]);
+        assert_eq!(companion(&[3.0, 2.0, 0.0]), [[0.0, 0.0], [1.0, 0.0]]);
     }
 
     #[test]
@@ -229,7 +229,7 @@ mod roots {
             0.000_001_341_6,
             0.000_000_078_2,
             0.000_000_001_6,
-            0.0 // incorrect companion if leading zero
+            0.0,
         ]).expect("failed to compute roots");
         assert_f32_eq!(roots[0].re, -20.7682, 0.03);
         assert_f32_eq!(roots[1].re, -13.0648, 0.05);
@@ -237,7 +237,7 @@ mod roots {
         assert_f32_eq!(roots[3].re, -3.3001, 0.00025);
         assert_f32_eq!(roots[4].re, -2.0024, 1e-4);
         assert_f32_eq!(roots[5].re, 0.0);
-        // assert!(roots[6].re.is_nan() && roots[6].im.is_nan());
+        assert!(roots[6].re.is_nan() && roots[6].im.is_nan());
         assert_f32_eq!(
             roots[0].im
             + roots[1].im

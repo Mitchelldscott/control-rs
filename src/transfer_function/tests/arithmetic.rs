@@ -4,10 +4,10 @@ mod addition {
     use super::*;
     #[test]
     fn test_add() {
-        let tf = TransferFunction::new([1], [1, 1]);
-        let sum = tf + TransferFunction::new([1], [1, 2]);
-        assert_eq!(sum.numerator, [3, 2], "Incorrect numerator");
-        assert_eq!(sum.denominator, [2, 3, 1], "Incorrect denominator");
+        let tf = TransferFunction::new([1, 2, 3], [1, 2, 3]);
+        let sum = tf + TransferFunction::new([1, 2, 3], [1, 2, 3]);
+        assert_eq!(sum.numerator, [18, 24, 20, 8, 2], "Incorrect numerator");
+        assert_eq!(sum.denominator, [9, 12, 10, 4, 1], "Incorrect denominator");
     }
 
     #[test]
@@ -31,10 +31,10 @@ mod subtraction {
     use super::*;
     #[test]
     fn test_sub() {
-        let tf = TransferFunction::new([1], [1, 1]);
-        let sum = tf - TransferFunction::new([1], [1, 1]);
-        assert_eq!(sum.numerator, [0, 0], "Incorrect numerator");
-        assert_eq!(sum.denominator, [1, 2, 1], "Incorrect denominator");
+        let tf = TransferFunction::new([1, 2, 3], [1, 2, 3]);
+        let sum = tf - TransferFunction::new([1, 2, 3], [1, 2, 3]);
+        assert_eq!(sum.numerator, [0, 0, 0, 0, 0], "Incorrect numerator");
+        assert_eq!(sum.denominator, [9, 12, 10, 4, 1], "Incorrect denominator");
     }
 
     #[test]
@@ -58,10 +58,10 @@ mod multiplication {
     use super::*;
     #[test]
     fn test_mul() {
-        let tf = TransferFunction::new([1], [1, 1]);
-        let product = tf * TransferFunction::new([1], [1, 2]);
-        assert_eq!(product.numerator, [1], "Incorrect numerator");
-        assert_eq!(product.denominator, [2, 3, 1], "Incorrect denominator");
+        let tf = TransferFunction::new([1, 2, 3], [1, 2, 3]);
+        let product = tf * TransferFunction::new([1, 2, 3], [1, 2, 3]);
+        assert_eq!(product.numerator, [9, 12, 10, 4, 1], "Incorrect numerator");
+        assert_eq!(product.denominator, [9, 12, 10, 4, 1], "Incorrect denominator");
     }
 
     #[test]

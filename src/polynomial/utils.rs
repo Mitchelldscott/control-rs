@@ -5,7 +5,6 @@
 
 use core::{
     array, fmt, iter,
-    mem::MaybeUninit,
     ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign},
 };
 use nalgebra::{
@@ -14,73 +13,7 @@ use nalgebra::{
 };
 use num_traits::{Float, One, Zero};
 
-/// Helper function to reverse arrays given to `Polynomial::new()`
-#[inline]
-pub const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
-    let mut output = input;
-    let mut i = 0;
-    while i < N / 2 {
-        let tmp = output[i];
-        output[i] = output[N - 1 - i];
-        output[N - 1 - i] = tmp;
-        i += 1;
-    }
-
-    output
-}
-
-/// Initialize an array from an iterator.
-///
-/// # Arguments
-/// * `iterator` - An [Iterator] over a collection of `T`.
-/// * `default` - the default value to use if the iterator is not long enough.
-///
-/// # Returns
-/// * `initialized_array` - An array with all elements initialized
-///
-/// # Safety
-/// This function uses `MaybeUninit` and raw pointer casting to avoid requiring `T: Default + Copy`.
-/// The safety relies on:
-/// - Fully initializing all elements of the `[MaybeUninit<T>; N]` array before calling `read()`
-/// - Not reading from or dropping uninitialized memory
-///
-/// TODO:
-///   * Move to a specific array_init module
-pub(crate) fn array_from_iterator_with_default<I, T, const N: usize>(
-    iterator: I,
-    default: T,
-) -> [T; N]
-where
-    T: Clone,
-    I: IntoIterator<Item = T>,
-{
-    // SAFETY: `[MaybeUninit<T>; N]` is valid.
-    let mut uninit_array: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
-    let mut count = 0;
-
-    // zip() will only iterate over `N.min(iterator_len)` items so no OOB access will occur.
-    for (c, d) in uninit_array.iter_mut().zip(iterator.into_iter()) {
-        *c = MaybeUninit::new(d);
-        count += 1;
-    }
-
-    // `T: Clone`, and we are initializing all remaining uninitialized slots.
-    for c in uninit_array.iter_mut().skip(count) {
-        *c = MaybeUninit::new(default.clone());
-    }
-
-    // SAFETY:
-    // * All `N` elements of `uninit_array` have been initialized.
-    // * `MaybeUninit<T>` and T are guaranteed to have the same layout.
-    // * `MaybeUninit` does not drop, so there are no double-frees.
-    unsafe {
-        // Get a pointer to the `uninit_array` array.
-        // Cast it to a pointer to an array of `T`.
-        // Then `read()` the value from that pointer.
-        // This is equivalent to transmute from `[MaybeUninit<T>; N]` to `[T; N]`.
-        uninit_array.as_ptr().cast::<[T; N]>().read()
-    }
-}
+use crate::static_storage::{array_from_iterator, array_from_iterator_with_default};
 
 /// Finds the **last** non-zero value in an array.
 ///
@@ -130,13 +63,16 @@ where
     Const<N>: DimSub<U1, Output = Const<M>>,
 {
     let mut exponent = T::zero();
-    array_from_iterator_with_default(
-        coefficients.iter().skip(1).map(|a_i| {
-            exponent += T::one();
-            a_i.clone() * exponent.clone()
-        }),
-        T::zero(),
-    )
+    // Safety: the iterator will have 1 less element than coefficients, which has more than 0
+    // elements
+    unsafe {
+        array_from_iterator(
+            coefficients.iter().skip(1).map(|a_i| {
+                exponent += T::one();
+                a_i.clone() * exponent.clone()
+            }),
+        )
+    }
 }
 
 /// Computes the indefinite integral of a polynomial.
@@ -163,13 +99,15 @@ where
     Const<N>: DimAdd<U1, Output = Const<M>>,
 {
     let mut exponent = T::zero();
-    array_from_iterator_with_default(
-        iter::once(constant).chain(coefficients.iter().map(|a_i| {
-            exponent += T::one();
-            a_i.clone() / exponent.clone()
-        })),
-        T::zero(),
-    )
+    // Safety: the iterator will have 1 more element than coefficients
+    unsafe {
+        array_from_iterator(
+            iter::once(constant).chain(coefficients.iter().map(|a_i| {
+                exponent += T::one();
+                a_i.clone() / exponent.clone()
+            })),
+        )
+    }
 }
 
 /// Computes the Frobenius companion matrix of a polynomial.
@@ -352,23 +290,35 @@ where
         let a = coefficients[2];
         if a.is_zero() {
             roots[0].re = linear_root(coefficients[1], coefficients[0])?;
-        }
-        for (q_root, root) in quadratic_roots(a, coefficients[1], coefficients[0])?
-            .into_iter()
-            .zip(roots.iter_mut())
-        {
-            *root = q_root;
+        } else {
+            for (q_root, root) in quadratic_roots(a, coefficients[1], coefficients[0])?
+                .into_iter()
+                .zip(roots.iter_mut())
+            {
+                *root = q_root;
+            }
         }
     } else {
         // TODO:
         //  * Edge-case where coefficients represent a monomial
         //  * Edge-case where polynomial has no constant (root at zero, can deflate)
-        //  * Edge-case where polynomial has a leading zero, companion will be zero filled
-        let matrix = SMatrix::from_data(ArrayStorage(companion(coefficients)));
+        //  * Edge-case where polynomial has a leading zero, companion will have a row of zeros
+        let companion = if degree == M {
+            companion(coefficients)
+        }
+        else {
+            let mut shifted_coefficients = [T::zero(); N];
+            for i in 0..=degree {
+                shifted_coefficients[M-i] = coefficients[degree-i];
+            }
+            companion(&shifted_coefficients)
+        };
+        let matrix = SMatrix::from_data(ArrayStorage(companion));
         for (eigenvalue, root) in matrix
             .complex_eigenvalues()
             .into_iter()
             .zip(roots.iter_mut())
+            .take(degree)
         {
             *root = *eigenvalue;
         }

@@ -40,12 +40,12 @@
 /// TODO: simulator + Lag compensator
 use control_rs::{
     frequency_tools::*,
-    // integrators::runge_kutta4,
-    math::systems::feedback, // DynamicalSystem},
+    integrators::runge_kutta4,
+    math::systems::DynamicalSystem,
     transfer_function::*,
 };
 
-use nalgebra::{Vector1, Vector2};
+use nalgebra::{Vector1, Vector3};
 
 // Define motor parameters
 const J: f64 = 0.01;
@@ -57,35 +57,38 @@ const R: f64 = 1.0;
 const L: f64 = 0.5;
 
 type MotorInput = f64;
-type MotorState = Vector2<f64>;
+type MotorState = Vector3<f64>;
 type MotorOutput = Vector1<f64>;
 
 const SIM_STEPS: usize = 100;
-type SimData = [(f64, f64, f64, f64); SIM_STEPS];
+type SimData = ([f64; SIM_STEPS], [MotorState; SIM_STEPS], [MotorOutput; SIM_STEPS]);
 
-// fn step<ModelInput, ModelState: Clone + Default, ModelOutput, G: DynamicalSystem<ModelInput, ModelState, ModelOutput>>(
-//     plant: G,
-//     dt: f64,
-// ) -> SimData {
-//     let mut x = ModelState::default();
-//     let mut sim = [(0.0, x[0], x[1], plant.output(x.clone(), 1.0)[(0, 0)]); SIM_STEPS];
-//     for i in 1..SIM_STEPS {
-//         x = runge_kutta4(&plant, x.clone(), 1.0, 0.0, 0.1, 0.01);
-//         sim[i] = (i as f64 * dt, x[0], x[1], plant.output(x.clone(), 1.0)[(0, 0)]);
-//     }
-//
-//     sim
-// }
+fn step<G: DynamicalSystem<MotorInput, MotorState, MotorOutput>>(
+    plant: G,
+    x0: MotorState,
+    dt: f64,
+) -> SimData {
+    let mut x = x0.clone();
+    let mut sim = ([0.0; SIM_STEPS], [x0.clone(); SIM_STEPS], [plant.output(x.clone(), 0.0); SIM_STEPS]);
+    for i in 1..SIM_STEPS {
+        x = runge_kutta4(&plant, x.clone(), 1.0, 0.0, dt, dt / 10.0);
+        sim.0[i] = i as f64 * dt;
+        sim.1[i] = x.clone();
+        sim.2[i] = plant.output(x.clone(), 1.0);
+    }
+
+    sim
+}
 
 #[cfg(feature = "std")]
 fn plot(sim: SimData) {
     use plotly::{Layout, Plot, Scatter};
 
     // Extract time and state values
-    let time: Vec<f64> = sim.iter().map(|(t, _, _, _)| *t).collect();
-    let state1: Vec<f64> = sim.iter().map(|(_, x, _, _)| *x).collect();
-    let state2: Vec<f64> = sim.iter().map(|(_, _, x, _)| *x).collect();
-    let output: Vec<f64> = sim.iter().map(|(_, _, _, x)| *x).collect();
+    let time: Vec<f64> = sim.0.iter().map(|t| *t).collect();
+    let state1: Vec<f64> = sim.1.iter().map(|x| x[0]).collect();
+    let state2: Vec<f64> = sim.1.iter().map(|x| x[1]).collect();
+    let output: Vec<f64> = sim.2.iter().map(|x| x[(0,0)]).collect();
 
     // Create plot traces
     let trace1 = Scatter::new(time.clone(), state1).name("State 1");
@@ -101,7 +104,7 @@ fn plot(sim: SimData) {
     plot.add_trace(trace2);
     plot.add_trace(trace3);
 
-    plot.show();
+    plot.write_html("target/plots/dc_motor_sim.html");
 }
 
 fn main() {
@@ -137,9 +140,9 @@ fn main() {
     .write_html("target/plots/dc_motor_gain_compensated_bode.html");
 
     #[allow(non_snake_case)]
-    let Td = 0.4; // TODO: use poles + fr to compute these
+    let Td = 0.01; // TODO: use poles + fr to compute these
     let alpha = 0.2;
-    let compensator_tf = TransferFunction::new([Td, 1.0], [alpha * Td, 1.0]);
+    let compensator_tf = 10.0 * TransferFunction::new([Td, 1.0], [alpha * Td, 1.0]);
     let lead_compensated_tf = gain_compensated_tf * compensator_tf;
     println!("Compensated System Zeros: {:?}", zeros(&lead_compensated_tf).ok());
     println!("Compensated System Poles: {:?}", poles(&lead_compensated_tf).ok());
@@ -154,10 +157,8 @@ fn main() {
     )
     .write_html("target/plots/dc_motor_lead_compensated_bode.html");
 
-    // #[cfg(feature = "std")]
-    let cl_motor_tf = feedback(&lead_compensated_tf, &1.0, 1.0, -1.0);
-    // println!("Closed loop tf: {cl_motor_tf}");
-    // println!("Closed loop poles: {:?}", poles(&cl_motor_tf).ok()); // hanging
-    // #[cfg(feature = "std")]
-    // plot(step(tf2ss(&cl_motor_tf), 0.1)); // simulation needs to know the state-shape of cl system
+    let mut cl_ss = tf2ss(&lead_compensated_tf);
+    cl_ss.a = cl_ss.a - (cl_ss.b * cl_ss.c);
+    #[cfg(feature = "std")]
+    plot(step(cl_ss, Vector3::zeros(), 0.01));
 }

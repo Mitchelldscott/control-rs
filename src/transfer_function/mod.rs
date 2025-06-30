@@ -24,8 +24,9 @@ use num_traits::{Float, One, Zero};
 use crate::{
     frequency_tools::{FrequencyResponse, FrequencyTools},
     polynomial::utils::{
-        add_generic, array_from_iterator_with_default, convolution, reverse_array, sub_generic,
+        add_generic, convolution, sub_generic,
     },
+    static_storage::{array_from_iterator_with_default, reverse_array},
     systems::System,
 };
 

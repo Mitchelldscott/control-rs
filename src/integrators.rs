@@ -1,4 +1,4 @@
-//! A variety of methods to integrate [DynamicalSystem]s
+//! A variety of methods to integrate [`DynamicalSystem`]s
 //!
 use crate::math::systems::DynamicalSystem;
 

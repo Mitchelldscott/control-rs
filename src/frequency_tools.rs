@@ -35,7 +35,7 @@
 //! - [ ] textbook example of trait productivity
 //! - [ ] move plotly to plotly helper file (or wait for a nice gui)
 
-use crate::polynomial::utils::array_from_iterator_with_default;
+use crate::static_storage::array_from_iterator;
 use core::ops::{AddAssign, Div, Mul, Sub};
 use nalgebra::{Complex, ComplexField, RealField};
 use num_traits::{Float, Zero};
@@ -132,11 +132,12 @@ where
     /// * `FrequencyResponse` - instance with logarithmically spaced frequencies and
     ///   no responses
     pub fn logspace(freq_start: [T; N], freq_stop: [T; N]) -> Self {
-        // use the final logspace array as default to avoid initializing a zero array... seems sketch
-        let frequencies = array_from_iterator_with_default(
-            (0..N - 1).map(|i| logspace(freq_start[i], freq_stop[i])),
-            logspace(freq_start[N - 1], freq_stop[N - 1]),
-        );
+        // Safety: There will be N arrays of L log spaced values
+        let frequencies = unsafe {
+            array_from_iterator(
+                (0..N).map(|i| logspace::<T, L>(freq_start[i], freq_stop[i])),
+            )
+        };
         Self {
             frequencies,
             responses: None,
@@ -542,6 +543,8 @@ where
 mod test_log_space {
     use super::*;
     use crate::assert_f32_eq;
+
+    #[allow(clippy::cognitive_complexity)]
     #[test]
     fn basic() {
         let ls = logspace::<f32, 10>(1.0, 5.0);
@@ -625,13 +628,13 @@ mod test_first_crossover {
     #[test]
     fn multiple_threshold_instances() {
         let frequencies: [usize; 10] = core::array::from_fn(|i| i);
-        let magnitudes: [usize; 10] = core::array::from_fn(|i| if i < 5 { 0 } else { 1 });
+        let magnitudes: [usize; 10] = core::array::from_fn(|i| (i >= 5).into());
         let threshold = 1;
         // Linear interpolation for decreasing crossover
         let result = first_crossover(&frequencies, &magnitudes, threshold);
         assert_eq!(result.unwrap(), 5); // Interpolated value
     }
-    #[allow(clippy::unwrap_used)]
+    #[allow(clippy::unwrap_used, clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
     #[test]
     fn integer_interpolation() {
         let frequencies: [i32; 10] = core::array::from_fn(|i| i as i32);
@@ -642,7 +645,7 @@ mod test_first_crossover {
         assert_eq!(result.unwrap(), 4); // Interpolated value
     }
 
-    #[allow(clippy::unwrap_used)]
+    #[allow(clippy::unwrap_used, clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_precision_loss)]
     #[test]
     fn multiple_crossovers() {
         let frequencies: [f32; 10] = core::array::from_fn(|i| i as f32);

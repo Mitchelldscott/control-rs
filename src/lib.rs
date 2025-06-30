@@ -60,7 +60,6 @@
 //! Please report any you find.***
 //!
 //! # References
-//! * [Control Systems Wiki book](https://en.wikibooks.org/wiki/Control_Systems)
 //! * [Feedback control of Dynamic Systems](https://mrce.in/ebooks/Feedback%20Control%20of%20Dynamic%20Systems%208th%20Ed.pdf)
 #![no_std]
 #![deny(
@@ -91,6 +90,8 @@ pub use polynomial::Polynomial;
 
 pub mod state_space;
 pub use state_space::StateSpace;
+
+pub mod static_storage;
 
 pub mod transfer_function;
 pub use transfer_function::TransferFunction;
