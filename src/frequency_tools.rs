@@ -35,21 +35,97 @@
 //! - [ ] textbook example of trait productivity
 //! - [ ] move plotly to plotly helper file (or wait for a nice gui)
 
-use crate::static_storage::array_from_iterator;
 use core::ops::{AddAssign, Div, Mul, Sub};
-use nalgebra::{Complex, ComplexField, RealField};
-use num_traits::{Float, Zero};
+#[cfg(feature="std")]
+use core::ops::Neg;
 
-// this is not that useful without fixed point support
-// pub trait Frequency {
-//     fn pow(self, exp: Self) -> Self;
-//     fn log10(self) -> Self;
-//     fn mag_to_db(self) -> Self;
-//     fn db_to_mag(self) -> Self;
-// }
+use nalgebra::{Complex, ComplexField, RealField};
+use num_traits::{Float, One, Zero};
+
+use crate::static_storage::array_from_iterator;
+
+/// A trait for types that can represent an angle and provide
+/// conversion from degrees to radians.
+pub trait Phase: Sized + Mul<Output = Self> + Div<Output = Self> {
+    /// Associated const to help with generic functions
+    const PI: Self;
+    /// Associated const to help with generic functions
+    const ONE_EIGHTY: Self;
+    /// Converts the angle from degrees to radians.
+    #[must_use]
+    #[inline]
+    fn to_radians(self) -> Self { self * (Self::PI / Self::ONE_EIGHTY) }
+    /// Converts the angle from radians to degrees.
+    #[must_use]
+    #[inline]
+    fn to_degrees(self) -> Self { self * (Self::ONE_EIGHTY / Self::PI) }
+}
+
+impl Phase for f32 {
+    const PI: Self = core::f32::consts::PI;
+    const ONE_EIGHTY: Self = 180.0;
+}
+impl Phase for f64 {
+    const PI: Self = core::f64::consts::PI;
+    const ONE_EIGHTY: Self = 180.0;
+}
+
+/// A trait for types that can represent a magnitude and provide
+/// conversion between absolute values and decibels (dB).
+pub trait Magnitude: Sized + Mul<Output = Self> + Div<Output = Self> {
+    /// Associated constant for magnitude calculations.
+    const TEN: Self;
+
+    /// Associated constant for decibel calculations.
+    const TWENTY: Self;
+
+    /// Calculates x where 10^x = self
+    ///
+    /// This is not defined for values <= 0
+    #[must_use]
+    fn log10(self) -> Self;
+
+    /// Calculates self^exp
+    ///
+    /// This is not defined for values <= 0
+    #[must_use]
+    fn powf(self, exp: Self) -> Self;
+
+    /// Converts an absolute magnitude value to decibels (dB).
+    ///
+    /// The formula used is `20 * log10(self / DB_REFERENCE)`.
+    #[must_use]
+    #[inline]
+    fn to_db(self) -> Self { Self::TWENTY * self.log10() }
+
+    /// Converts a decibel (dB) value to an absolute magnitude.
+    ///
+    /// The formula used is `DB_REFERENCE * 10^(self / DB_MULTIPLIER)`.
+    #[must_use]
+    #[inline]
+    fn to_mag(self) -> Self { Self::TEN.powf(self / Self::TWENTY) }
+}
+
+impl Magnitude for f32 {
+    const TEN: Self = 10.0;
+    const TWENTY: Self = 20.0;
+    #[inline]
+    fn log10(self) -> Self { self.log10() }
+    #[inline]
+    fn powf(self, exp: Self) -> Self { self.powf(exp) }
+}
+
+impl Magnitude for f64 {
+    const TEN: Self = 10.0;
+    const TWENTY: Self = 20.0;
+    #[inline]
+    fn log10(self) -> Self { self.log10() }
+    #[inline]
+    fn powf(self, exp: Self) -> Self { self.powf(exp) }
+}
 
 /// Standard interface for frequency analysis tools
-pub trait FrequencyTools<T: Float + RealField, const N: usize, const M: usize> {
+pub trait FrequencyTools<T: RealField, const N: usize, const M: usize> {
     /// Calculates the complex response from a set of input frequencies
     fn frequency_response<const L: usize>(&self, response: &mut FrequencyResponse<T, L, N, M>);
 }
@@ -99,7 +175,7 @@ impl<T, const L: usize, const N: usize, const M: usize> FrequencyResponse<T, L, 
 
 impl<T, const L: usize, const N: usize, const M: usize> FrequencyResponse<T, L, N, M>
 where
-    T: Float + Zero,
+    T: Copy + Zero + RealField,
 {
     /// Extract the magnitude and phase from a frequency responses output channel
     ///
@@ -203,7 +279,7 @@ pub struct PhaseGainCrossover<T> {
     pub gain_margin: Option<T>,
 }
 
-impl<T: Float + RealField> PhaseGainCrossover<T> {
+impl<T: Copy + Zero + One + RealField + Phase + Magnitude> PhaseGainCrossover<T> {
     /// Computes both the magnitude and phase crossover frequencies and margins of
     /// a frequency response
     ///
@@ -221,7 +297,7 @@ impl<T: Float + RealField> PhaseGainCrossover<T> {
         (0..L).for_each(|i| (magnitudes[i], phases[i]) = response[i].to_polar());
 
         let gain_crossover = first_crossover(frequencies, &magnitudes, T::one());
-        let phase_crossover = first_crossover(frequencies, &phases, -T::pi());
+        let phase_crossover = first_crossover(frequencies, &phases, -T::PI);
 
         let gain_margin = phase_crossover.map(|wc| {
             // should be using frequencies.iter().position(|hz| hz == threshold, or change first_crossover to return the index)
@@ -230,8 +306,7 @@ impl<T: Float + RealField> PhaseGainCrossover<T> {
             // TODO: Fix this so there doesn't need to be an unwrap (see `first_crossover()` todos)
             let mag_at_crossover =
                 first_crossover(&magnitudes, frequencies, wc).unwrap_or_else(|| T::zero());
-            // TODO: Use Frequency trait to do this conversion
-            T::from(20).unwrap_or_else(|| T::zero()) * -ComplexField::log10(mag_at_crossover)
+            mag_at_crossover.to_db()
         });
 
         let phase_margin = gain_crossover.map(|wc| {
@@ -239,7 +314,7 @@ impl<T: Float + RealField> PhaseGainCrossover<T> {
             // index in the phase array
             let phase_at_crossover =
                 first_crossover(&phases, frequencies, wc).unwrap_or_else(|| T::zero());
-            (phase_at_crossover + T::pi()).to_degrees()
+            (phase_at_crossover + T::PI).to_degrees()
         });
 
         Self {
@@ -275,7 +350,7 @@ impl<T> Default for PhaseGainCrossover<T> {
 /// - `M`: Dimension of the system's output.
 pub struct FrequencyMargin<T, const N: usize, const M: usize>(pub [[PhaseGainCrossover<T>; N]; M]);
 
-impl<T: Float + RealField, const N: usize, const M: usize> FrequencyMargin<T, N, M> {
+impl<T: Copy + Zero + One + RealField + Magnitude + Phase, const N: usize, const M: usize> FrequencyMargin<T, N, M> {
     /// Creates a new `FrequencyMargin` instance from a given `FrequencyResponse`
     ///
     /// This function computes the stability margins for all input-output channel pairs in the
@@ -405,7 +480,7 @@ fn render_bode_subplot<T>(
     col: usize,
     margins: &PhaseGainCrossover<T>,
 ) where
-    T: 'static + Copy + Float + From<i16> + serde::ser::Serialize,
+    T: 'static + Copy + Neg<Output = T> + Zero + One + Magnitude + Phase + serde::ser::Serialize,
 {
     use plotly::common;
     extern crate std;
@@ -413,7 +488,7 @@ fn render_bode_subplot<T>(
 
     let mag_db: Vec<T> = mag
         .iter()
-        .map(|&m| <T as From<i16>>::from(20) * m.log10())
+        .map(|&m| m.to_db())
         .collect();
     let phase_deg: Vec<T> = phase.iter().map(|&p| p.to_degrees()).collect();
 
@@ -456,7 +531,7 @@ fn render_bode_subplot<T>(
     // Phase margin line
     if let (Some(wc), Some(pm)) = (margins.gain_crossover, margins.phase_margin) {
         plot.add_trace(
-            plotly::Scatter::new(vec![wc, wc], vec![<T as From<i16>>::from(-180), pm])
+            plotly::Scatter::new(vec![wc, wc], vec![T::ONE_EIGHTY.neg(), pm])
                 .mode(common::Mode::Lines)
                 .name(format!("Phase FrequencyMargin[{row}, {col}]"))
                 .x_axis("x2")
@@ -478,7 +553,7 @@ pub fn bode<T, F, const L: usize, const N: usize, const M: usize>(
     mut response: FrequencyResponse<T, L, N, M>,
 ) -> plotly::Plot
 where
-    T: Copy + Float + RealField + From<i16> + serde::ser::Serialize,
+    T: Copy + Neg<Output = T> + Zero + One + RealField + Magnitude + Phase + serde::ser::Serialize,
     F: FrequencyTools<T, N, M>,
 {
     use plotly::Layout;

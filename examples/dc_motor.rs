@@ -40,93 +40,99 @@
 /// TODO: simulator + Lag compensator
 use control_rs::{
     frequency_tools::*,
-    integrators::runge_kutta4,
     math::systems::DynamicalSystem,
     transfer_function::*,
 };
+#[cfg(feature = "std")]
+use control_rs::integrators::runge_kutta4;
 
-use nalgebra::{Vector1, Vector3};
+#[cfg(feature = "std")]
+use plotly::{Layout, Plot, Scatter};
 
-// Define motor parameters
-const J: f64 = 0.01;
-#[allow(non_upper_case_globals)]
-const b: f64 = 0.1;
-#[allow(non_upper_case_globals)]
-const Km: f64 = 0.01;
-const R: f64 = 1.0;
-const L: f64 = 0.5;
+// A Convenient way to set the precision of the models.
+pub type Scalar = f64;
 
-type MotorInput = f64;
-type MotorState = Vector3<f64>;
-type MotorOutput = Vector1<f64>;
+mod dc_motor_lead_lag;
+pub use dc_motor_lead_lag::*;
 
+
+#[cfg(feature = "std")]
 const SIM_STEPS: usize = 100;
-type SimData = ([f64; SIM_STEPS], [MotorState; SIM_STEPS], [MotorOutput; SIM_STEPS]);
+#[cfg(feature = "std")]
+type SimData = ([Scalar; SIM_STEPS], [MotorInput; SIM_STEPS], [MotorState; SIM_STEPS]);
 
-fn step<G: DynamicalSystem<MotorInput, MotorState, MotorOutput>>(
-    plant: G,
+#[cfg(feature = "std")]
+fn step(
+    plant: MotorSS,
+    compensator: LeadCompensator,
     x0: MotorState,
-    dt: f64,
+    dt: Scalar,
 ) -> SimData {
     let mut x = x0.clone();
-    let mut sim = ([0.0; SIM_STEPS], [x0.clone(); SIM_STEPS], [plant.output(x.clone(), 0.0); SIM_STEPS]);
+    let mut x_c = nalgebra::Vector1::zeros();
+    let compensator_ss = tf2ss(&compensator);
+    let mut sim = (
+        [0.0; SIM_STEPS],
+        [compensator_ss.output(x_c.clone(), 1.0)[(0,0)]; SIM_STEPS],
+        [x0.clone(); SIM_STEPS],
+    );
     for i in 1..SIM_STEPS {
-        x = runge_kutta4(&plant, x.clone(), 1.0, 0.0, dt, dt / 10.0);
-        sim.0[i] = i as f64 * dt;
-        sim.1[i] = x.clone();
-        sim.2[i] = plant.output(x.clone(), 1.0);
+        x_c = compensator_ss.dynamics(x_c.clone(), 1.0);
+        let u = compensator_ss.output(x_c.clone(), 1.0)[(0,0)];
+        x = runge_kutta4(&plant, x.clone(), u, 0.0, dt, dt / 10.0);
+        sim.0[i] = i as Scalar * dt;
+        sim.1[i] = u;
+        sim.2[i] = x.clone();
     }
 
     sim
 }
 
 #[cfg(feature = "std")]
-fn plot(sim: SimData) {
-    use plotly::{Layout, Plot, Scatter};
+fn plot(sim: SimData) -> Plot {
 
     // Extract time and state values
     let time: Vec<f64> = sim.0.iter().map(|t| *t).collect();
-    let state1: Vec<f64> = sim.1.iter().map(|x| x[0]).collect();
-    let state2: Vec<f64> = sim.1.iter().map(|x| x[1]).collect();
-    let output: Vec<f64> = sim.2.iter().map(|x| x[(0,0)]).collect();
+    let voltage: Vec<f64> = sim.1.iter().map(|u| *u).collect();
+    let current: Vec<f64> = sim.2.iter().map(|x| x[0]).collect();
+    let speed: Vec<f64> = sim.2.iter().map(|x| x[1]).collect();
 
     // Create plot traces
-    let trace1 = Scatter::new(time.clone(), state1).name("State 1");
-    let trace2 = Scatter::new(time.clone(), state2).name("State 2");
-    let trace3 = Scatter::new(time, output).name("Output");
+    let trace0 = Scatter::new(time.clone(), vec![1.0; time.len()]).name("reference");
+    let trace1 = Scatter::new(time.clone(), voltage).name("voltage");
+    let trace2 = Scatter::new(time.clone(), current).name("Current");
+    let trace3 = Scatter::new(time.clone(), speed).name("Speed");
 
     // Create subplots
     let mut plot = Plot::new();
     let layout = Layout::new();
 
     plot.set_layout(layout);
+    plot.add_trace(trace0);
     plot.add_trace(trace1);
     plot.add_trace(trace2);
     plot.add_trace(trace3);
 
-    plot.write_html("target/plots/dc_motor_sim.html");
+    plot
 }
 
 fn main() {
-    // Numerator: [Km]
-    // Denominator: JLs^2 + (JR + bL)s + bR + Km^2
-    let motor_tf = TransferFunction::new([Km], [J * L, J * R + L * b, (R * b) + (Km * Km)]);
-    println!("DC Motor {motor_tf}");
-    println!("DC Gain: {:?}", dc_gain(&motor_tf));
-    println!("System Poles: {:?}", poles(&motor_tf).ok());
+    println!("DC Motor {Motor_TF}");
+    println!("DC Gain: {:?}", dc_gain(&Motor_TF));
+    println!("System Poles: {:?}", poles(&Motor_TF).ok());
 
     let mut fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([-10.0], [5.0]);
-    motor_tf.frequency_response(&mut fr);
+    Motor_TF.frequency_response(&mut fr);
     #[cfg(feature = "std")]
     std::fs::create_dir_all("target/plots").expect("Failed to creat plots directory");
     #[cfg(feature = "std")]
-    bode("DC Motor Transfer Function", &motor_tf, fr)
+    bode("DC Motor Transfer Function", &Motor_TF, fr)
         .write_html("target/plots/dc_motor_ol_bode.html");
 
     // Simulates adding a simple feedforward controller that scales the input by the inverse of the
     // dc_gain, resulting in a new dc_gain = 1. In reality, this drives the motor state to the value
     // of the input voltage. An additional gain can scale the output value to an appropriate speed.
-    let gain_compensated_tf = motor_tf / dc_gain(&motor_tf);
+    let gain_compensated_tf = Motor_TF / dc_gain(&Motor_TF);
     assert_eq!(dc_gain(&gain_compensated_tf), 1.0);
 
     #[cfg(feature = "std")]
@@ -140,9 +146,7 @@ fn main() {
     .write_html("target/plots/dc_motor_gain_compensated_bode.html");
 
     #[allow(non_snake_case)]
-    let Td = 0.01; // TODO: use poles + fr to compute these
-    let alpha = 0.2;
-    let compensator_tf = 10.0 * TransferFunction::new([Td, 1.0], [alpha * Td, 1.0]);
+    let compensator_tf = lead_compensator(0.1, 30.0);
     let lead_compensated_tf = gain_compensated_tf * compensator_tf;
     println!("Compensated System Zeros: {:?}", zeros(&lead_compensated_tf).ok());
     println!("Compensated System Poles: {:?}", poles(&lead_compensated_tf).ok());
@@ -157,8 +161,6 @@ fn main() {
     )
     .write_html("target/plots/dc_motor_lead_compensated_bode.html");
 
-    let mut cl_ss = tf2ss(&lead_compensated_tf);
-    cl_ss.a = cl_ss.a - (cl_ss.b * cl_ss.c);
     #[cfg(feature = "std")]
-    plot(step(cl_ss, Vector3::zeros(), 0.01));
+    plot(step(Motor_SS, compensator_tf, MotorState::zeros(), 0.1)).write_html("target/plots/dc_motor_sim.html");
 }
