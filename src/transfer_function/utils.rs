@@ -126,15 +126,15 @@ pub fn zeros<T, const M: usize, const N: usize, const L: usize>(
 ) -> Result<[Complex<T>; L], crate::polynomial::utils::NoRoots>
 where
     T: Copy
-    + Zero
-    + One
-    + Neg<Output = T>
-    + Sub<Output = T>
-    + Div<Output = T>
-    + PartialOrd
-    + fmt::Debug
-    + RealField
-    + Float,
+        + Zero
+        + One
+        + Neg<Output = T>
+        + Sub<Output = T>
+        + Div<Output = T>
+        + PartialOrd
+        + fmt::Debug
+        + RealField
+        + Float,
     Const<M>: DimSub<U1, Output = Const<L>>,
     Const<L>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,

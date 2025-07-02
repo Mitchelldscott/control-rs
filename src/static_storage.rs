@@ -31,9 +31,7 @@ pub const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
 ///
 /// # Safety
 /// - The iterator must have **at least** `N` elements
-pub(crate) unsafe fn array_from_iterator<I, T, const N: usize>(
-    iterator: I,
-) -> [T; N]
+pub(crate) unsafe fn array_from_iterator<I, T, const N: usize>(iterator: I) -> [T; N]
 where
     I: IntoIterator<Item = T>,
 {
@@ -45,9 +43,8 @@ where
     maybe_uninit_array.assume_init()
 }
 
-
 /// Initialize an array from an iterator and a default.
-/// 
+///
 /// If the iterator is not long enough to fill the array, the remaining indices will be filled with
 /// the default value. If the iterator is equal to or longer than the array, this is equivalent to
 /// [`array_from_iterator()`].
@@ -63,14 +60,12 @@ where
 /// - The iterator must have **at least** `N` elements
 pub(crate) fn array_from_iterator_with_default<I, T, const N: usize>(
     iterator: I,
-    default: T
+    default: T,
 ) -> [T; N]
 where
     T: Clone,
     I: IntoIterator<Item = T>,
 {
     // Safety: The iterator has an infinite length so the array will eventually be full
-    unsafe {
-        array_from_iterator(iterator.into_iter().chain(iter::repeat(default)))
-    }
+    unsafe { array_from_iterator(iterator.into_iter().chain(iter::repeat(default))) }
 }

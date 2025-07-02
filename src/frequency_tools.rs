@@ -35,9 +35,9 @@
 //! - [ ] textbook example of trait productivity
 //! - [ ] move plotly to plotly helper file (or wait for a nice gui)
 
-use core::ops::{AddAssign, Div, Mul, Sub};
-#[cfg(feature="std")]
+#[cfg(feature = "std")]
 use core::ops::Neg;
+use core::ops::{AddAssign, Div, Mul, Sub};
 
 use nalgebra::{Complex, ComplexField, RealField};
 use num_traits::{Float, One, Zero};
@@ -54,11 +54,15 @@ pub trait Phase: Sized + Mul<Output = Self> + Div<Output = Self> {
     /// Converts the angle from degrees to radians.
     #[must_use]
     #[inline]
-    fn to_radians(self) -> Self { self * (Self::PI / Self::ONE_EIGHTY) }
+    fn to_radians(self) -> Self {
+        self * (Self::PI / Self::ONE_EIGHTY)
+    }
     /// Converts the angle from radians to degrees.
     #[must_use]
     #[inline]
-    fn to_degrees(self) -> Self { self * (Self::ONE_EIGHTY / Self::PI) }
+    fn to_degrees(self) -> Self {
+        self * (Self::ONE_EIGHTY / Self::PI)
+    }
 }
 
 impl Phase for f32 {
@@ -96,32 +100,44 @@ pub trait Magnitude: Sized + Mul<Output = Self> + Div<Output = Self> {
     /// The formula used is `20 * log10(self / DB_REFERENCE)`.
     #[must_use]
     #[inline]
-    fn to_db(self) -> Self { Self::TWENTY * self.log10() }
+    fn to_db(self) -> Self {
+        Self::TWENTY * self.log10()
+    }
 
     /// Converts a decibel (dB) value to an absolute magnitude.
     ///
     /// The formula used is `DB_REFERENCE * 10^(self / DB_MULTIPLIER)`.
     #[must_use]
     #[inline]
-    fn to_mag(self) -> Self { Self::TEN.powf(self / Self::TWENTY) }
+    fn to_mag(self) -> Self {
+        Self::TEN.powf(self / Self::TWENTY)
+    }
 }
 
 impl Magnitude for f32 {
     const TEN: Self = 10.0;
     const TWENTY: Self = 20.0;
     #[inline]
-    fn log10(self) -> Self { self.log10() }
+    fn log10(self) -> Self {
+        self.log10()
+    }
     #[inline]
-    fn powf(self, exp: Self) -> Self { self.powf(exp) }
+    fn powf(self, exp: Self) -> Self {
+        self.powf(exp)
+    }
 }
 
 impl Magnitude for f64 {
     const TEN: Self = 10.0;
     const TWENTY: Self = 20.0;
     #[inline]
-    fn log10(self) -> Self { self.log10() }
+    fn log10(self) -> Self {
+        self.log10()
+    }
     #[inline]
-    fn powf(self, exp: Self) -> Self { self.powf(exp) }
+    fn powf(self, exp: Self) -> Self {
+        self.powf(exp)
+    }
 }
 
 /// Standard interface for frequency analysis tools
@@ -210,9 +226,7 @@ where
     pub fn logspace(freq_start: [T; N], freq_stop: [T; N]) -> Self {
         // Safety: There will be N arrays of L log spaced values
         let frequencies = unsafe {
-            array_from_iterator(
-                (0..N).map(|i| logspace::<T, L>(freq_start[i], freq_stop[i])),
-            )
+            array_from_iterator((0..N).map(|i| logspace::<T, L>(freq_start[i], freq_stop[i])))
         };
         Self {
             frequencies,
@@ -265,7 +279,7 @@ where
 ///
 /// # Generic Arguments
 /// - `T`: The numeric type for the stability metrics (e.g., `f32` or `f64`).
-/// 
+///
 /// TODO: This shouldn't need to store the margin, those should be easily extracted from the resp
 #[derive(Copy, Clone, Debug)]
 pub struct PhaseGainCrossover<T> {
@@ -306,7 +320,7 @@ impl<T: Copy + Zero + One + RealField + Phase + Magnitude> PhaseGainCrossover<T>
             // TODO: Fix this so there doesn't need to be an unwrap (see `first_crossover()` todos)
             let mag_at_crossover =
                 first_crossover(&magnitudes, frequencies, wc).unwrap_or_else(|| T::zero());
-            mag_at_crossover.to_db()
+            mag_at_crossover.to_db().neg()
         });
 
         let phase_margin = gain_crossover.map(|wc| {
@@ -350,7 +364,9 @@ impl<T> Default for PhaseGainCrossover<T> {
 /// - `M`: Dimension of the system's output.
 pub struct FrequencyMargin<T, const N: usize, const M: usize>(pub [[PhaseGainCrossover<T>; N]; M]);
 
-impl<T: Copy + Zero + One + RealField + Magnitude + Phase, const N: usize, const M: usize> FrequencyMargin<T, N, M> {
+impl<T: Copy + Zero + One + RealField + Magnitude + Phase, const N: usize, const M: usize>
+    FrequencyMargin<T, N, M>
+{
     /// Creates a new `FrequencyMargin` instance from a given `FrequencyResponse`
     ///
     /// This function computes the stability margins for all input-output channel pairs in the
@@ -403,8 +419,8 @@ impl<T: Copy + Zero + One + RealField + Magnitude + Phase, const N: usize, const
 ///
 /// # Returns
 /// * `Option<T>` - The crossover frequency in rad/s, or `None` if no crossover frequency is found
-/// 
-/// TODO: 
+///
+/// TODO:
 ///   * Split this up into `first_crossover(arr, threshold) -> index` and
 ///     `interpolate_arrays(arr_a, arr_b) -> T`
 fn first_crossover<T, const N: usize>(a: &[T; N], b: &[T; N], threshold: T) -> Option<T>
@@ -444,7 +460,7 @@ where
 /// # Panics
 /// * if 10.0 cannot cast to T
 /// * if N - 1 cannot cast to T
-/// 
+///
 /// TODO: remove unwraps + make a 10E struct that impl powf for floats and ints
 pub fn logspace<T: Float + AddAssign, const N: usize>(a: T, b: T) -> [T; N] {
     let mut result = [T::zero(); N];
@@ -486,10 +502,7 @@ fn render_bode_subplot<T>(
     extern crate std;
     use std::{format, vec, vec::Vec};
 
-    let mag_db: Vec<T> = mag
-        .iter()
-        .map(|&m| m.to_db())
-        .collect();
+    let mag_db: Vec<T> = mag.iter().map(|&m| m.to_db()).collect();
     let phase_deg: Vec<T> = phase.iter().map(|&p| p.to_degrees()).collect();
 
     // Add magnitude plot
@@ -709,7 +722,11 @@ mod test_first_crossover {
         let result = first_crossover(&frequencies, &magnitudes, threshold);
         assert_eq!(result.unwrap(), 5); // Interpolated value
     }
-    #[allow(clippy::unwrap_used, clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+    #[allow(
+        clippy::unwrap_used,
+        clippy::cast_possible_wrap,
+        clippy::cast_possible_truncation
+    )]
     #[test]
     fn integer_interpolation() {
         let frequencies: [i32; 10] = core::array::from_fn(|i| i as i32);
@@ -720,7 +737,12 @@ mod test_first_crossover {
         assert_eq!(result.unwrap(), 4); // Interpolated value
     }
 
-    #[allow(clippy::unwrap_used, clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+    #[allow(
+        clippy::unwrap_used,
+        clippy::cast_possible_wrap,
+        clippy::cast_possible_truncation,
+        clippy::cast_precision_loss
+    )]
     #[test]
     fn multiple_crossovers() {
         let frequencies: [f32; 10] = core::array::from_fn(|i| i as f32);

@@ -15,20 +15,50 @@ use num_traits::{Float, One, Zero};
 
 use crate::static_storage::{array_from_iterator, array_from_iterator_with_default};
 
-/// Finds the **last** non-zero value in an array.
+/// Finds the largest index of a non-zero value in a slice.
+///
+/// This function iterates through a slice in reverse and checks if each value `.is_zero()`. It
+/// will return after the first time the condition is **false**.
+///
+/// <div class="warning">
+///
+/// The logical correctness of the result is dependent on the correctness of `.is_zero()`.
+///
+/// </div>
+/// <div class="warning">
+///
+/// If the slice has more elements than `usize::MAX`, the result will be incorrect (this should not
+/// be possible without heap allocation).
+///
+/// </div>
+///
+/// # Generic Arguments
+/// * `T` - field type of the array, which must implement [Zero].
+///
+/// # Arguments
+/// * `coefficients` - a slice of `T`.
 ///
 /// # Returns
 /// * `Option<usize>`
-///     * `Some(index)` - largets non-zero index
-///     * `None` - if the length is zero or all elements are zero
+///     * `Some(index)` - The largest index containing a non-zero value.
+///     * `None` - If the slice is empty or all elements are zero.
+///
+/// # Panics
+///
+/// This function does not panic.
+///
+/// # Safety
+///
+/// This function does not use `unsafe` code.
 ///
 /// # Example
 /// ```
 /// use control_rs::polynomial::utils::largest_nonzero_index;
 /// assert_eq!(largest_nonzero_index::<u8>(&[]), None);
-/// assert_eq!(largest_nonzero_index(&[1]), Some(0));
 /// assert_eq!(largest_nonzero_index(&[0, 1]), Some(1));
 /// assert_eq!(largest_nonzero_index(&[1, 0]), Some(0));
+/// assert_eq!(largest_nonzero_index(&[0, 0]), None);
+/// assert_eq!(largest_nonzero_index(&[1]), Some(0));
 /// ```
 #[inline]
 pub fn largest_nonzero_index<T: Zero>(coefficients: &[T]) -> Option<usize> {
@@ -44,56 +74,108 @@ pub fn largest_nonzero_index<T: Zero>(coefficients: &[T]) -> Option<usize> {
 ///
 /// This function performs the core derivative calculation by applying the power rule
 /// `d/dx(ax^n) = n * ax^{n-1}` to each term of the polynomial.
-/// It iterates through the coefficients, effectively shifting them to a lower exponent
-/// and multiplying by the original exponent.
 ///
-/// > **Note**: if `N == 1` the result will be an empty array, in some cases this may be unexpected
+/// <div class="warning">
+///
+/// If `N == 1`, the result will be an empty array, even if the element is non-zero. This may be
+/// unexpected.
+///
+/// </div>
+/// <div class="warning">
+///
+/// If `T` cannot represent up-to `N`, there will be an overflow calculating the exponent that
+/// scales the elements of the source array ([`DimSub`] is only implemented for `Const<N> < 128`).
+///
+/// </div>
+///
+/// # Generic Arguments
+/// * `T` - Field type of the coefficients.
+/// * `N` - Capacity of the source coefficients array.
+/// * `M` - Capacity of the destination derivative array.
+///
+/// # Arguments
+/// * `coefficients` - A degree minor polynomial array.
+///
+/// # Returns
+/// * `derivative` - A degree minor polynomial array with length `N-1`.
+///
+/// # Panics
+/// This function does not panic.
+///
+/// # Safety
+///
+/// This function uses an unsafe block to initialize the derivative array from an iterator. The
+/// length of the new array is inferred from the return type which is guaranteed to be equal to
+/// `N-1`. The iterator given to the initializing function has `N` items and will skip the first
+/// item, so its length is also guaranteed to be `N-1`.
 ///
 /// # Examples
 /// ```
 /// use control_rs::polynomial::utils::differentiate;
-/// assert_eq!(differentiate(&[1u8]), [0u8; 0]); // d/dt(1) = 0 base case is an empty array
-/// assert_eq!(differentiate(&[1, 2]), [2]); // d/dt(2x + 1) = 2
-/// assert_eq!(differentiate(&[1, 1, 1]), [1, 2]); // d/dt(x^2 + x + 1) = 2x + 1
+/// assert_eq!(differentiate([1u8]), [0u8; 0]); // derivative of constants is an empty array
+/// assert_eq!(differentiate([1, 2]), [2]); // d/dt(2x + 1) = 2
+/// assert_eq!(differentiate([1, 1, 1]), [1, 2]); // d/dt(x^2 + x + 1) = 2x + 1
 /// ```
 #[inline]
-pub fn differentiate<T, const N: usize, const M: usize>(coefficients: &[T; N]) -> [T; M]
+pub fn differentiate<T, const N: usize, const M: usize>(coefficients: [T; N]) -> [T; M]
 where
     T: Clone + AddAssign + Zero + One,
     Const<N>: DimSub<U1, Output = Const<M>>,
 {
     let mut exponent = T::zero();
     // Safety: the iterator will have 1 less element than coefficients, which has more than 0
-    // elements
+    // elements because Const<N> impls DimSub
     unsafe {
-        array_from_iterator(
-            coefficients.iter().skip(1).map(|a_i| {
-                exponent += T::one();
-                a_i.clone() * exponent.clone()
-            }),
-        )
+        array_from_iterator(coefficients.into_iter().skip(1).map(|a_i| {
+            exponent += T::one();
+            a_i * exponent.clone()
+        }))
     }
 }
 
 /// Computes the indefinite integral of a polynomial.
 ///
 /// This internal function computes the indefinite integral of the polynomial by
-/// applying the reverse power rule `\int ax^n dx = (a / n) * x^n` to each term.
-/// It also incorporates the provided `constant` of integration as the new constant term.
+/// applying the reverse power rule `∫ax^n dx = a * x^(n+1) / (n+1)` to each term.
+/// It incorporates the provided constant of integration as the new constant term (x^0).
 ///
-/// The process involves:
-/// 1. Prepending the `constant` of integration as the coefficient of `x^0`.
-/// 2. For each `a_i`, calculating the new coefficient as `a_i = da_i / (i+1)`
+/// <div class="warning">
+///
+/// If `T` cannot represent up-to `N`, there will be an overflow calculating the exponent that
+/// scales the elements of the source array ([`DimSub`] is only implemented for `Const<N> < 128`).
+///
+/// </div>
+///
+/// # Generic Arguments
+/// * `T` - The field type of the coefficients.
+/// * `N` - The capacity of the source coefficients array.
+/// * `M` - The capacity of the destination integral array.
+///
+/// # Arguments
+/// * `coefficients` - A degree-minor polynomial array.
+/// * `constant` - The constant of integration.
+///
+/// # Returns
+/// * `integral` - a degree minor polynomial array with length `N+1`.
+///
+/// # Panics
+/// This function does not panic.
+///
+/// # Safety
+/// This function uses an unsafe block to initialize the new array from an iterator. The length of
+/// the new array is inferred from the return type which is guaranteed to be `N+1`. The iterator
+/// given to the initializer is created by chaining a single item (the constant) to the source
+/// array, this is guaranteed to have length `N+1`.
 ///
 /// # Example
 /// ```
 /// use control_rs::polynomial::utils::integrate;
-/// assert_eq!(integrate(&[], 0), [0]); // d/dt(1) = 0 base case is an empty array
-/// assert_eq!(integrate(&[2], 1), [1, 2]); // d/dt(2x + 1) = 2
-/// assert_eq!(integrate(&[1, 2], 1), [1, 1, 1]); // d/dt(x^2 + x + 1) = 2x + 1
+/// assert_eq!(integrate([], 1), [1]); // d/dt(1) = [] base case is an empty array
+/// assert_eq!(integrate([2], 1), [1, 2]); // d/dt(2x + 1) = 2
+/// assert_eq!(integrate([1, 2], 1), [1, 1, 1]); // d/dt(x^2 + x + 1) = 2x + 1
 /// ```
 #[inline]
-pub fn integrate<T, const N: usize, const M: usize>(coefficients: &[T; N], constant: T) -> [T; M]
+pub fn integrate<T, const N: usize, const M: usize>(coefficients: [T; N], constant: T) -> [T; M]
 where
     T: Clone + AddAssign + Div<Output = T> + Zero + One,
     Const<N>: DimAdd<U1, Output = Const<M>>,
@@ -102,9 +184,9 @@ where
     // Safety: the iterator will have 1 more element than coefficients
     unsafe {
         array_from_iterator(
-            iter::once(constant).chain(coefficients.iter().map(|a_i| {
+            iter::once(constant).chain(coefficients.into_iter().map(|a_i| {
                 exponent += T::one();
-                a_i.clone() / exponent.clone()
+                a_i / exponent.clone()
             })),
         )
     }
@@ -116,8 +198,6 @@ where
 /// It is constructed from an identity matrix, a zero column and a row of the polynomial's
 /// coefficients scaled by the highest term.
 ///
-/// > **Note**: if the leading coefficient is zero, the result will be incorrect.
-///
 /// <pre>
 /// companion(a_n * x^n + ... + a_1 * x + a_0) =
 ///     |  -a_(n-1)/a_n -a_(n-2)/a_n -a_(n-3)/a_n ...  -a_1/a_0  -a_0/a_n |
@@ -127,6 +207,32 @@ where
 ///     |   ...          ...          ...         ...    ...       ...    |
 ///     |    0            0            0          ...     1         0     |
 /// </pre>
+///
+/// <div class="warning">
+///
+/// The polynomial is assumed to not have any leading zeros. If it does, the first row of the
+/// companion will be all zeros.
+///
+/// </div>
+///
+/// # Generic Arguments
+/// * `T` - Field type of the array and companion matrix.
+/// * `N` - Capacity of the coefficient array.
+/// * `M` - Number of rows and columns of the companion matrix.
+///
+/// # Arguments
+/// * `coefficients` - The degree minor polynomial array.
+///
+/// # Returns
+/// * `companion` - An array of arrays, both dimensions equal to `N-1`.
+///
+/// # Panics
+/// The function does not panic.
+///
+/// # Safety
+/// The function makes an unsafe call to access the leading coefficient of the polynomial. The
+/// polynomial is assumed to not have any leading zero coefficients and so the leading coefficient
+/// is at the largest index `N-1`. It is guaranteed that `M = N-1` so `M` is a safe index.
 ///
 /// # Example
 /// ```
@@ -152,6 +258,7 @@ where
             }
         }
         for (i, row) in companion_row_iter.enumerate() {
+            // this could also be a get_unchecked(), r == c, i < r.
             row[i] = T::one();
         }
     }
@@ -305,11 +412,10 @@ where
         //  * Edge-case where polynomial has a leading zero, companion will have a row of zeros
         let companion = if degree == M {
             companion(coefficients)
-        }
-        else {
+        } else {
             let mut shifted_coefficients = [T::zero(); N];
             for i in 0..=degree {
-                shifted_coefficients[M-i] = coefficients[degree-i];
+                shifted_coefficients[M - i] = coefficients[degree - i];
             }
             companion(&shifted_coefficients)
         };
@@ -425,7 +531,10 @@ where
 ///     r ← r − t × d
 /// return (q, r)
 ///</pre>
-pub fn long_division<T, const N: usize, const M: usize>(dividend: [T; N], divisor: &[T; M]) -> [T; N]
+pub fn long_division<T, const N: usize, const M: usize>(
+    dividend: [T; N],
+    divisor: &[T; M],
+) -> [T; N]
 where
     T: Clone + Zero + Div<Output = T> + Mul<Output = T> + AddAssign + SubAssign,
     Const<N>: DimMax<Const<M>, Output = Const<N>>,

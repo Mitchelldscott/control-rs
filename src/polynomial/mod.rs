@@ -59,7 +59,10 @@ pub mod utils;
 // ===============================================================================================
 
 mod aliases;
-use crate::{systems::System, static_storage::{array_from_iterator_with_default, reverse_array}};
+use crate::{
+    static_storage::{array_from_iterator_with_default, reverse_array},
+    systems::System,
+};
 pub use aliases::{Constant, Cubic, Line, Quadratic, Quartic, Quintic};
 // ===============================================================================================
 //      Polynomial Tests
@@ -646,7 +649,7 @@ impl<T: Clone + AddAssign + Zero + One, const N: usize> Polynomial<T, N> {
                     Ok(Polynomial::from_iterator([constant]))
                 }
                 _ => Ok(Polynomial::from_data(utils::differentiate(
-                    &self.coefficients,
+                    self.coefficients.clone(),
                 ))),
             },
         )
@@ -676,7 +679,10 @@ impl<T: Clone + Zero + One + AddAssign + Div<Output = T>, const N: usize> Polyno
     where
         Const<N>: DimAdd<U1, Output = Const<M>>,
     {
-        Polynomial::from_data(utils::integrate::<T, N, M>(&self.coefficients, constant))
+        Polynomial::from_data(utils::integrate::<T, N, M>(
+            self.coefficients.clone(),
+            constant,
+        ))
     }
 }
 
@@ -1236,7 +1242,6 @@ where
     T: Clone + Zero + One + PartialOrd + Neg<Output = T> + fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-
         let mut n = N;
         for (i, a_i) in self.iter().enumerate().rev() {
             if a_i.is_zero() {
@@ -1256,8 +1261,7 @@ where
             if !abs_a_i.is_one() || i == 0 {
                 if let Some(precision) = f.precision() {
                     write!(f, "{abs_a_i:.precision$}")?;
-                }
-                else {
+                } else {
                     write!(f, "{abs_a_i}")?;
                 }
             }

@@ -1,3 +1,5 @@
+#[cfg(feature = "std")]
+use control_rs::integrators::runge_kutta4;
 /// # DC Motor Position Control with a Lead-Lag Compensator
 ///
 /// This example demonstrates the use of a lead-lag compensator for controlling the
@@ -38,13 +40,10 @@
 /// * [DC Motor Control (Lead-Lag)](https://www.mathworks.com/help/sps/ug/dc-motor-control-lead-lag.html)
 ///
 /// TODO: simulator + Lag compensator
-use control_rs::{
-    frequency_tools::*,
-    math::systems::DynamicalSystem,
-    transfer_function::*,
-};
+use control_rs::{frequency_tools::*, transfer_function::*};
+
 #[cfg(feature = "std")]
-use control_rs::integrators::runge_kutta4;
+use control_rs::math::systems::DynamicalSystem;
 
 #[cfg(feature = "std")]
 use plotly::{Layout, Plot, Scatter};
@@ -55,30 +54,28 @@ pub type Scalar = f64;
 mod dc_motor_lead_lag;
 pub use dc_motor_lead_lag::*;
 
-
 #[cfg(feature = "std")]
 const SIM_STEPS: usize = 100;
 #[cfg(feature = "std")]
-type SimData = ([Scalar; SIM_STEPS], [MotorInput; SIM_STEPS], [MotorState; SIM_STEPS]);
+type SimData = (
+    [Scalar; SIM_STEPS],
+    [MotorInput; SIM_STEPS],
+    [MotorState; SIM_STEPS],
+);
 
 #[cfg(feature = "std")]
-fn step(
-    plant: MotorSS,
-    compensator: LeadCompensator,
-    x0: MotorState,
-    dt: Scalar,
-) -> SimData {
+fn step(plant: MotorSS, compensator: LeadCompensator, x0: MotorState, dt: Scalar) -> SimData {
     let mut x = x0.clone();
     let mut x_c = nalgebra::Vector1::zeros();
     let compensator_ss = tf2ss(&compensator);
     let mut sim = (
         [0.0; SIM_STEPS],
-        [compensator_ss.output(x_c.clone(), 1.0)[(0,0)]; SIM_STEPS],
+        [compensator_ss.output(x_c.clone(), 1.0)[(0, 0)]; SIM_STEPS],
         [x0.clone(); SIM_STEPS],
     );
     for i in 1..SIM_STEPS {
         x_c = compensator_ss.dynamics(x_c.clone(), 1.0);
-        let u = compensator_ss.output(x_c.clone(), 1.0)[(0,0)];
+        let u = compensator_ss.output(x_c.clone(), 1.0)[(0, 0)];
         x = runge_kutta4(&plant, x.clone(), u, 0.0, dt, dt / 10.0);
         sim.0[i] = i as Scalar * dt;
         sim.1[i] = u;
@@ -90,7 +87,6 @@ fn step(
 
 #[cfg(feature = "std")]
 fn plot(sim: SimData) -> Plot {
-
     // Extract time and state values
     let time: Vec<f64> = sim.0.iter().map(|t| *t).collect();
     let voltage: Vec<f64> = sim.1.iter().map(|u| *u).collect();
@@ -148,8 +144,14 @@ fn main() {
     #[allow(non_snake_case)]
     let compensator_tf = lead_compensator(0.1, 30.0);
     let lead_compensated_tf = gain_compensated_tf * compensator_tf;
-    println!("Compensated System Zeros: {:?}", zeros(&lead_compensated_tf).ok());
-    println!("Compensated System Poles: {:?}", poles(&lead_compensated_tf).ok());
+    println!(
+        "Compensated System Zeros: {:?}",
+        zeros(&lead_compensated_tf).ok()
+    );
+    println!(
+        "Compensated System Poles: {:?}",
+        poles(&lead_compensated_tf).ok()
+    );
 
     #[cfg(feature = "std")]
     let fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([-10.0], [5.0]);
@@ -162,5 +164,6 @@ fn main() {
     .write_html("target/plots/dc_motor_lead_compensated_bode.html");
 
     #[cfg(feature = "std")]
-    plot(step(Motor_SS, compensator_tf, MotorState::zeros(), 0.1)).write_html("target/plots/dc_motor_sim.html");
+    plot(step(Motor_SS, compensator_tf, MotorState::zeros(), 0.1))
+        .write_html("target/plots/dc_motor_sim.html");
 }

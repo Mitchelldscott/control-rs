@@ -3,8 +3,8 @@
 //!
 //! # Reference
 //! * Feedback Control of Dynamic Systems Ch. 6.7.2
-use control_rs::TransferFunction;
 use super::Scalar;
+use control_rs::TransferFunction;
 
 use num_traits::One;
 

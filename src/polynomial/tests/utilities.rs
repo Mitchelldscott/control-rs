@@ -3,75 +3,72 @@
 
 use super::*;
 
+mod largest_nonzero_index {
+    use super::utils::largest_nonzero_index;
+    #[test]
+    fn empty() { assert_eq!(largest_nonzero_index(&[0u8; 0]), None); }
+    #[test]
+    fn zeros() { assert_eq!(largest_nonzero_index(&[0; 10]), None); }
+    #[test]
+    fn leading_zeros() { assert_eq!(largest_nonzero_index(&[1, 0, 0, 0]), Some(0)); }
+    #[test]
+    fn one() { assert_eq!(largest_nonzero_index(&[1, 1]), Some(1)); }
+    // #[test] // should not compile
+    // fn too_large_array() { assert_eq!(largest_nonzero_index(&[1u8; usize::MAX+1]), Some(usize::MAX)); }
+}
+
 mod derivative {
-    use super::*;
-    use utils::differentiate;
+    use super::utils::differentiate;
     #[test]
     fn emtpy() {
-        assert_eq!(differentiate(&[0_i16]), [0_i16; 0]);
+        assert_eq!(differentiate([0_i16]), [0_i16; 0]);
     }
     #[test]
     fn zero() {
-        let zero: Polynomial<u8, 1> = Polynomial::zero();
-        assert_eq!(zero.derivative(), Err(DerivativeEdgeCase::DerivativeOfZero));
+        assert_eq!(differentiate([0_i16, 0_i16]), [0_i16; 1]);
     }
     #[test]
     fn one() {
-        let p = Line::<i8>::identity();
-        assert_eq!(p.derivative(), Err(DerivativeEdgeCase::Zero));
+        assert_eq!(differentiate([1_i8]), [0_i8; 0]);
     }
     #[test]
     fn lots_of_zeros() {
-        let p = Quartic::<f32>::zero();
-        assert_eq!(p.derivative(), Err(DerivativeEdgeCase::DerivativeOfZero));
+        assert_eq!(differentiate([0; 15]), [0; 14]);
     }
     #[test]
     fn lots_of_zeros_with_constant() {
-        let p: Polynomial<f32, 10> = Polynomial::identity();
-        assert_eq!(p.derivative(), Err(DerivativeEdgeCase::Zero));
+        assert_eq!(differentiate([1, 0, 0, 0, 0]), [0; 4]);
     }
     #[test]
     fn line() {
-        let p = Polynomial::from_data([1, 1]);
-        assert_eq!(p.derivative(), Ok(Polynomial::from_data([1])));
+        assert_eq!(differentiate([1, 2]), [2]);
     }
     #[test]
     fn quadratic() {
-        let p = Quadratic::monomial(1.0);
-        assert_eq!(p.derivative(), Ok(Polynomial::from_data([0.0, 2.0])));
+        assert_eq!(differentiate([1, 1, 1]), [1, 2]);
     }
-    #[test]
-    fn cubic() {
-        let p = Cubic::monomial(1.0);
-        assert_eq!(p.derivative(), Ok(Polynomial::from_data([0.0, 0.0, 3.0])));
-    }
+    // #[test] // The array is too large and violates the trait bounds
+    // fn too_large_array() {assert_eq!(differentiate([0i8; (i8::MAX+1) as usize]), [0i8; i8::MAX]);}
 }
 
-mod integrals {
-    use super::*;
-    use utils::integrate;
+mod integrals{
+    use super::utils::integrate;
     #[test]
-    fn empty() {
-        // passing an emtpy array will return a single element array with the constant
-        assert_eq!(integrate(&[], 1i8), [1]);
-    }
+    fn empty() { assert_eq!(integrate([], 1i8), [1]); }
     #[test]
-    fn zero() {
-        // integrating an array of zeros will return an array of zeros with the constant at index 0
-        assert_eq!(integrate(&[0, 0, 0], 1usize), [1, 0, 0, 0]);
-    }
+    fn zeros() { assert_eq!(integrate([0, 0, 0], 1usize), [1, 0, 0, 0]); }
     #[test]
     fn one() {
-        assert_eq!(integrate(&[1, 0, 0], 1), [1, 1, 0, 0]);
+        assert_eq!(integrate([1], 0), [0, 1]);
     }
     #[test]
     fn quadratic() {
-        assert_eq!(integrate(&[0, 0, 3], 1), [1, 0, 0, 1]);
+        assert_eq!(integrate([0, 0, 3], 1), [1, 0, 0, 1]);
     }
     #[test]
-    fn cubic() {
-        assert_eq!(integrate(&[1, 2, 3, 4], 0), [0, 1, 1, 1, 1]);
-    }
+    fn cubic() { assert_eq!(integrate([1, 2, 3, 4], 0), [0, 1, 1, 1, 1]); }
+    // #[test] // The array is too large and violates the trait bounds
+    // fn too_large_array() { assert_eq!(integrate([0i8; i8::MAX as usize], 0), [0i8; (i8::MAX+1) as usize]); }
 }
 
 mod companion {
@@ -129,7 +126,7 @@ mod roots {
     use super::*;
     use crate::{
         assert_f32_eq, assert_f64_eq,
-        polynomial::utils::{NoRoots, roots}
+        polynomial::utils::{roots, NoRoots},
     };
 
     #[test]
@@ -145,7 +142,6 @@ mod roots {
     fn line() {
         assert_eq!(roots(&[0.0, 1.0]), Ok([Complex::new(0.0, 0.0)]));
     }
-
 
     #[test]
     fn quadratic_real() {
@@ -230,7 +226,8 @@ mod roots {
             0.000_000_078_2,
             0.000_000_001_6,
             0.0,
-        ]).expect("failed to compute roots");
+        ])
+        .expect("failed to compute roots");
         assert_f32_eq!(roots[0].re, -20.7682, 0.03);
         assert_f32_eq!(roots[1].re, -13.0648, 0.05);
         assert_f32_eq!(roots[2].re, -9.7396, 0.02);
@@ -239,12 +236,7 @@ mod roots {
         assert_f32_eq!(roots[5].re, 0.0);
         assert!(roots[6].re.is_nan() && roots[6].im.is_nan());
         assert_f32_eq!(
-            roots[0].im
-            + roots[1].im
-            + roots[2].im
-            + roots[3].im
-            + roots[4].im
-            + roots[5].im,
+            roots[0].im + roots[1].im + roots[2].im + roots[3].im + roots[4].im + roots[5].im,
             0.0
         );
     }

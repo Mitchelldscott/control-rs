@@ -38,11 +38,10 @@
 /// * [DC Motor Control (Lead-Lag)](https://www.mathworks.com/help/sps/ug/dc-motor-control-lead-lag.html)
 ///
 /// TODO: simulator + Lag compensator
-
 pub use super::Scalar;
 
 mod dc_motor_model;
-pub use dc_motor_model::{Motor_TF, MotorSS, Motor_SS, MotorInput, MotorState, MotorOutput};
+pub use dc_motor_model::{MotorInput, MotorOutput, MotorSS, MotorState, Motor_SS, Motor_TF};
 
 mod lead_lag_compensator;
-pub use lead_lag_compensator::{LeadCompensator, lead_compensator};
+pub use lead_lag_compensator::{lead_compensator, LeadCompensator};

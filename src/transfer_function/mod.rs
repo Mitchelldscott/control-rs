@@ -23,9 +23,7 @@ use num_traits::{Float, One, Zero};
 
 use crate::{
     frequency_tools::{FrequencyResponse, FrequencyTools},
-    polynomial::utils::{
-        add_generic, convolution, sub_generic,
-    },
+    polynomial::utils::{add_generic, convolution, sub_generic},
     static_storage::{array_from_iterator_with_default, reverse_array},
     systems::System,
 };
@@ -519,13 +517,15 @@ impl fmt::Write for FmtLengthCounter {
     }
 }
 
-fn formatted_length<T: fmt::Display>(value: &T, f: &fmt::Formatter<'_>) -> Result<usize, fmt::Error> {
+fn formatted_length<T: fmt::Display>(
+    value: &T,
+    f: &fmt::Formatter<'_>,
+) -> Result<usize, fmt::Error> {
     use fmt::Write;
     let mut counter = FmtLengthCounter { length: 0 };
     if let Some(precision) = f.precision() {
         write!(&mut counter, "{value:precision$}")?;
-    }
-    else {
+    } else {
         write!(&mut counter, "{value}")?;
     }
 
@@ -557,8 +557,7 @@ where
         }
         if let Some(precision) = f.precision() {
             writeln!(f, "{num:.precision$}")?;
-        }
-        else {
+        } else {
             writeln!(f, "{num}")?;
         }
 
@@ -574,11 +573,9 @@ where
         }
         if let Some(precision) = f.precision() {
             writeln!(f, "{den:.precision$}")?;
-        }
-        else {
+        } else {
             writeln!(f, "{den}")?;
         }
-
 
         Ok(())
     }

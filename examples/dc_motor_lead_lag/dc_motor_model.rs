@@ -3,10 +3,10 @@
 //! # Reference:
 //! * [Equivalent Circuit Encompassing Electrical and Mechanical Parts of Direct Current Motors](https://ieeexplore.ieee.org/document/9332747)
 
-use control_rs::{TransferFunction, StateSpace};
 use super::Scalar;
+use control_rs::{StateSpace, TransferFunction};
 
-use nalgebra::{Matrix2, Matrix1x2, Vector2, Vector1};
+use nalgebra::{Matrix1x2, Matrix2, Vector1, Vector2};
 
 //  Model Parameters
 
@@ -64,8 +64,8 @@ pub type MotorOutput = Vector1<Scalar>;
 pub type MotorSS = StateSpace<Matrix2<Scalar>, Vector2<Scalar>, Matrix1x2<Scalar>, Vector1<Scalar>>;
 #[allow(non_upper_case_globals)]
 pub const Motor_SS: MotorSS = StateSpace::new(
-    Matrix2::new(-R, -K, K/J, -B/J),
+    Matrix2::new(-R, -K, K / J, -B / J),
     Vector2::new(1.0, 0.0),
     Matrix1x2::new(0.0, 1.0),
-    Vector1::new(0.0)
+    Vector1::new(0.0),
 );
