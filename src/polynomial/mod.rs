@@ -106,8 +106,8 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// Creates a new polynomial from an array of coefficients.
     ///
     /// # Arguments
-    /// * `coefficients` - An array of coefficients `[a_0, a_1 ... a_n]`,
-    ///   where `a_0` is the constant and `a_n` the nth degree term.
+    /// * `coefficients` - An array of coefficients `[a_0, a_1 ... a_n]`, where `a_0` is the 
+    ///   constant and `a_n` the nth degree term.
     ///
     /// # Returns
     /// * `polynomial` - A polynomial with the given coefficients.
@@ -129,6 +129,8 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// Creates a new polynomial from a function closure.
     ///
     /// This is a wrapper for [`array::from_fn`].
+    /// 
+    /// # Generic Arguments
     ///
     /// # Arguments
     /// * `cb` - The generator function, which takes the degree as input and returns the
