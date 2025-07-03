@@ -196,7 +196,7 @@ where
 ///
 /// The companion matrix is a square matrix whose eigenvalues are the roots of the polynomial.
 /// It is constructed from an identity matrix, a zero column and a row of the polynomial's
-/// coefficients scaled by the highest term.
+/// coefficients scaled by the leading coefficient.
 ///
 /// <pre>
 /// companion(a_n * x^n + ... + a_1 * x + a_0) =
@@ -230,9 +230,9 @@ where
 /// The function does not panic.
 ///
 /// # Safety
-/// The function makes an unsafe call to access the leading coefficient of the polynomial. The
+/// This function makes an unsafe call to access the leading coefficient of the polynomial. The
 /// polynomial is assumed to not have any leading zero coefficients and so the leading coefficient
-/// is at the largest index `N-1`. It is guaranteed that `M = N-1` so `M` is a safe index.
+/// is at the largest index `N-1`. It is guaranteed that `M=N-1` so `M` is a safe index.
 ///
 /// # Example
 /// ```
@@ -272,15 +272,32 @@ pub struct NoRoots;
 
 /// Computes the root of a line.
 ///
+/// This function calculates the x intercept of the standard slope intercept form `y=m*x+b`.
+///
+/// # Generic Arguments
+/// * `T` - Field type of the line's coefficients.
+///
+/// # Arguments
+/// * `m` - slope of the line.
+/// * `b` - offset of the line.
+///
+/// # Returns
+/// * `Result`
+///     * `Ok(root)` - The x-intercept of the line.
+///     * `NoRoots` - The slope is 0 or undefined, so there is no intercept.
+///
 /// # Errors
 /// * `NoRoots` - the function was not able to compute a solution for the line
 ///
 /// # Example
 /// ```
-/// use control_rs::{polynomial::utils::linear_root, assert_f64_eq};
-/// assert_eq!(linear_root(1, 0), Ok(0));
+/// use control_rs::{polynomial::utils::x_intercept, assert_f64_eq};
+/// assert_eq!(x_intercept(1, 0), Ok(0));
 /// ```
-pub fn linear_root<T: Zero + Neg<Output = T> + Div<Output = T>>(m: T, b: T) -> Result<T, NoRoots> {
+pub fn x_intercept<T>(m: T, b: T) -> Result<T, NoRoots>
+where
+    T: Zero + Neg<Output = T> + Div<Output = T>,
+{
     if m.is_zero() {
         return Err(NoRoots);
     }
@@ -391,12 +408,12 @@ where
     if degree == 0 {
         return Err(NoRoots);
     } else if degree == 1 {
-        roots[0].re = linear_root(coefficients[1], coefficients[0])?;
+        roots[0].re = x_intercept(coefficients[1], coefficients[0])?;
         roots[0].im = T::zero();
     } else if degree == 2 {
         let a = coefficients[2];
         if a.is_zero() {
-            roots[0].re = linear_root(coefficients[1], coefficients[0])?;
+            roots[0].re = x_intercept(coefficients[1], coefficients[0])?;
         } else {
             for (q_root, root) in quadratic_roots(a, coefficients[1], coefficients[0])?
                 .into_iter()

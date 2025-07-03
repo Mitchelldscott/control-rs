@@ -126,9 +126,12 @@ mod roots {
     use super::*;
     use crate::{
         assert_f32_eq, assert_f64_eq,
-        polynomial::utils::{roots, NoRoots},
+        polynomial::utils::{
+            roots,
+            x_intercept,
+            NoRoots
+        },
     };
-
     #[test]
     fn zero() {
         assert_eq!(roots(&[0.0, 0.0]), Err(NoRoots));
@@ -137,10 +140,13 @@ mod roots {
     fn one() {
         assert_eq!(roots(&[1.0, 0.0]), Err(NoRoots));
     }
-
+    #[test]
+    fn nan_slope() { assert_eq!(x_intercept(f64::NAN, 0.0), Ok(f64::NAN)); }
+    #[test]
+    fn inf_slope() { assert_eq!(x_intercept(f64::INFINITY, 0.0), Ok(0.0)); }
     #[test]
     fn line() {
-        assert_eq!(roots(&[0.0, 1.0]), Ok([Complex::new(0.0, 0.0)]));
+        assert_eq!(roots(&[1.0, 1.0]), Ok([Complex::new(-1.0, 0.0)]));
     }
 
     #[test]
