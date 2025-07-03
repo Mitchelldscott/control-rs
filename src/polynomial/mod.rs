@@ -686,21 +686,33 @@ impl<T: Clone + Zero + One + AddAssign + Div<Output = T>, const N: usize> Polyno
     }
 }
 
+/// Marker type indicating an operation was not possible because of leading zeros.
+#[derive(Debug, PartialEq, Eq)]
+pub struct LeadingZeroError;
+
 impl<T: Copy + Zero + One + Neg<Output = T> + Div<Output = T>, const N: usize> Polynomial<T, N> {
     /// Computes the Frobenius companion matrix of a polynomial.
+    ///
+    /// # Errors
+    /// * This function will fail if the polynomial array has leading zeros.
     ///
     /// # Example
     /// ```rust
     /// use control_rs::polynomial::Polynomial;
     ///
     /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]); // x^3 - 6x^2 + 11x - 6
-    /// assert_eq!(p.companion(), [[6.0, -11.0, 6.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], "incorrect companion");
+    /// assert_eq!(p.companion(), Ok([[6.0, -11.0, 6.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]), "incorrect companion");
     /// ```
-    pub fn companion<const M: usize>(&self) -> [[T; M]; M]
+    pub fn companion<const M: usize>(&self) -> Result<[[T; M]; M], LeadingZeroError>
     where
         Const<N>: DimSub<U1, Output = Const<M>>,
     {
-        utils::companion::<T, N, M>(&self.coefficients)
+        if Some(M) == self.degree() {
+            Ok(utils::unchecked_companion::<T, N, M>(&self.coefficients))
+        }
+        else {
+            Err(LeadingZeroError)
+        }
     }
 }
 
@@ -720,7 +732,7 @@ where
     /// * `NoRoots` - the polynomial has no roots, or the function could not compute them
     ///
     /// TODO: Review return cases
-    pub fn roots<const M: usize>(&self) -> Result<[Complex<T>; M], utils::NoRoots>
+    pub fn roots<const M: usize>(&self) -> Result<[Complex<T>; M], utils::RootFindingError>
     where
         T: Copy
             + Zero
@@ -737,7 +749,7 @@ where
         DefaultAllocator:
             Allocator<Const<M>, DimDiff<Const<M>, U1>> + Allocator<DimDiff<Const<M>, U1>>,
     {
-        utils::roots::<T, N, M>(&self.coefficients)
+        utils::unchecked_roots(&self.coefficients)
     }
 }
 
@@ -1104,7 +1116,7 @@ where
     /// Adds the coefficients of a polynomial together
     #[inline]
     fn add(self, rhs: Polynomial<T, M>) -> Self::Output {
-        Polynomial::from_data(utils::add_generic(self.coefficients, rhs.coefficients))
+        Polynomial::from_data(utils::unchecked_polynomial_add(self.coefficients, rhs.coefficients))
     }
 }
 
@@ -1153,7 +1165,7 @@ where
     /// Subtracts the coefficients of a polynomial from each other
     #[inline]
     fn sub(self, rhs: Polynomial<T, M>) -> Self::Output {
-        Polynomial::from_data(utils::sub_generic(self.coefficients, rhs.coefficients))
+        Polynomial::from_data(utils::unchecked_polynomial_sub(self.coefficients, rhs.coefficients))
     }
 }
 

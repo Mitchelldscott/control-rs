@@ -25,12 +25,6 @@ use crate::static_storage::{array_from_iterator, array_from_iterator_with_defaul
 /// The logical correctness of the result is dependent on the correctness of `.is_zero()`.
 ///
 /// </div>
-/// <div class="warning">
-///
-/// If the slice has more elements than `usize::MAX`, the result will be incorrect (this should not
-/// be possible without heap allocation).
-///
-/// </div>
 ///
 /// # Generic Arguments
 /// * `T` - field type of the array, which must implement [Zero].
@@ -82,14 +76,14 @@ pub fn largest_nonzero_index<T: Zero>(coefficients: &[T]) -> Option<usize> {
 /// <div class="warning">
 ///
 /// If `T` cannot represent up-to `N`, there will be an overflow calculating the exponent that
-/// scales the elements of the source array ([`DimSub`] is only implemented for `Const<N> < 128`).
+/// scales the elements of the source array ([`DimSub`] is only implemented for `(0,128)`).
 ///
 /// </div>
 ///
 /// # Generic Arguments
 /// * `T` - Field type of the coefficients.
-/// * `N` - Capacity of the source coefficients array (restricted to the range [1..127].
-/// * `M` - Capacity of the destination derivative array.
+/// * `N` - Capacity of the source coefficients array (restricted to `(0,127]`).
+/// * `M` - Capacity of the destination derivative array (restricted to `[0,127)`).
 ///
 /// # Arguments
 /// * `coefficients` - A degree minor polynomial array.
@@ -139,14 +133,14 @@ where
 /// <div class="warning">
 ///
 /// If `T` cannot represent up-to `N`, there will be an overflow calculating the exponent that
-/// scales the elements of the source array ([`DimSub`] is only implemented for `Const<N> < 128`).
+/// scales the elements of the source array ([`DimSub`] is only implemented for `(0,128)`).
 ///
 /// </div>
 ///
 /// # Generic Arguments
 /// * `T` - The field type of the coefficients.
-/// * `N` - The capacity of the source coefficients array.
-/// * `M` - The capacity of the destination integral array.
+/// * `N` - The capacity of the source coefficients array (restricted to `[0,127)`).
+/// * `M` - The capacity of the destination integral array (restricted to `(0,127]`).
 ///
 /// # Arguments
 /// * `coefficients` - A degree-minor polynomial array.
@@ -207,15 +201,15 @@ where
 ///
 /// <div class="warning">
 ///
-/// The polynomial is assumed to not have any leading zeros. If it does, the first row of the
-/// companion will be all zeros.
+/// The polynomial is assumed to not have any leading zeros. If it does, the function will result in
+/// a division by zero.
 ///
 /// </div>
 ///
 /// # Generic Arguments
 /// * `T` - Field type of the array and companion matrix.
-/// * `N` - Capacity of the coefficient array.
-/// * `M` - Number of rows and columns of the companion matrix.
+/// * `N` - Capacity of the coefficient array (restricted to `(0,127]`).
+/// * `M` - Number of rows and columns of the companion matrix (restricted to `[0,127)`).
 ///
 /// # Arguments
 /// * `coefficients` - The degree minor polynomial array.
@@ -224,7 +218,7 @@ where
 /// * `companion` - An array of arrays, both dimensions equal to `N-1`.
 ///
 /// # Panics
-/// The function does not panic.
+/// This function may panic attempting invalid arithmetic.
 ///
 /// # Safety
 /// This function makes an unsafe call to access the leading coefficient of the polynomial. The
@@ -233,11 +227,11 @@ where
 ///
 /// # Example
 /// ```
-/// use control_rs::polynomial::utils::companion;
+/// use control_rs::polynomial::utils::unchecked_companion;
 /// let coefficients = [6, -7, 0, 1]; // p(x) = x^3 - 7x + 6
-/// assert_eq!(companion(&coefficients), [[0, 7, -6], [1, 0, 0], [0, 1, 0]]);
+/// assert_eq!(unchecked_companion(&coefficients), [[0, 7, -6], [1, 0, 0], [0, 1, 0]]);
 /// ```
-pub fn companion<T, const N: usize, const M: usize>(coefficients: &[T; N]) -> [[T; M]; M]
+pub fn unchecked_companion<T, const N: usize, const M: usize>(coefficients: &[T; N]) -> [[T; M]; M]
 where
     T: Clone + Zero + One + Neg<Output = T> + Div<Output = T>,
     Const<N>: DimSub<U1, Output = Const<M>>,
@@ -249,10 +243,8 @@ where
     let leading_coefficient_neg = unsafe { coefficients.get_unchecked(M).clone().neg() };
     let mut companion_row_iter = companion.iter_mut();
     if let Some(first_row) = companion_row_iter.next() {
-        if !leading_coefficient_neg.is_zero() {
-            for (companion_i, coefficient) in first_row.iter_mut().rev().zip(coefficients.iter()) {
-                *companion_i = coefficient.clone() / leading_coefficient_neg.clone();
-            }
+        for (companion_i, coefficient) in first_row.iter_mut().rev().zip(coefficients.iter()) {
+            *companion_i = coefficient.clone() / leading_coefficient_neg.clone();
         }
         for (i, row) in companion_row_iter.enumerate() {
             // this could also be a get_unchecked(), r == c, i < r.
@@ -262,53 +254,45 @@ where
     companion
 }
 
-/// Temporary marker struct indicating that the roots function was not able to calculate a
-/// solution.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
-pub struct NoRoots;
-
-/// Computes the root of a line.
+/// Computes the roots of a quadratic.
 ///
-/// This function calculates the x intercept of the standard slope intercept form `y=m*x+b`.
+/// This function solves for the roots of a standard quadratic equation of the form
+/// `ax^2 + bx + c = 0`. It utilizes the quadratic formula, `x = -b +/- sqrt(b^2-4ac) / 2a`, to
+/// find the solutions.
+///
+/// <div class = "warning>
+///
+/// This function assumes that the values of a, b and c are valid and finite coefficients of a
+/// quadratic equation.
+///
+/// </div>
 ///
 /// # Generic Arguments
-/// * `T` - Field type of the line's coefficients.
+/// * `T` - Field type of the coefficients.
 ///
 /// # Arguments
-/// * `m` - slope of the line.
-/// * `b` - offset of the line.
+/// * `a` - leading coefficient of the quadratic.
+/// * `b` - linear coefficient of the quadratic.
+/// * `c` - constant term of the quadratic.
 ///
 /// # Returns
-/// * `Result`
-///     * `Ok(root)` - The x-intercept of the line.
-///     * `NoRoots` - The slope is 0 or undefined, so there is no intercept.
+/// * `roots` - Complex roots of the quadratic.
 ///
-/// # Errors
-/// * `NoRoots` - the function was not able to compute a solution for the line
+/// # Panics
+/// This function may panic attempting invalid arithmetic.
 ///
-/// # Example
-/// ```
-/// use control_rs::{polynomial::utils::x_intercept, assert_f64_eq};
-/// assert_eq!(x_intercept(1, 0), Ok(0));
-/// ```
-pub fn x_intercept<T: Zero + Neg<Output = T> + Div<Output = T>>(m: T, b: T) -> Result<T, NoRoots> {
-    Ok(b.neg() / m)
-}
-
-/// Computes the root of a quadratic.
-///
-/// # Errors
-/// * `NoRoots` - the function was not able to compute a solution for the quadratic
+/// # Safety
+/// This function does not use `unsafe` code.
 ///
 /// # Example
 /// ```
-/// use control_rs::{polynomial::utils::quadratic_roots, assert_f64_eq};
-/// let roots = quadratic_roots(1.0, 0.0, 0.0).expect("failed to compute roots");
+/// use control_rs::{polynomial::utils::unchecked_quadratic_roots, assert_f64_eq};
+/// let roots = unchecked_quadratic_roots(1.0, 0.0, 0.0);
 /// assert_f64_eq!(roots[0].re, 0.0, 1.5e-14); // having precision issues...
 /// assert_f64_eq!(roots[1].re, 0.0, 1e-14);
 /// ```
 /// TODO: Fixed Point support
-pub fn quadratic_roots<T>(a: T, b: T, c: T) -> Result<[Complex<T>; 2], NoRoots>
+pub fn unchecked_quadratic_roots<T>(a: T, b: T, c: T) -> [Complex<T>; 2]
 where
     T: Clone
         + PartialOrd
@@ -326,7 +310,7 @@ where
     if discriminant < T::zero() {
         let real_part = b_neg / two_a.clone();
         let imag_part = (-discriminant).sqrt() / two_a;
-        Ok([
+        [
             Complex {
                 re: real_part.clone(),
                 im: imag_part.clone(),
@@ -335,10 +319,10 @@ where
                 re: real_part,
                 im: imag_part.neg(),
             },
-        ])
+        ]
     } else {
         let discriminant_sqrt = discriminant.sqrt();
-        Ok([
+        [
             Complex {
                 re: (b_neg.clone() + discriminant_sqrt.clone()) / two_a.clone(),
                 im: T::zero(),
@@ -347,7 +331,28 @@ where
                 re: (b_neg - discriminant_sqrt) / two_a,
                 im: T::zero(),
             },
-        ])
+        ]
+    }
+}
+
+/// Possible error types for root finding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RootFindingError {
+    /// The polynomial is a constant and does not have a solution.
+    NoSolution,
+    /// All coefficients of the polynomial are zero.
+    DegeneratePolynomial,
+    /// One or more of the coefficients are infinite or not a number.
+    InvalidCoefficients,
+}
+
+impl fmt::Display for RootFindingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NoSolution => write!(f, "Constant polynomial has no root"),
+            Self::DegeneratePolynomial => write!(f, "Polynomial is identically zero (∞ roots)"),
+            Self::InvalidCoefficients => write!(f, "Polynomial contains NaN or infinite coefficients"),
+        }
     }
 }
 
@@ -356,6 +361,25 @@ where
 /// This function returns an array of `Complex<T>` that may have a larger capacity than the
 /// polynomial has roots. By default elements of the returned array have a real and imaginary part
 /// set to NaN. This prevents the function from being available for integer types.
+///
+/// # Generic Arguments
+/// * `T` - Field type of the polynomial.
+/// * `N` - Capacity of coefficient array (restricted to `(1,127]`).
+/// * `M` - Worst case number of roots (`N-1`) (restricted to `[1,127)`).
+///
+/// # Arguments
+/// * `coefficients` - degree minor array of polynomial coefficients
+///
+/// # Returns
+/// * `Result`
+///     * `[Complex<T>; M]` - array of roots.
+///     * `RootFindingError` - Possible errors while computing roots.
+///
+/// # Panics
+/// This function does not panic.
+///
+/// # Safety
+/// This function does not use `unsafe` code.
 ///
 /// # Errors
 /// * `NoRoots` - the function was not able to compute roots for the given polynomial
@@ -370,10 +394,10 @@ where
 /// assert_f64_eq!(roots[1].re, 2.0, 1e-14);
 /// assert_f64_eq!(roots[2].re, 1.0);
 /// ```
-/// TODO: fixed point support
-pub fn roots<T, const N: usize, const M: usize>(
+/// TODO: Cleanup (break this into more specific functions) + fixed point support
+pub fn unchecked_roots<T, const N: usize, const M: usize>(
     coefficients: &[T; N],
-) -> Result<[Complex<T>; M], NoRoots>
+) -> Result<[Complex<T>; M], RootFindingError>
 where
     T: Clone
         + Zero
@@ -390,48 +414,43 @@ where
     DefaultAllocator: Allocator<Const<M>, DimDiff<Const<M>, U1>> + Allocator<DimDiff<Const<M>, U1>>,
 {
     let Some(degree) = largest_nonzero_index(coefficients) else {
-        return Err(NoRoots);
+        return Err(RootFindingError::DegeneratePolynomial);
     };
 
     let mut roots = array::from_fn(|_| Complex::new(T::nan(), T::nan()));
 
     if degree == 0 {
-        return Err(NoRoots);
+        return Err(RootFindingError::NoSolution);
     } else if degree == 1 {
-        roots[0].re = x_intercept(coefficients[1], coefficients[0])?;
+        roots[0].re = coefficients[0].neg() / coefficients[1];
         roots[0].im = T::zero();
     } else if degree == 2 {
-        let a = coefficients[2];
-        if a.is_zero() {
-            roots[0].re = x_intercept(coefficients[1], coefficients[0])?;
-        } else {
-            for (q_root, root) in quadratic_roots(a, coefficients[1], coefficients[0])?
-                .into_iter()
-                .zip(roots.iter_mut())
-            {
-                *root = q_root;
-            }
+        for (q_root, root) in unchecked_quadratic_roots(coefficients[2], coefficients[1], coefficients[0])
+            .into_iter()
+            .zip(roots.iter_mut())
+        {
+            *root = q_root;
         }
     } else {
         // TODO:
         //  * Edge-case where coefficients represent a monomial
         //  * Edge-case where polynomial has no constant (root at zero, can deflate)
-        //  * Edge-case where polynomial has a leading zero, companion will have a row of zeros
         let companion = if degree == M {
-            companion(coefficients)
+            unchecked_companion(coefficients)
         } else {
+            // array has leading zeros, so shift the coefficients
             let mut shifted_coefficients = [T::zero(); N];
             for i in 0..=degree {
                 shifted_coefficients[M - i] = coefficients[degree - i];
             }
-            companion(&shifted_coefficients)
+            unchecked_companion(&shifted_coefficients)
         };
         let matrix = SMatrix::from_data(ArrayStorage(companion));
         for (eigenvalue, root) in matrix
             .complex_eigenvalues()
             .into_iter()
             .zip(roots.iter_mut())
-            .take(degree)
+            .take(degree) // the companion may have been built from shifted coefficients
         {
             *root = *eigenvalue;
         }
@@ -441,8 +460,33 @@ where
 
 /// Adds two polynomials.
 ///
-/// This function takes ownership of the given arrays
-pub fn add_generic<T, const N: usize, const M: usize, const L: usize>(
+/// This function sums two arrays into a new array with capacity equal to the larger of the
+/// two inputs.
+///
+/// # Generic Arguments
+/// * `T` - Field type of the arrays.
+/// * `N` - Capacity of the lhs array (restricted to `[0,127]`).
+/// * `M` - Capacity of the rhs array (restricted to `[0,127]`).
+///
+/// # Arguments
+/// * `lhs` - array on the left side of the operator.
+/// * `rhs` - array on the right side of the operator.
+///
+/// # Returns
+/// * `sum` - the sum of the two input arrays.
+///
+/// # Panics
+/// This function may panic attempting invalid addition (overflow).
+///
+/// # Safety
+/// This function does not use `unsafe` code.
+///
+/// # Example
+/// ```
+/// use control_rs::polynomial::utils::unchecked_polynomial_add;
+/// assert_eq!(unchecked_polynomial_add([0, 1, 2], [0, 1, 2]), [0, 2, 4]);
+/// ```
+pub fn unchecked_polynomial_add<T, const N: usize, const M: usize, const L: usize>(
     lhs: [T; N],
     rhs: [T; M],
 ) -> [T; L]
@@ -457,10 +501,36 @@ where
     result
 }
 
-/// Subtracts two polynomials
+/// Subtracts two polynomials.
 ///
-/// This function takes ownership of the given arrays
-pub fn sub_generic<T, const N: usize, const M: usize, const L: usize>(
+/// This function subtracts two arrays and stores the result into a new array with capacity equal
+/// to the larger of the two inputs. If the lhs array is significantly shorter, it may be more
+/// efficient to negate the rhs and use it as the lhs in an addition call.
+///
+/// # Generic Arguments
+/// * `T` - Field type of the arrays.
+/// * `N` - Capacity of the lhs array (restricted to `[0,127]`).
+/// * `M` - Capacity of the rhs array (restricted to `[0,127]`).
+///
+/// # Arguments
+/// * `lhs` - array on the left side of the operator.
+/// * `rhs` - array on the right side of the operator.
+///
+/// # Returns
+/// * `difference` - the difference of the two input arrays.
+///
+/// # Panics
+/// This function may panic attempting invalid subtraction (underflow).
+///
+/// # Safety
+/// This function does not use `unsafe` code.
+///
+/// # Example
+/// ```
+/// use control_rs::polynomial::utils::unchecked_polynomial_sub;
+/// assert_eq!(unchecked_polynomial_sub([0, 1, 2], [0, 1, 2]), [0, 0, 0]);
+/// ```
+pub fn unchecked_polynomial_sub<T, const N: usize, const M: usize, const L: usize>(
     lhs: [T; N],
     rhs: [T; M],
 ) -> [T; L]
@@ -477,12 +547,33 @@ where
 
 /// Multiplies two polynomials.
 ///
-/// The result is a polynomial with capacity `N + M - 1`. This may be larger than the degree of the
-/// result polynomial, in which case the higher order coefficients are set to zero.
+/// This function iterates over each input array and multiplies each ith element with each jth
+/// element. The result is accumulated in the (i+j)th index.
+///
+/// <div class="warning">
+///
+/// The result is a polynomial with capacity `N+M-1`. This may be larger than the degree of the
+/// result polynomial, in which case the higher order coefficients are set to `T::zero()`.
+///
+/// </div>
 ///
 /// # Generic Arguments
-/// * `M` - Degree of the rhs polynomial.
-/// * `L` - Degree of the result polynomial.
+/// * `T` - Field type of the polynomials.
+/// * `N` - Capacity of the lhs polynomial (restricted to `[0,127]`).
+/// * `M` - Capacity of the rhs polynomial (restricted to `[0,127]`).
+/// * `L` - Capacity of the result polynomial (restricted to `[0,127]`).
+///
+/// # Arguments
+/// * `lhs` - array on the left side of the operator.
+/// * `rhs` - array on the right side of the operator.
+///
+/// # Panics
+/// This function may panic attempting invalid multiplication or addition (overflow).
+///
+/// # Safety
+/// This function uses an `unsafe` block to perform unchecked access to the elements of the two
+/// input arrays and the result. The length of the return is `N+M-1`, so it will always be
+/// possible to access the `i+j`th element.
 ///
 /// # Example
 /// ```rust
@@ -518,9 +609,32 @@ where
 
 /// Divides two polynomials.
 ///
-/// The result is a polynomial with capacity `N`. This may be larger than the degree of the result,
-/// in which case the higher order terms will be `T::zero()`.
+/// <div class="warning">
 ///
+/// The result is a polynomial with capacity `N`. This may be larger than the degree of the
+/// result polynomial, in which case the higher order coefficients are set to `T::zero()`.
+///
+/// </div>
+///
+/// # Generic Arguments
+/// * `T` - Field type of the polynomials.
+/// * `N` - Capacity of the dividend (restricted to `(0,127]`).
+/// * `M` - Capacity of the divisor (restricted to `(0,N]`).
+///
+/// # Arguments
+/// * `dividend` - The polynomial to be divided.
+/// * `divisor` - The polynomial doing the dividing.
+/// 
+/// # Returns
+/// * `quotient` - result of the division.
+/// 
+/// # Panics
+/// This function may panic from invalid arithmatic operations.
+/// 
+/// # Safety
+/// This function uses `unsafe` code to access elements of the divisor, remainder and quotient.
+/// All the accesses are guaranteed to work based on the generic constants provided.
+/// 
 /// # Example
 /// ```rust
 /// use control_rs::polynomial::utils::long_division;
@@ -538,6 +652,8 @@ where
 ///     r ← r − t × d
 /// return (q, r)
 ///</pre>
+/// 
+/// TODO: Unit tests
 pub fn long_division<T, const N: usize, const M: usize>(
     dividend: [T; N],
     divisor: &[T; M],

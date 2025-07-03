@@ -23,7 +23,7 @@ use num_traits::{Float, One, Zero};
 
 use crate::{
     frequency_tools::{FrequencyResponse, FrequencyTools},
-    polynomial::utils::{add_generic, convolution, sub_generic},
+    polynomial::utils::{unchecked_polynomial_add, convolution, unchecked_polynomial_sub},
     static_storage::{array_from_iterator_with_default, reverse_array},
     systems::System,
 };
@@ -209,7 +209,7 @@ where
             *a = a.clone().mul(rhs.clone());
         }
 
-        TransferFunction::from_data(add_generic(self.numerator, scaled_denom), self.denominator)
+        TransferFunction::from_data(unchecked_polynomial_add(self.numerator, scaled_denom), self.denominator)
     }
 }
 
@@ -243,7 +243,7 @@ where
             *a = a.clone().mul(rhs.clone());
         }
 
-        TransferFunction::from_data(sub_generic(self.numerator, scaled_denom), self.denominator)
+        TransferFunction::from_data(unchecked_polynomial_sub(self.numerator, scaled_denom), self.denominator)
     }
 }
 
@@ -337,7 +337,7 @@ macro_rules! impl_left_scalar_ops {
                     for a in &mut scaled_denom {
                         *a = a.clone().mul(self.clone());
                     }
-                    TransferFunction::from_data(sub_generic(scaled_denom, rhs.numerator), rhs.denominator)
+                    TransferFunction::from_data(unchecked_polynomial_sub(scaled_denom, rhs.numerator), rhs.denominator)
                 }
             }
             impl<const M: usize, const N: usize> Mul<TransferFunction<$scalar, M, N>> for $scalar
@@ -402,7 +402,7 @@ where
     type Output = TransferFunction<T, M3, N3>;
     fn add(self, rhs: TransferFunction<T, M2, N2>) -> Self::Output {
         TransferFunction::from_data(
-            add_generic(
+            unchecked_polynomial_add(
                 convolution(&self.numerator, &rhs.denominator),
                 convolution(&rhs.numerator, &self.denominator),
             ),
@@ -439,7 +439,7 @@ where
     type Output = TransferFunction<T, M3, N3>;
     fn sub(self, rhs: TransferFunction<T, M2, N2>) -> Self::Output {
         TransferFunction::from_data(
-            sub_generic(
+            unchecked_polynomial_sub(
                 convolution(&self.numerator, &rhs.denominator),
                 convolution(&rhs.numerator, &self.denominator),
             ),
