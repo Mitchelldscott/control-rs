@@ -230,9 +230,9 @@ where
 /// The function does not panic.
 ///
 /// # Safety
-/// The function makes an unsafe call to access the leading coefficient of the polynomial. The
+/// This function makes an unsafe call to access the leading coefficient of the polynomial. The
 /// polynomial is assumed to not have any leading zero coefficients and so the leading coefficient
-/// is at the largest index `N-1`. It is guaranteed that `M = N-1` so `M` is a safe index.
+/// is at the largest index `N-1`. It is guaranteed that `M=N-1` so `M` is a safe index.
 ///
 /// # Example
 /// ```
@@ -277,10 +277,13 @@ pub struct NoRoots;
 ///
 /// # Example
 /// ```
-/// use control_rs::{polynomial::utils::linear_root, assert_f64_eq};
-/// assert_eq!(linear_root(1, 0), Ok(0));
+/// use control_rs::{polynomial::utils::x_intercept, assert_f64_eq};
+/// assert_eq!(x_intercept(1, 0), Ok(0));
 /// ```
-pub fn linear_root<T: Zero + Neg<Output = T> + Div<Output = T>>(m: T, b: T) -> Result<T, NoRoots> {
+pub fn x_intercept<T>(m: T, b: T) -> Result<T, NoRoots>
+where
+    T: Zero + Neg<Output = T> + Div<Output = T>
+{
     if m.is_zero() {
         return Err(NoRoots);
     }
@@ -290,18 +293,39 @@ pub fn linear_root<T: Zero + Neg<Output = T> + Div<Output = T>>(m: T, b: T) -> R
 
 /// Computes the root of a quadratic.
 ///
+/// This function solves for the roots of a standard quadratic equation of the form
+/// `ax^2 + bx + c = 0`. It utilizes the quadratic formula,
+/// `x = -b +/- sqrt(b^2-4ac) / 2a`, to find the solutions.
+///
+/// # Generic Arguments
+/// * `T` - Field type of the coefficients.
+///
+/// # Arguments
+/// * `a` - leading coefficient.
+/// * `b` - linear coefficient.
+/// * `c` - constant term.
+///
+/// # Returns
+/// * `[Complex<T>; 2]` - The two roots of the quadratic.
+///
 /// # Errors
-/// * `NoRoots` - the function was not able to compute a solution for the quadratic
+/// * `NoRoots` - the function was not able to compute a solution for the quadratic.
+///
+/// # Panics
+/// This function does not panic.
+///
+/// # Safety
+/// This function does not call unsafe code.
 ///
 /// # Example
 /// ```
 /// use control_rs::{polynomial::utils::quadratic_roots, assert_f64_eq};
-/// let roots = quadratic_roots(1.0, 0.0, 0.0).expect("failed to compute roots");
+/// let roots = quadratic_roots(1.0, 0.0, 0.0);
 /// assert_f64_eq!(roots[0].re, 0.0, 1.5e-14); // having precision issues...
 /// assert_f64_eq!(roots[1].re, 0.0, 1e-14);
 /// ```
 /// TODO: Fixed Point support
-pub fn quadratic_roots<T>(a: T, b: T, c: T) -> Result<[Complex<T>; 2], NoRoots>
+pub fn quadratic_roots<T>(a: T, b: T, c: T) -> [Complex<T>; 2]
 where
     T: Clone
         + PartialOrd
@@ -319,7 +343,7 @@ where
     if discriminant < T::zero() {
         let real_part = b_neg / two_a.clone();
         let imag_part = (-discriminant).sqrt() / two_a;
-        Ok([
+        [
             Complex {
                 re: real_part.clone(),
                 im: imag_part.clone(),
@@ -328,10 +352,10 @@ where
                 re: real_part,
                 im: imag_part.neg(),
             },
-        ])
+        ]
     } else {
         let discriminant_sqrt = discriminant.sqrt();
-        Ok([
+        [
             Complex {
                 re: (b_neg.clone() + discriminant_sqrt.clone()) / two_a.clone(),
                 im: T::zero(),
@@ -340,7 +364,7 @@ where
                 re: (b_neg - discriminant_sqrt) / two_a,
                 im: T::zero(),
             },
-        ])
+        ]
     }
 }
 

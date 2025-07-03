@@ -39,9 +39,12 @@ The documentation for every public item should adhere to the following order:
 ```rust
 /// Finds the largest index of a non-zero value in a slice.
 ///
-/// This function iterates through a slice in reverse and checks if each value `.is_zero()`. It
-/// will return after the first time the condition is **false**.
+/// This function iterates through a slice in reverse and checks if each value `.is_zero()`. It will return after the 
+/// first time the condition is **false**.
 ///
+/// The logical correctness of the result is dependent on the correctness of the `.is_zero()` implementation for 
+/// type `T`.
+/// 
 /// # Generic Arguments
 /// * `T` - field type of the array, which must implement [Zero].
 ///
@@ -57,8 +60,7 @@ The documentation for every public item should adhere to the following order:
 /// This function does not panic.
 /// 
 /// # Safety 
-/// This function does not use `unsafe` code. The logical correctness of the result is dependent on the correctness of 
-/// the `.is_zero()` implementation for type `T`.
+/// This function does not use `unsafe` code. 
 /// 
 /// # Example
 /// ```
