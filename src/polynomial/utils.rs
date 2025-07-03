@@ -44,11 +44,9 @@ use crate::static_storage::{array_from_iterator, array_from_iterator_with_defaul
 ///     * `None` - If the slice is empty or all elements are zero.
 ///
 /// # Panics
-///
 /// This function does not panic.
 ///
 /// # Safety
-///
 /// This function does not use `unsafe` code.
 ///
 /// # Example
@@ -90,7 +88,7 @@ pub fn largest_nonzero_index<T: Zero>(coefficients: &[T]) -> Option<usize> {
 ///
 /// # Generic Arguments
 /// * `T` - Field type of the coefficients.
-/// * `N` - Capacity of the source coefficients array.
+/// * `N` - Capacity of the source coefficients array (restricted to the range [1..127].
 /// * `M` - Capacity of the destination derivative array.
 ///
 /// # Arguments
@@ -103,7 +101,6 @@ pub fn largest_nonzero_index<T: Zero>(coefficients: &[T]) -> Option<usize> {
 /// This function does not panic.
 ///
 /// # Safety
-///
 /// This function uses an unsafe block to initialize the derivative array from an iterator. The
 /// length of the new array is inferred from the return type which is guaranteed to be equal to
 /// `N-1`. The iterator given to the initializing function has `N` items and will skip the first
@@ -196,7 +193,7 @@ where
 ///
 /// The companion matrix is a square matrix whose eigenvalues are the roots of the polynomial.
 /// It is constructed from an identity matrix, a zero column and a row of the polynomial's
-/// coefficients scaled by the highest term.
+/// coefficients scaled by the leading coefficient.
 ///
 /// <pre>
 /// companion(a_n * x^n + ... + a_1 * x + a_0) =
@@ -272,6 +269,20 @@ pub struct NoRoots;
 
 /// Computes the root of a line.
 ///
+/// This function calculates the x intercept of the standard slope intercept form `y=m*x+b`.
+///
+/// # Generic Arguments
+/// * `T` - Field type of the line's coefficients.
+///
+/// # Arguments
+/// * `m` - slope of the line.
+/// * `b` - offset of the line.
+///
+/// # Returns
+/// * `Result`
+///     * `Ok(root)` - The x-intercept of the line.
+///     * `NoRoots` - The slope is 0 or undefined, so there is no intercept.
+///
 /// # Errors
 /// * `NoRoots` - the function was not able to compute a solution for the line
 ///
@@ -280,52 +291,24 @@ pub struct NoRoots;
 /// use control_rs::{polynomial::utils::x_intercept, assert_f64_eq};
 /// assert_eq!(x_intercept(1, 0), Ok(0));
 /// ```
-pub fn x_intercept<T>(m: T, b: T) -> Result<T, NoRoots>
-where
-    T: Zero + Neg<Output = T> + Div<Output = T>
-{
-    if m.is_zero() {
-        return Err(NoRoots);
-    }
-
+pub fn x_intercept<T: Zero + Neg<Output = T> + Div<Output = T>>(m: T, b: T) -> Result<T, NoRoots> {
     Ok(b.neg() / m)
 }
 
 /// Computes the root of a quadratic.
 ///
-/// This function solves for the roots of a standard quadratic equation of the form
-/// `ax^2 + bx + c = 0`. It utilizes the quadratic formula,
-/// `x = -b +/- sqrt(b^2-4ac) / 2a`, to find the solutions.
-///
-/// # Generic Arguments
-/// * `T` - Field type of the coefficients.
-///
-/// # Arguments
-/// * `a` - leading coefficient.
-/// * `b` - linear coefficient.
-/// * `c` - constant term.
-///
-/// # Returns
-/// * `[Complex<T>; 2]` - The two roots of the quadratic.
-///
 /// # Errors
-/// * `NoRoots` - the function was not able to compute a solution for the quadratic.
-///
-/// # Panics
-/// This function does not panic.
-///
-/// # Safety
-/// This function does not call unsafe code.
+/// * `NoRoots` - the function was not able to compute a solution for the quadratic
 ///
 /// # Example
 /// ```
 /// use control_rs::{polynomial::utils::quadratic_roots, assert_f64_eq};
-/// let roots = quadratic_roots(1.0, 0.0, 0.0);
+/// let roots = quadratic_roots(1.0, 0.0, 0.0).expect("failed to compute roots");
 /// assert_f64_eq!(roots[0].re, 0.0, 1.5e-14); // having precision issues...
 /// assert_f64_eq!(roots[1].re, 0.0, 1e-14);
 /// ```
 /// TODO: Fixed Point support
-pub fn quadratic_roots<T>(a: T, b: T, c: T) -> [Complex<T>; 2]
+pub fn quadratic_roots<T>(a: T, b: T, c: T) -> Result<[Complex<T>; 2], NoRoots>
 where
     T: Clone
         + PartialOrd
@@ -343,7 +326,7 @@ where
     if discriminant < T::zero() {
         let real_part = b_neg / two_a.clone();
         let imag_part = (-discriminant).sqrt() / two_a;
-        [
+        Ok([
             Complex {
                 re: real_part.clone(),
                 im: imag_part.clone(),
@@ -352,10 +335,10 @@ where
                 re: real_part,
                 im: imag_part.neg(),
             },
-        ]
+        ])
     } else {
         let discriminant_sqrt = discriminant.sqrt();
-        [
+        Ok([
             Complex {
                 re: (b_neg.clone() + discriminant_sqrt.clone()) / two_a.clone(),
                 im: T::zero(),
@@ -364,7 +347,7 @@ where
                 re: (b_neg - discriminant_sqrt) / two_a,
                 im: T::zero(),
             },
-        ]
+        ])
     }
 }
 
@@ -415,12 +398,12 @@ where
     if degree == 0 {
         return Err(NoRoots);
     } else if degree == 1 {
-        roots[0].re = linear_root(coefficients[1], coefficients[0])?;
+        roots[0].re = x_intercept(coefficients[1], coefficients[0])?;
         roots[0].im = T::zero();
     } else if degree == 2 {
         let a = coefficients[2];
         if a.is_zero() {
-            roots[0].re = linear_root(coefficients[1], coefficients[0])?;
+            roots[0].re = x_intercept(coefficients[1], coefficients[0])?;
         } else {
             for (q_root, root) in quadratic_roots(a, coefficients[1], coefficients[0])?
                 .into_iter()
