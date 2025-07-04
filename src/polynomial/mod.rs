@@ -64,6 +64,8 @@ use crate::{
     systems::System,
 };
 pub use aliases::{Constant, Cubic, Line, Quadratic, Quartic, Quintic};
+use crate::polynomial::utils::RootFindingError;
+
 // ===============================================================================================
 //      Polynomial Tests
 // ===============================================================================================
@@ -131,6 +133,8 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// This is a wrapper for [`array::from_fn`].
     /// 
     /// # Generic Arguments
+    /// * `F` - Type of the function closure that generates the array. Restricted to
+    ///   `FnMut(usize) -> T`.
     ///
     /// # Arguments
     /// * `cb` - The generator function, which takes the degree as input and returns the
@@ -161,7 +165,6 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// * `bool` - true if the capacity is zero.
     ///
     /// # Example
-    ///
     /// ```
     /// use control_rs::Polynomial;
     /// let p = Polynomial::<f32, 0>::new([]);
@@ -174,13 +177,13 @@ impl<T, const N: usize> Polynomial<T, N> {
         N == 0
     }
 
-    /// Access the coefficients as a slice iter
+    /// Access the coefficients as a slice iter.
     #[inline]
     fn iter(&self) -> slice::Iter<'_, T> {
         self.coefficients.iter()
     }
 
-    /// Access the coefficients as a mutable slice iter
+    /// Access the coefficients as a mutable slice iter.
     #[inline]
     pub fn iter_mut(&mut self) -> slice::IterMut<'_, T> {
         self.coefficients.iter_mut()
@@ -223,7 +226,7 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// has fewer than N items, the remaining indices will be filled with zeros.
     ///
     /// # Arguments
-    /// * `iterator` - [Iterator] over items of `T`
+    /// * `iterator` - [Iterator] over items of `T`.
     ///
     /// # Returns
     /// * `polynomial` - A zero-padded polynomial with the given coefficients.
@@ -271,6 +274,9 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// A monomial consists of a single non-zero leading coefficient. This is implemented by
     /// creating a zero polynomial with the specified size and setting the final element to the
     /// given constant.
+    ///
+    /// # Arguments
+    /// * `coefficient` - the leading coefficient of the polynomial.
     ///
     /// # Returns
     /// * `Polynomial` - a polynomial with a single non-zero element.
@@ -348,6 +354,7 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     /// * `Option<usize>`
     ///     * `Some(degree)` - power of the highest order non-zero coefficient
     ///     * `None` - if the length is zero or all coefficients are zero
+    ///
     /// # Example
     /// ```
     /// use control_rs::Polynomial;
@@ -446,15 +453,15 @@ impl<T, const N: usize> Polynomial<T, N> {
         self.coefficients.get_unchecked_mut(index)
     }
 
-    /// Returns a coefficient of the polynomial
+    /// Returns a coefficient of the polynomial.
     ///
     /// # Arguments
-    /// * `degree` - the degree/index of the coefficient to return
+    /// * `degree` - the degree/index of the coefficient to return.
     ///
     /// # Returns
     /// * `Option<&T>`
-    ///     * `Some(coefficient)` - when N > degree
-    ///     * `None` - when N <= degree
+    ///     * `Some(coefficient)` - when N > degree.
+    ///     * `None` - when N <= degree.
     ///
     /// # Example
     /// ```
@@ -473,15 +480,15 @@ impl<T, const N: usize> Polynomial<T, N> {
         }
     }
 
-    /// Returns a coefficient of the polynomial
+    /// Returns a coefficient of the polynomial.
     ///
     /// # Arguments
-    /// * `degree` - the degree/index of the coefficient to return
+    /// * `degree` - the degree/index of the coefficient to return.
     ///
     /// # Returns
     /// * `Option<&mut T>`
-    ///     * `Some(coefficient)` - when N > degree
-    ///     * `None` - when N <= degree
+    ///     * `Some(coefficient)` - when N > degree.
+    ///     * `None` - when N <= degree.
     ///
     /// ```
     /// use control_rs::Polynomial;
@@ -508,8 +515,8 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     ///
     /// # Returns
     /// * `Option<&T>`
-    ///     * `Some(leading_coefficient)` - when N > 0
-    ///     * `None` - when N == 0
+    ///     * `Some(leading_coefficient)` - when N > 0.
+    ///     * `None` - when N == 0.
     ///
     /// # Example
     /// ```
@@ -531,9 +538,8 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     ///
     /// # Returns
     /// * `Option<&mut T>`
-    ///     * `Some(leading_coefficient)` - when N > 0
-    ///     * `None` - when N == 0
-    ///
+    ///     * `Some(leading_coefficient)` - when N > 0.
+    ///     * `None` - when N == 0.
     ///
     /// # Example
     /// ```
@@ -561,8 +567,8 @@ where
     ///
     /// # Returns
     /// * `Option<&T>`
-    ///     * `Some(constant)` - when N > 0
-    ///     * `None` - when N == 0
+    ///     * `Some(constant)` - when N > 0.
+    ///     * `None` - when N == 0.
     ///
     /// # Example
     /// ```
@@ -581,8 +587,8 @@ where
     ///
     /// # Returns
     /// * `Option<&mut T>`
-    ///     * `Some(constant)` - when N > 0
-    ///     * `None` - when N == 0
+    ///     * `Some(constant)` - when N > 0.
+    ///     * `None` - when N == 0.
     ///
     /// # Example
     /// ```
@@ -664,7 +670,7 @@ impl<T: Clone + Zero + One + AddAssign + Div<Output = T>, const N: usize> Polyno
     /// See [`utils::integrate()`] for more.
     ///
     /// # Returns
-    /// * `Polynomial` - a polynomial with capacity `N + 1`
+    /// * `Polynomial` - a polynomial with capacity `N + 1`.
     ///
     /// # Examples
     /// ```
@@ -695,6 +701,8 @@ pub struct LeadingZeroError;
 impl<T: Copy + Zero + One + Neg<Output = T> + Div<Output = T>, const N: usize> Polynomial<T, N> {
     /// Computes the Frobenius companion matrix of a polynomial.
     ///
+    /// See [`utils::unchecked_companion()`] for more.
+    ///
     /// # Errors
     /// * This function will fail if the polynomial array has leading zeros.
     ///
@@ -722,7 +730,10 @@ impl<T, const N: usize> Polynomial<T, N>
 where
     T: Clone + Num + Neg<Output = T> + RealField,
 {
-    /// Computes the roots of the polynomial
+    /// Computes the roots of the polynomial.
+    ///
+    /// # Errors
+    /// * See [RootFindingError] for variants.
     ///
     /// # Example
     /// ```
@@ -730,11 +741,7 @@ where
     /// let p = Polynomial::new([1.0, -6.0, 11.0, -6.0]);
     /// let roots = p.roots();
     /// ```
-    /// # Errors
-    /// * `NoRoots` - the polynomial has no roots, or the function could not compute them
-    ///
-    /// TODO: Review return cases
-    pub fn roots<const M: usize>(&self) -> Result<[Complex<T>; M], utils::RootFindingError>
+    pub fn roots<const M: usize>(&self) -> Result<[Complex<T>; M], RootFindingError>
     where
         T: Copy
             + Zero
@@ -751,12 +758,15 @@ where
         DefaultAllocator:
             Allocator<Const<M>, DimDiff<Const<M>, U1>> + Allocator<DimDiff<Const<M>, U1>>,
     {
+        if let Some(_) = self.iter().find(|a| a.is_nan() || a.is_infinite()) {
+            return Err(RootFindingError::InvalidCoefficients);
+        }
         utils::unchecked_roots(&self.coefficients)
     }
 }
 
 // ===============================================================================================
-//      Polynomial System traits
+//      Polynomial System trait
 // ===============================================================================================
 
 impl<T, const N: usize> System for Polynomial<T, N>

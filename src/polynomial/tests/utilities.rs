@@ -319,3 +319,22 @@ mod convolution {
     #[test]
     fn mul_add_overflow() { assert_eq!(convolution(&[1, 1], &[(u8::MAX/2)+1, (u8::MAX/2)+1]), [u8::MAX/2, u8::MAX, u8::MAX/2]); }
 }
+
+mod division {
+    // Have not been able to cause an addition or subtraction overflow, that doesn't mean it is not
+    // possible, just difficult.
+    use super::utils::long_division;
+    #[test]
+    fn div_by_zero() { assert_eq!(long_division([1], &[0]), [0]); }
+    #[test]
+    fn div_by_one() { assert_eq!(long_division([1, 2, 3], &[1]), [1, 2, 3]); }
+    #[test]
+    fn u8_max_div_by_one() { assert_eq!(long_division([u8::MAX, u8::MAX], &[1]), [u8::MAX, u8::MAX]); }
+    #[test]
+    fn i8_min_div_by_one() { assert_eq!(long_division([i8::MIN, i8::MIN], &[1]), [i8::MIN, i8::MIN]); }
+    #[should_panic = "attempt to multiply with overflow"]
+    #[test]
+    fn u8_max_div_by_line() { assert_eq!(long_division([u8::MAX, u8::MAX], &[2, 1]), [0, 0]); }
+    #[test]
+    fn div_by_two() { assert_eq!(long_division([1.0], &[2.0]), [0.5]); }
+}

@@ -467,6 +467,7 @@ where
 /// * `T` - Field type of the arrays.
 /// * `N` - Capacity of the lhs array (restricted to `[0,127]`).
 /// * `M` - Capacity of the rhs array (restricted to `[0,127]`).
+/// * `L` - Capacity of the result array (restricted to `[0,127]`).
 ///
 /// # Arguments
 /// * `lhs` - array on the left side of the operator.
@@ -511,6 +512,7 @@ where
 /// * `T` - Field type of the arrays.
 /// * `N` - Capacity of the lhs array (restricted to `[0,127]`).
 /// * `M` - Capacity of the rhs array (restricted to `[0,127]`).
+/// * `L` - Capacity of the result array (restricted to `[0,127]`).
 ///
 /// # Arguments
 /// * `lhs` - array on the left side of the operator.
@@ -559,9 +561,9 @@ where
 ///
 /// # Generic Arguments
 /// * `T` - Field type of the polynomials.
-/// * `N` - Capacity of the lhs polynomial (restricted to `[0,127]`).
-/// * `M` - Capacity of the rhs polynomial (restricted to `[0,127]`).
-/// * `L` - Capacity of the result polynomial (restricted to `[0,127]`).
+/// * `N` - Capacity of the lhs array (restricted to `[0,127]`).
+/// * `M` - Capacity of the rhs array (restricted to `[0,127]`).
+/// * `L` - Capacity of the result array (restricted to `[0,127]`).
 ///
 /// # Arguments
 /// * `lhs` - array on the left side of the operator.
@@ -616,6 +618,12 @@ where
 ///
 /// </div>
 ///
+/// <div class="warning">
+///
+/// If the divisor is a degenerate polynomial this will return an array of zeros.
+///
+/// </div>
+///
 /// # Generic Arguments
 /// * `T` - Field type of the polynomials.
 /// * `N` - Capacity of the dividend (restricted to `(0,127]`).
@@ -629,7 +637,10 @@ where
 /// * `quotient` - result of the division.
 /// 
 /// # Panics
-/// This function may panic from invalid arithmatic operations.
+/// * There is an unchecked multiplication that may overflow (if dividend is as large as possible,
+/// the leading divisor term is 1 and the divisor is not a monomial).
+/// * There is an unchecked `add_assign` that may overflow
+/// * There is an unchecked `sub_assign` that may overflow
 /// 
 /// # Safety
 /// This function uses `unsafe` code to access elements of the divisor, remainder and quotient.
@@ -652,8 +663,6 @@ where
 ///     r ← r − t × d
 /// return (q, r)
 ///</pre>
-/// 
-/// TODO: Unit tests
 pub fn long_division<T, const N: usize, const M: usize>(
     dividend: [T; N],
     divisor: &[T; M],
@@ -681,8 +690,9 @@ where
                 if rem_i.is_zero() {
                     continue;
                 }
-
+                // it is guaranteed that `i >= divisor_order` order, this will never panic
                 let q_index = i - divisor_order;
+                // divisor_order is not none so leading divisor is non-zero
                 let term_divisor = rem_i.clone() / leading_divisor.clone();
                 // SAFETY: q_index is less than the capacity of dividend, quotient has the same
                 // capacity
