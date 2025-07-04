@@ -5,9 +5,7 @@
 /// better assert
 #[macro_export]
 macro_rules! assert_f64_eq {
-    ($a:expr, $b:expr) => {{
-        assert_f64_eq!($a, $b, f64::EPSILON)
-    }};
+    ($a:expr, $b:expr) => {{ assert_f64_eq!($a, $b, f64::EPSILON) }};
     ($a:expr, $b:expr, $eps:expr) => {{
         let (a, b): (f64, f64) = ($a, $b);
         let epsilon = $eps;
@@ -37,9 +35,7 @@ macro_rules! assert_f64_eq {
 /// better assert
 #[macro_export]
 macro_rules! assert_f32_eq {
-    ($a:expr, $b:expr) => {{
-        assert_f32_eq!($a, $b, f32::EPSILON)
-    }};
+    ($a:expr, $b:expr) => {{ assert_f32_eq!($a, $b, f32::EPSILON) }};
     ($a:expr, $b:expr, $eps:expr) => {{
         let (a, b): (f32, f32) = ($a, $b);
         let epsilon = $eps;

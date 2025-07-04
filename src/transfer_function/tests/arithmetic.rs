@@ -113,8 +113,8 @@ mod division {
 }
 
 mod cl {
-    use crate::systems::System;
     use crate::TransferFunction;
+    use crate::systems::System;
     #[test]
     fn test_cl() {
         let tf = TransferFunction::new([1], [1, 1]);

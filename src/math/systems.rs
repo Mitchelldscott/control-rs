@@ -69,14 +69,14 @@ pub trait System: Clone {
 ///
 /// # Generic Arguments
 /// * `T` - Type of the input variable(s)
-pub fn feedback<T, G, H, GH, GH2, CL>(sys1: &G, sys2: &H, sign_in: T, sign_feedback: T) -> CL
+pub fn feedback<T, G, H, GH, CL>(sys1: &G, sys2: &H, sign_in: T, sign_feedback: T) -> CL
 where
-    T: Clone + Zero + One + Mul<G, Output = G> + Mul<GH, Output = GH>,
-    G: System + Mul<H, Output = GH> + Div<GH2, Output = CL>,
-    GH: System + Add<Output = GH2>,
+    T: Clone + Zero + One + Mul<G, Output = G> + Add<GH, Output = GH> + Mul<GH, Output = GH>,
+    G: System + Mul<H, Output = GH> + Div<GH, Output = CL>,
+    GH: System,
     H: System,
 {
-    sign_in * sys1.clone() / (GH::identity() + sign_feedback * sys1.clone() * sys2.clone())
+    sign_in * sys1.clone() / (T::one() + sign_feedback * sys1.clone() * sys2.clone())
 }
 
 impl System for f32 {
@@ -93,49 +93,5 @@ impl System for f64 {
     }
     fn identity() -> Self {
         1.0f64
-    }
-}
-
-#[cfg(test)]
-mod feedback_test {
-    use super::*;
-
-    use crate::{assert_f32_eq, polynomial::Constant, TransferFunction};
-
-    #[test]
-    fn zero_constant() {
-        let p1 = Constant::zero();
-        let p2 = Constant::new([2.0]);
-        let p3: Constant<f64> = feedback(&p1, &p2, 1.0, -1.0);
-        assert_eq!(
-            p3.coefficient(0),
-            Some(&0.0),
-            "incorrect feedback polynomial {p3}"
-        );
-    }
-
-    #[test]
-    fn constant_constant() {
-        // x = r - m where, m = p2(p1(x)) and r is an arbitrary input to the system
-        let p1 = Constant::new([1.0]);
-        let p2 = Constant::new([2.0]);
-        let p3 = feedback(&p1, &p2, 1.0, -1.0);
-        assert_eq!(
-            p3.coefficient(0),
-            Some(&-1.0),
-            "incorrect feedback polynomial {p3}"
-        );
-    }
-
-    #[test]
-    fn tf_closed_loop() {
-        let tf = TransferFunction::new([1.0], [1.0, 1.0]);
-        let cl_tf = feedback(&tf, &1.0, 1.0, -1.0);
-        assert_f32_eq!(cl_tf.numerator[0], 1.0);
-        assert_f32_eq!(cl_tf.numerator[1], 1.0);
-        assert_f32_eq!(cl_tf.numerator[2], 0.0);
-        assert_f32_eq!(cl_tf.denominator[0], 0.0);
-        assert_f32_eq!(cl_tf.denominator[1], 1.0);
-        assert_f32_eq!(cl_tf.denominator[2], 1.0);
     }
 }

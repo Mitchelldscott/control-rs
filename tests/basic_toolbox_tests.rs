@@ -4,8 +4,8 @@ mod basic_model_tests {
     use control_rs::{
         integrators::runge_kutta4,
         state_space::{
-            utils::{control_canonical, zoh},
             StateSpace,
+            utils::{control_canonical, zoh},
         },
         systems::{DynamicalSystem, NLModel},
     };
@@ -122,7 +122,7 @@ mod tf_frequency_tool_tests {
         let frequencies = [0.0, 0.1, 1.0, 10.0];
 
         // Call the bode function
-        let mut response = FrequencyResponse::new([frequencies]);
+        let mut response = FrequencyResponse::new(frequencies);
         tf.frequency_response(&mut response);
 
         let margins = FrequencyMargin::new(&response);
@@ -151,7 +151,7 @@ mod tf_frequency_tool_tests {
 #[cfg(feature = "std")]
 mod bode_and_nyquist_plot_tests {
     use control_rs::{
-        frequency_tools::{bode, FrequencyResponse},
+        frequency_tools::{FrequencyResponse, bode},
         transfer_function::TransferFunction,
     };
 

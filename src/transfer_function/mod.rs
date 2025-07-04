@@ -23,7 +23,7 @@ use num_traits::{Float, One, Zero};
 
 use crate::{
     frequency_tools::{FrequencyResponse, FrequencyTools},
-    polynomial::utils::{unchecked_polynomial_add, convolution, unchecked_polynomial_sub},
+    polynomial::utils::{convolution, unchecked_polynomial_add, unchecked_polynomial_sub},
     static_storage::{array_from_iterator_with_default, reverse_array},
     systems::System,
 };
@@ -146,17 +146,18 @@ impl<T: Float + RealField, const M: usize, const N: usize> FrequencyTools<T, 1, 
     for TransferFunction<T, M, N>
 {
     /// TODO: Doc + Unit Test + Example
-    fn frequency_response<const L: usize>(&self, response: &mut FrequencyResponse<T, L, 1, 1>) {
-        let mut responses = [Complex::zero(); L];
+    fn frequency_response<const K: usize>(&self, response: &mut FrequencyResponse<T, 1, 1, K>) {
+        let mut responses = [Complex::zero(); K];
         // Evaluate the transfer function at each frequency
-        response.frequencies[0]
+        response
+            .frequencies
             .iter()
             .enumerate()
             .for_each(|(i, frequency)| {
                 // s = jω
                 responses[i] = self.evaluate(&Complex::new(T::zero(), *frequency));
             });
-        response.responses = Some([responses]);
+        response.responses = Some([[responses]]);
     }
 }
 
@@ -209,7 +210,10 @@ where
             *a = a.clone().mul(rhs.clone());
         }
 
-        TransferFunction::from_data(unchecked_polynomial_add(self.numerator, scaled_denom), self.denominator)
+        TransferFunction::from_data(
+            unchecked_polynomial_add(self.numerator, scaled_denom),
+            self.denominator,
+        )
     }
 }
 
@@ -243,7 +247,10 @@ where
             *a = a.clone().mul(rhs.clone());
         }
 
-        TransferFunction::from_data(unchecked_polynomial_sub(self.numerator, scaled_denom), self.denominator)
+        TransferFunction::from_data(
+            unchecked_polynomial_sub(self.numerator, scaled_denom),
+            self.denominator,
+        )
     }
 }
 
@@ -375,16 +382,16 @@ impl_left_scalar_ops!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
 // ===============================================================================================
 
 impl<
-        T,
-        const M1: usize,
-        const N1: usize,
-        const M2: usize,
-        const N2: usize,
-        const S1: usize,
-        const S2: usize,
-        const M3: usize,
-        const N3: usize,
-    > Add<TransferFunction<T, M2, N2>> for TransferFunction<T, M1, N1>
+    T,
+    const M1: usize,
+    const N1: usize,
+    const M2: usize,
+    const N2: usize,
+    const S1: usize,
+    const S2: usize,
+    const M3: usize,
+    const N3: usize,
+> Add<TransferFunction<T, M2, N2>> for TransferFunction<T, M1, N1>
 where
     T: Clone + AddAssign + Mul<Output = T> + Zero,
     // Bound for self.numerator * rhs.denominator
@@ -412,16 +419,16 @@ where
 }
 
 impl<
-        T,
-        const M1: usize,
-        const N1: usize,
-        const M2: usize,
-        const N2: usize,
-        const S1: usize,
-        const S2: usize,
-        const M3: usize,
-        const N3: usize,
-    > Sub<TransferFunction<T, M2, N2>> for TransferFunction<T, M1, N1>
+    T,
+    const M1: usize,
+    const N1: usize,
+    const M2: usize,
+    const N2: usize,
+    const S1: usize,
+    const S2: usize,
+    const M3: usize,
+    const N3: usize,
+> Sub<TransferFunction<T, M2, N2>> for TransferFunction<T, M1, N1>
 where
     T: Clone + AddAssign + Sub<Output = T> + Mul<Output = T> + Zero,
     // Bound for self.numerator * rhs.denominator
@@ -449,14 +456,14 @@ where
 }
 
 impl<
-        T,
-        const M1: usize,
-        const N1: usize,
-        const M2: usize,
-        const N2: usize,
-        const M3: usize,
-        const N3: usize,
-    > Mul<TransferFunction<T, M2, N2>> for TransferFunction<T, M1, N1>
+    T,
+    const M1: usize,
+    const N1: usize,
+    const M2: usize,
+    const N2: usize,
+    const M3: usize,
+    const N3: usize,
+> Mul<TransferFunction<T, M2, N2>> for TransferFunction<T, M1, N1>
 where
     T: Clone + AddAssign + Mul<Output = T> + Zero,
     // Bound for self.numerator * rhs.numerator
@@ -476,14 +483,14 @@ where
 }
 
 impl<
-        T,
-        const M1: usize,
-        const N1: usize,
-        const M2: usize,
-        const N2: usize,
-        const M3: usize,
-        const N3: usize,
-    > Div<TransferFunction<T, M2, N2>> for TransferFunction<T, M1, N1>
+    T,
+    const M1: usize,
+    const N1: usize,
+    const M2: usize,
+    const N2: usize,
+    const M3: usize,
+    const N3: usize,
+> Div<TransferFunction<T, M2, N2>> for TransferFunction<T, M1, N1>
 where
     T: Clone + AddAssign + Mul<Output = T> + Zero,
     // Bound for self.numerator * rhs.denominator

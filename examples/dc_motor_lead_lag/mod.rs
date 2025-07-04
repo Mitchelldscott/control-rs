@@ -41,7 +41,7 @@
 pub use super::Scalar;
 
 mod dc_motor_model;
-pub use dc_motor_model::{MotorInput, MotorOutput, MotorSS, MotorState, Motor_SS, Motor_TF};
+pub use dc_motor_model::{Motor_SS, Motor_TF, MotorInput, MotorOutput, MotorSS, MotorState};
 
 mod lead_lag_compensator;
-pub use lead_lag_compensator::{lead_compensator, LeadCompensator};
+pub use lead_lag_compensator::{LeadCompensator, lead_compensator};

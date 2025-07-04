@@ -77,7 +77,7 @@ pub trait StaticStorage<T, const N: usize>: Sized {
     /// If the index is out of bounds, the method will cause undefined behavior.
     #[inline]
     unsafe fn get_unchecked_linear(&self, i: usize) -> &T {
-        &*self.get_address_unchecked_linear(i)
+        unsafe { &*self.get_address_unchecked_linear(i) }
     }
 
     /// Retrieves a reference to the i-th element without bound-checking.
@@ -86,7 +86,7 @@ pub trait StaticStorage<T, const N: usize>: Sized {
     /// If the index is out of bounds, the method will cause undefined behavior.
     #[inline]
     unsafe fn get_unchecked(&self, index: Self::Index) -> &T {
-        self.get_unchecked_linear(self.linear_index(index))
+        unsafe { self.get_unchecked_linear(self.linear_index(index)) }
     }
 
     /// Returns the compile-time capacity (number of elements) of the storage.
@@ -149,7 +149,7 @@ pub trait StaticStorageMut<T, const N: usize>: StaticStorage<T, N> {
     /// # Safety
     /// If the index is out of bounds, the method will cause undefined behavior.
     unsafe fn get_unchecked_linear_mut(&mut self, i: usize) -> &mut T {
-        &mut *self.get_address_unchecked_linear_mut(i)
+        unsafe { &mut *self.get_address_unchecked_linear_mut(i) }
     }
 
     /// Retrieves a mutable reference to the element at `index` without bound-checking.
@@ -158,7 +158,7 @@ pub trait StaticStorageMut<T, const N: usize>: StaticStorage<T, N> {
     /// If the index is out of bounds, the method will cause undefined behavior.
     #[inline]
     unsafe fn get_unchecked_mut(&mut self, index: Self::Index) -> &mut T {
-        &mut *self.get_address_unchecked_mut(index)
+        unsafe { &mut *self.get_address_unchecked_mut(index) }
     }
 }
 

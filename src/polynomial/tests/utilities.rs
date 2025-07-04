@@ -6,13 +6,21 @@ use super::*;
 mod largest_nonzero_index {
     use super::utils::largest_nonzero_index;
     #[test]
-    fn empty() { assert_eq!(largest_nonzero_index(&[0u8; 0]), None); }
+    fn empty() {
+        assert_eq!(largest_nonzero_index(&[0u8; 0]), None);
+    }
     #[test]
-    fn zeros() { assert_eq!(largest_nonzero_index(&[0; 10]), None); }
+    fn zeros() {
+        assert_eq!(largest_nonzero_index(&[0; 10]), None);
+    }
     #[test]
-    fn leading_zeros() { assert_eq!(largest_nonzero_index(&[1, 0, 0, 0]), Some(0)); }
+    fn leading_zeros() {
+        assert_eq!(largest_nonzero_index(&[1, 0, 0, 0]), Some(0));
+    }
     #[test]
-    fn one() { assert_eq!(largest_nonzero_index(&[1, 1]), Some(1)); }
+    fn one() {
+        assert_eq!(largest_nonzero_index(&[1, 1]), Some(1));
+    }
 }
 
 mod derivative {
@@ -51,12 +59,16 @@ mod derivative {
     // }
 }
 
-mod integrals{
+mod integrals {
     use super::utils::integrate;
     #[test]
-    fn empty() { assert_eq!(integrate([], 1i8), [1]); }
+    fn empty() {
+        assert_eq!(integrate([], 1i8), [1]);
+    }
     #[test]
-    fn zeros() { assert_eq!(integrate([0, 0, 0], 1usize), [1, 0, 0, 0]); }
+    fn zeros() {
+        assert_eq!(integrate([0, 0, 0], 1usize), [1, 0, 0, 0]);
+    }
     #[test]
     fn one() {
         assert_eq!(integrate([1], 0), [0, 1]);
@@ -66,7 +78,9 @@ mod integrals{
         assert_eq!(integrate([0, 0, 3], 1), [1, 0, 0, 1]);
     }
     #[test]
-    fn cubic() { assert_eq!(integrate([1, 2, 3, 4], 0), [0, 1, 1, 1, 1]); }
+    fn cubic() {
+        assert_eq!(integrate([1, 2, 3, 4], 0), [0, 1, 1, 1, 1]);
+    }
     // #[test] // The array is too large and violates the trait bounds
     // fn too_large_array() {
     //     assert_eq!(integrate([0i8; i8::MAX as usize], 0), [0i8; i8::MAX as usize + 1]);
@@ -79,7 +93,10 @@ mod companion {
     fn quadratic() {
         // Polynomial: x^2 + 2x + 3
         // Coefficients: [3, 2, 1] (constant, x^1, x^2) -> N = 3, M = 2
-        assert_eq!(unchecked_companion(&[3.0, 2.0, 1.0]), [[-2.0, -3.0], [1.0, 0.0]]);
+        assert_eq!(
+            unchecked_companion(&[3.0, 2.0, 1.0]),
+            [[-2.0, -3.0], [1.0, 0.0]]
+        );
     }
 
     #[test]
@@ -129,7 +146,10 @@ mod companion {
     fn integer_cubic() {
         // Polynomial: 2x^3 + x^2 - 2x + 1
         // Coefficients: [1, -2, 1, 2] -> N = 4, M = 3
-        assert_eq!(unchecked_companion(&[1, -2, 1, 2]), [[0, 1, 0], [1, 0, 0], [0, 1, 0]]);
+        assert_eq!(
+            unchecked_companion(&[1, -2, 1, 2]),
+            [[0, 1, 0], [1, 0, 0], [0, 1, 0]]
+        );
     }
 }
 
@@ -137,27 +157,32 @@ mod roots {
     use super::*;
     use crate::{
         assert_f32_eq, assert_f64_eq,
-        polynomial::utils::{
-            unchecked_roots,
-            RootFindingError,
-        },
+        polynomial::utils::{RootFindingError, unchecked_roots},
     };
     #[test]
     fn zero() {
-        assert_eq!(unchecked_roots(&[0.0, 0.0]), Err(RootFindingError::DegeneratePolynomial));
-    }
-    #[test]
-    fn one() {
-        assert_eq!(unchecked_roots(&[1.0, 0.0]), Err(RootFindingError::NoSolution));
-    }
-    #[test]
-    fn zero_slope() { assert_eq!(
+        assert_eq!(
             unchecked_roots(&[0.0, 0.0]),
             Err(RootFindingError::DegeneratePolynomial)
         );
     }
     #[test]
-    fn nan_slope() { assert_eq!(
+    fn one() {
+        assert_eq!(
+            unchecked_roots(&[1.0, 0.0]),
+            Err(RootFindingError::NoSolution)
+        );
+    }
+    #[test]
+    fn zero_slope() {
+        assert_eq!(
+            unchecked_roots(&[0.0, 0.0]),
+            Err(RootFindingError::DegeneratePolynomial)
+        );
+    }
+    #[test]
+    fn nan_slope() {
+        assert_eq!(
             unchecked_roots(&[f64::NAN, 0.0]),
             Err(RootFindingError::NoSolution)
         );
@@ -195,7 +220,8 @@ mod roots {
     #[allow(clippy::expect_used)]
     #[test]
     fn cubic_imaginary() {
-        let unchecked_roots = unchecked_roots(&[1.0, 1.0, 1.0, 1.0]).expect("failed to compute unchecked_roots");
+        let unchecked_roots =
+            unchecked_roots(&[1.0, 1.0, 1.0, 1.0]).expect("failed to compute unchecked_roots");
         let mut complex1 = None;
         let mut complex2 = None;
         for root in &unchecked_roots {
@@ -226,7 +252,8 @@ mod roots {
     #[allow(clippy::expect_used)]
     #[test]
     fn line_with_leading_zeros() {
-        let unchecked_roots = unchecked_roots(&[0.0, 1.0, 0.0, 0.0]).expect("failed to compute unchecked_roots");
+        let unchecked_roots =
+            unchecked_roots(&[0.0, 1.0, 0.0, 0.0]).expect("failed to compute unchecked_roots");
         assert_f32_eq!(unchecked_roots[0].re, 0.0);
         assert_f32_eq!(unchecked_roots[0].im, 0.0);
         assert!(unchecked_roots[1].re.is_nan());
@@ -237,7 +264,8 @@ mod roots {
     #[allow(clippy::expect_used)]
     #[test]
     fn cubic_with_zero_constant() {
-        let unchecked_roots = unchecked_roots(&[0.0, 1.0, 1.0, 1.0]).expect("failed to compute unchecked_roots");
+        let unchecked_roots =
+            unchecked_roots(&[0.0, 1.0, 1.0, 1.0]).expect("failed to compute unchecked_roots");
         assert_f32_eq!(unchecked_roots[0].re, -0.5);
         assert_f32_eq!(unchecked_roots[0].im, 0.866_025_4);
         assert_f32_eq!(unchecked_roots[1].re, -0.5);
@@ -268,11 +296,11 @@ mod roots {
         assert!(unchecked_roots[6].re.is_nan() && unchecked_roots[6].im.is_nan());
         assert_f32_eq!(
             unchecked_roots[0].im
-            + unchecked_roots[1].im
-            + unchecked_roots[2].im
-            + unchecked_roots[3].im
-            + unchecked_roots[4].im
-            + unchecked_roots[5].im,
+                + unchecked_roots[1].im
+                + unchecked_roots[2].im
+                + unchecked_roots[3].im
+                + unchecked_roots[4].im
+                + unchecked_roots[5].im,
             0.0
         );
     }
@@ -281,43 +309,70 @@ mod roots {
 mod add {
     use super::utils::unchecked_polynomial_add;
     #[test]
-    fn add_shorter() { assert_eq!(unchecked_polynomial_add([1, 1], [1]), [2, 1]); }
+    fn add_shorter() {
+        assert_eq!(unchecked_polynomial_add([1, 1], [1]), [2, 1]);
+    }
     #[test]
-    fn add_longer() { assert_eq!(unchecked_polynomial_add([1], [1, 1]), [2, 1]); }
+    fn add_longer() {
+        assert_eq!(unchecked_polynomial_add([1], [1, 1]), [2, 1]);
+    }
     #[should_panic = "attempt to add with overflow"]
     #[test]
-    fn add_overflow() { assert_eq!(unchecked_polynomial_add([1, 1], [u32::MAX]), [1, 1]); }
+    fn add_overflow() {
+        assert_eq!(unchecked_polynomial_add([1, 1], [u32::MAX]), [1, 1]);
+    }
     #[should_panic = "attempt to add with overflow"]
     #[test]
-    fn add_underflow() { assert_eq!(unchecked_polynomial_add([i8::MIN], [i8::MIN]), [0]); }
+    fn add_underflow() {
+        assert_eq!(unchecked_polynomial_add([i8::MIN], [i8::MIN]), [0]);
+    }
 }
 
 mod sub {
     use super::utils::unchecked_polynomial_sub;
     #[test]
-    fn sub_shorter() { assert_eq!(unchecked_polynomial_sub([1, 1], [1]), [0, 1]); }
+    fn sub_shorter() {
+        assert_eq!(unchecked_polynomial_sub([1, 1], [1]), [0, 1]);
+    }
     #[test]
-    fn sub_longer() { assert_eq!(unchecked_polynomial_sub([1], [1, 1]), [0, -1]); }
+    fn sub_longer() {
+        assert_eq!(unchecked_polynomial_sub([1], [1, 1]), [0, -1]);
+    }
     #[should_panic = "attempt to subtract with overflow"]
     #[test]
-    fn sub_overflow() { assert_eq!(unchecked_polynomial_sub([i8::MAX], [i8::MIN]), [0]); }
+    fn sub_overflow() {
+        assert_eq!(unchecked_polynomial_sub([i8::MAX], [i8::MIN]), [0]);
+    }
     #[should_panic = "attempt to subtract with overflow"]
     #[test]
-    fn sub_underflow() { assert_eq!(unchecked_polynomial_sub([i8::MIN], [i8::MAX]), [0]); }
+    fn sub_underflow() {
+        assert_eq!(unchecked_polynomial_sub([i8::MIN], [i8::MAX]), [0]);
+    }
 }
 
 mod convolution {
     use super::utils::convolution;
     #[test]
-    fn mul_shorter() { assert_eq!(convolution(&[1, 1], &[0]), [0, 0]); }
+    fn mul_shorter() {
+        assert_eq!(convolution(&[1, 1], &[0]), [0, 0]);
+    }
     #[test]
-    fn mul_longer() { assert_eq!(convolution(&[1, 1], &[1, 1]), [1, 2, 1]); }
+    fn mul_longer() {
+        assert_eq!(convolution(&[1, 1], &[1, 1]), [1, 2, 1]);
+    }
     #[should_panic = "attempt to multiply with overflow"]
     #[test]
-    fn mul_overflow() { assert_eq!(convolution(&[i8::MAX], &[i8::MAX]), [0]); }
+    fn mul_overflow() {
+        assert_eq!(convolution(&[i8::MAX], &[i8::MAX]), [0]);
+    }
     #[should_panic = "attempt to add with overflow"]
     #[test]
-    fn mul_add_overflow() { assert_eq!(convolution(&[1, 1], &[(u8::MAX/2)+1, (u8::MAX/2)+1]), [u8::MAX/2, u8::MAX, u8::MAX/2]); }
+    fn mul_add_overflow() {
+        assert_eq!(
+            convolution(&[1, 1], &[(u8::MAX / 2) + 1, (u8::MAX / 2) + 1]),
+            [u8::MAX / 2, u8::MAX, u8::MAX / 2]
+        );
+    }
 }
 
 mod division {
@@ -325,16 +380,28 @@ mod division {
     // possible, just difficult.
     use super::utils::long_division;
     #[test]
-    fn div_by_zero() { assert_eq!(long_division([1], &[0]), [0]); }
+    fn div_by_zero() {
+        assert_eq!(long_division([1], &[0]), [0]);
+    }
     #[test]
-    fn div_by_one() { assert_eq!(long_division([1, 2, 3], &[1]), [1, 2, 3]); }
+    fn div_by_one() {
+        assert_eq!(long_division([1, 2, 3], &[1]), [1, 2, 3]);
+    }
     #[test]
-    fn u8_max_div_by_one() { assert_eq!(long_division([u8::MAX, u8::MAX], &[1]), [u8::MAX, u8::MAX]); }
+    fn u8_max_div_by_one() {
+        assert_eq!(long_division([u8::MAX, u8::MAX], &[1]), [u8::MAX, u8::MAX]);
+    }
     #[test]
-    fn i8_min_div_by_one() { assert_eq!(long_division([i8::MIN, i8::MIN], &[1]), [i8::MIN, i8::MIN]); }
+    fn i8_min_div_by_one() {
+        assert_eq!(long_division([i8::MIN, i8::MIN], &[1]), [i8::MIN, i8::MIN]);
+    }
     #[should_panic = "attempt to multiply with overflow"]
     #[test]
-    fn u8_max_div_by_line() { assert_eq!(long_division([u8::MAX, u8::MAX], &[2, 1]), [0, 0]); }
+    fn u8_max_div_by_line() {
+        assert_eq!(long_division([u8::MAX, u8::MAX], &[2, 1]), [0, 0]);
+    }
     #[test]
-    fn div_by_two() { assert_eq!(long_division([1.0], &[2.0]), [0.5]); }
+    fn div_by_two() {
+        assert_eq!(long_division([1.0], &[2.0]), [0.5]);
+    }
 }

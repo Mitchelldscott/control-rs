@@ -39,8 +39,8 @@ use core::{
     slice,
 };
 use nalgebra::{
-    allocator::Allocator, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax, DimSub,
-    RealField, U1,
+    Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax, DimSub, RealField, U1,
+    allocator::Allocator,
 };
 use num_traits::{Float, Num, One, Zero};
 
@@ -56,11 +56,10 @@ pub mod utils;
 
 mod aliases;
 use crate::{
+    polynomial::utils::RootFindingError,
     static_storage::{array_from_iterator_with_default, reverse_array},
-    systems::System,
 };
 pub use aliases::{Constant, Cubic, Line, Quadratic, Quartic, Quintic};
-use crate::polynomial::utils::RootFindingError;
 
 // ===============================================================================================
 //      Polynomial Tests
@@ -104,7 +103,7 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// Creates a new polynomial from an array of coefficients.
     ///
     /// # Arguments
-    /// * `coefficients` - An array of coefficients `[a_0, a_1 ... a_n]`, where `a_0` is the 
+    /// * `coefficients` - An array of coefficients `[a_0, a_1 ... a_n]`, where `a_0` is the
     ///   constant and `a_n` the nth degree term.
     ///
     /// # Returns
@@ -127,7 +126,7 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// Creates a new polynomial from a function closure.
     ///
     /// This is a wrapper for [`array::from_fn`].
-    /// 
+    ///
     /// # Generic Arguments
     /// * `F` - Type of the function closure that generates the array. Restricted to
     ///   `FnMut(usize) -> T`.
@@ -259,7 +258,6 @@ impl<T: Clone + Zero, const N: usize> Polynomial<T, N> {
     /// let extended_quadratic = quadratic.resize::<4>();
     /// assert_eq!(extended_quadratic, Polynomial::from_data([0, 0, 1, 0]));
     /// ```
-    /// TODO: Unit Test
     #[inline]
     pub fn resize<const M: usize>(self) -> Polynomial<T, M> {
         Polynomial::<T, M>::from_iterator(self)
@@ -366,7 +364,7 @@ impl<T: Clone, const N: usize> Polynomial<T, N> {
     /// Evaluate the polynomial using Horner's method.
     ///
     /// # Arguments
-    /// * `value` - A variable that supports arithmetic with the polynomials coefficients.
+    /// * `value` - A variable that supports arithmetic with the polynomial's coefficients.
     ///
     /// # Returns
     /// * `T` - The value of the polynomial at the given value.
@@ -407,7 +405,11 @@ impl<T: PartialEq + One + Zero, const N: usize> Polynomial<T, N> {
 // ===============================================================================================
 
 impl<T, const N: usize> Polynomial<T, N> {
-    /// Returns a coefficient of the polynomial
+    /// Returns a coefficient of the polynomial.
+    ///
+    /// This function takes a pointer to the start of the coefficient array and adds the index using
+    /// [`wrapping_add()`]. The resulting pointer is dereferenced and a reference to the value is
+    /// returned.
     ///
     /// # Arguments
     /// * `index` - the degree/index of the coefficient to return
@@ -423,10 +425,8 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///   of the returned reference.
     #[inline]
     #[must_use]
-    unsafe fn get_unchecked(&self, index: usize) -> &T {
-        // TODO: Setup benchmarks to compare performance of ptr vs slice access
-        // &*self.coefficients.as_ptr().wrapping_add(index)
-        self.coefficients.get_unchecked(index)
+    const unsafe fn get_unchecked(&self, index: usize) -> &T {
+        unsafe { &*self.coefficients.as_ptr().wrapping_add(index) }
     }
 
     /// Returns a coefficient of the polynomial
@@ -446,9 +446,7 @@ impl<T, const N: usize> Polynomial<T, N> {
     #[inline]
     #[must_use]
     unsafe fn get_unchecked_mut(&mut self, index: usize) -> &mut T {
-        // TODO: Setup benchmarks to compare performance of ptr vs slice access
-        // &mut *self.coefficients.as_mut_ptr().wrapping_add(index)
-        self.coefficients.get_unchecked_mut(index)
+        unsafe { &mut *self.coefficients.as_mut_ptr().wrapping_add(index) }
     }
 
     /// Returns a coefficient of the polynomial.
@@ -473,7 +471,7 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// ```
     #[inline]
     #[must_use]
-    pub fn coefficient(&self, degree: usize) -> Option<&T> {
+    pub const fn coefficient(&self, degree: usize) -> Option<&T> {
         if N > degree {
             // SAFETY: the index is usize (>= 0) and less than N,
             unsafe { Some(self.get_unchecked(degree)) }
@@ -525,7 +523,7 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     ///     * `None` - when N == 0.
     ///
     /// # Safety
-    /// If the polynomial has a leading term this function makes an `unsafe` call to access it.
+    /// If the polynomial has a leading term, this function makes an `unsafe` call to access it.
     ///
     /// # Example
     /// ```
@@ -551,7 +549,7 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     ///     * `None` - when N == 0.
     ///
     /// # Safety
-    /// If the polynomial has a leading term this function makes an `unsafe` call to access it.
+    /// If the polynomial has a leading term, this function makes an `unsafe` call to access it.
     ///
     /// # Example
     /// ```
@@ -582,7 +580,7 @@ where
     ///
     /// # Safety
     /// This function uses an `unsafe` call to access the first element of the array. The
-    /// function is only available for polynomials with capacity > 0 so it is always safe.
+    /// function is only available for polynomials where `N > 0` so it is always safe.
     ///
     /// # Example
     /// ```
@@ -592,7 +590,7 @@ where
     /// ```
     #[inline]
     #[must_use]
-    pub fn constant(&self) -> &T {
+    pub const fn constant(&self) -> &T {
         // SAFETY: `N > 0` so this is valid
         unsafe { self.get_unchecked(0) }
     }
@@ -604,7 +602,7 @@ where
     ///
     /// # Safety
     /// This function uses an `unsafe` call to access the first element of the array. The
-    /// function is only available for polynomials with capacity > 0 so it is always safe.
+    /// function is only available for polynomials where `N > 0` so it is always safe.
     ///
     /// # Example
     /// ```
@@ -734,8 +732,7 @@ impl<T: Copy + Zero + One + Neg<Output = T> + Div<Output = T>, const N: usize> P
     {
         if Some(M) == self.degree() {
             Ok(utils::unchecked_companion::<T, N, M>(&self.coefficients))
-        }
-        else {
+        } else {
             Err(LeadingZeroError)
         }
     }
@@ -748,7 +745,7 @@ where
     /// Computes the roots of the polynomial.
     ///
     /// # Errors
-    /// * See [RootFindingError] for variants.
+    /// * See [`RootFindingError`] for variants.
     ///
     /// # Example
     /// ```
@@ -773,27 +770,10 @@ where
         DefaultAllocator:
             Allocator<Const<M>, DimDiff<Const<M>, U1>> + Allocator<DimDiff<Const<M>, U1>>,
     {
-        if let Some(_) = self.iter().find(|a| a.is_nan() || a.is_infinite()) {
+        if self.iter().any(|a| a.is_nan() || a.is_infinite()) {
             return Err(RootFindingError::InvalidCoefficients);
         }
         utils::unchecked_roots(&self.coefficients)
-    }
-}
-
-// ===============================================================================================
-//      Polynomial System trait
-// ===============================================================================================
-
-impl<T, const N: usize> System for Polynomial<T, N>
-where
-    T: Copy + Clone + Zero + One,
-{
-    fn zero() -> Self {
-        Self::from_element(T::zero())
-    }
-
-    fn identity() -> Self {
-        Self::from_iterator([T::one()])
     }
 }
 
@@ -1025,7 +1005,6 @@ where
 /// let p1 = Polynomial::new([1, 2, 3]);
 /// assert_eq!(p1 % 2, Polynomial::new([1, 0, 1]));
 /// ```
-/// TODO: Unit Test
 impl<T: Clone + Rem<Output = T>, const N: usize> Rem<T> for Polynomial<T, N>
 where
     Const<N>: DimSub<U1>,
@@ -1051,7 +1030,6 @@ where
 /// p1 %= 2;
 /// assert_eq!(p1, Polynomial::new([1, 0, 1]));
 /// ```
-/// TODO: Unit Test
 impl<T: Clone + RemAssign, const N: usize> RemAssign<T> for Polynomial<T, N>
 where
     Const<N>: DimSub<U1>,
@@ -1114,6 +1092,20 @@ macro_rules! impl_left_scalar_ops {
                     result
                 }
             }
+            impl<const N: usize> Rem<Polynomial<$scalar, N>> for $scalar
+            where
+                Const<N>: DimSub<U1>,
+            {
+                type Output = Polynomial<$scalar, N>;
+                #[inline(always)]
+                fn rem(self, rhs: Polynomial<$scalar, N>) -> Self::Output {
+                    let mut result = rhs;
+                    for a_i in result.iter_mut() {
+                        *a_i = self.clone().rem(a_i.clone());
+                    }
+                    result
+                }
+            }
         )*
     };
 }
@@ -1143,7 +1135,10 @@ where
     /// Adds the coefficients of a polynomial together
     #[inline]
     fn add(self, rhs: Polynomial<T, M>) -> Self::Output {
-        Polynomial::from_data(utils::unchecked_polynomial_add(self.coefficients, rhs.coefficients))
+        Polynomial::from_data(utils::unchecked_polynomial_add(
+            self.coefficients,
+            rhs.coefficients,
+        ))
     }
 }
 
@@ -1192,7 +1187,10 @@ where
     /// Subtracts the coefficients of a polynomial from each other
     #[inline]
     fn sub(self, rhs: Polynomial<T, M>) -> Self::Output {
-        Polynomial::from_data(utils::unchecked_polynomial_sub(self.coefficients, rhs.coefficients))
+        Polynomial::from_data(utils::unchecked_polynomial_sub(
+            self.coefficients,
+            rhs.coefficients,
+        ))
     }
 }
 

@@ -8,8 +8,8 @@ use core::{
     ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign},
 };
 use nalgebra::{
-    allocator::Allocator, ArrayStorage, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax,
-    DimSub, RealField, SMatrix, U1,
+    ArrayStorage, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax, DimSub, RealField,
+    SMatrix, U1, allocator::Allocator,
 };
 use num_traits::{Float, One, Zero};
 
@@ -351,7 +351,9 @@ impl fmt::Display for RootFindingError {
         match self {
             Self::NoSolution => write!(f, "Constant polynomial has no root"),
             Self::DegeneratePolynomial => write!(f, "Polynomial is identically zero (∞ roots)"),
-            Self::InvalidCoefficients => write!(f, "Polynomial contains NaN or infinite coefficients"),
+            Self::InvalidCoefficients => {
+                write!(f, "Polynomial contains NaN or infinite coefficients")
+            }
         }
     }
 }
@@ -425,9 +427,10 @@ where
         roots[0].re = coefficients[0].neg() / coefficients[1];
         roots[0].im = T::zero();
     } else if degree == 2 {
-        for (q_root, root) in unchecked_quadratic_roots(coefficients[2], coefficients[1], coefficients[0])
-            .into_iter()
-            .zip(roots.iter_mut())
+        for (q_root, root) in
+            unchecked_quadratic_roots(coefficients[2], coefficients[1], coefficients[0])
+                .into_iter()
+                .zip(roots.iter_mut())
         {
             *root = q_root;
         }
@@ -450,7 +453,8 @@ where
             .complex_eigenvalues()
             .into_iter()
             .zip(roots.iter_mut())
-            .take(degree) // the companion may have been built from shifted coefficients
+            .take(degree)
+        // the companion may have been built from shifted coefficients
         {
             *root = *eigenvalue;
         }
@@ -632,20 +636,20 @@ where
 /// # Arguments
 /// * `dividend` - The polynomial to be divided.
 /// * `divisor` - The polynomial doing the dividing.
-/// 
+///
 /// # Returns
 /// * `quotient` - result of the division.
-/// 
+///
 /// # Panics
 /// * There is an unchecked multiplication that may overflow (if dividend is as large as possible,
 /// the leading divisor term is 1 and the divisor is not a monomial).
 /// * There is an unchecked `add_assign` that may overflow
 /// * There is an unchecked `sub_assign` that may overflow
-/// 
+///
 /// # Safety
 /// This function uses `unsafe` code to access elements of the divisor, remainder and quotient.
 /// All the accesses are guaranteed to work based on the generic constants provided.
-/// 
+///
 /// # Example
 /// ```rust
 /// use control_rs::polynomial::utils::long_division;

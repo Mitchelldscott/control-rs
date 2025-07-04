@@ -6,17 +6,15 @@ use core::{
 };
 
 use nalgebra::{
-    allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimSub, RealField, SMatrix,
-    Scalar, U1,
+    Complex, Const, DefaultAllocator, DimDiff, DimSub, RealField, SMatrix, Scalar, U1,
+    allocator::Allocator,
 };
 use num_traits::{Float, One, Zero};
 
 use crate::{
-    polynomial::utils::{
-        largest_nonzero_index, unchecked_roots, RootFindingError,
-    },
+    StateSpace, TransferFunction,
+    polynomial::utils::{RootFindingError, largest_nonzero_index, unchecked_roots},
     state_space::utils::control_canonical,
-    StateSpace, TransferFunction
 };
 
 /// Computes the DC gain of a continuous transfer function.

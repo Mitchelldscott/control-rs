@@ -23,24 +23,38 @@ pub const fn reverse_array<T: Copy, const N: usize>(input: [T; N]) -> [T; N] {
 
 /// Initialize an array from an iterator.
 ///
+/// # Generic Arguments
+/// * `I` - Any collection that implements [`IntoIterator<item=T>`].
+/// * `T` - Field type of the array.
+/// * `N` - Capacity of the array.
+///
 /// # Arguments
-/// * `iterator` - An [Iterator] over a collection of `T`.
+/// * `iterator` - Collection of `T`.
 ///
 /// # Returns
-/// * `initialized_array` - An array filled with elements from the iterator
+/// * `initialized_array` - An array filled with elements from the iterator.
 ///
 /// # Safety
-/// - The iterator must have **at least** `N` elements
+/// * The iterator must have **at least** `N` elements or this will assume an uninitialized
+///   value is initialized (resulting in UB).
+///
+/// # Panics
+/// * This function will panic in debug builds if the safety criterion is not met.
 pub(crate) unsafe fn array_from_iterator<I, T, const N: usize>(iterator: I) -> [T; N]
 where
     I: IntoIterator<Item = T>,
 {
     let mut maybe_uninit_array: MaybeUninit<[T; N]> = MaybeUninit::uninit();
     let arr_ptr = maybe_uninit_array.as_mut_ptr().cast::<T>();
+    let mut write_counter = 0;
     for (i, b) in (0..N).zip(iterator.into_iter()) {
-        arr_ptr.add(i).write(b);
+        unsafe {
+            arr_ptr.add(i).write(b);
+        }
+        write_counter += 1;
     }
-    maybe_uninit_array.assume_init()
+    debug_assert_eq!(write_counter, N);
+    unsafe { maybe_uninit_array.assume_init() }
 }
 
 /// Initialize an array from an iterator and a default.
@@ -49,15 +63,21 @@ where
 /// the default value. If the iterator is equal to or longer than the array, this is equivalent to
 /// [`array_from_iterator()`].
 ///
+/// # Generic Arguments
+/// * `I` - Any collection that implements [`IntoIterator<item=T>`].
+/// * `T` - Field type of the array.
+/// * `N` - Capacity of the array.
+///
 /// # Arguments
-/// * `iterator` - An [Iterator] over a collection of `T`.
-/// * `default` - the default value to fill the array with.
+/// * `iterator` - Collection of `T`.
+/// * `default` - The default value to fill the array with.
 ///
 /// # Returns
 /// * `initialized_array` - An array filled with elements from the iterator
 ///
 /// # Safety
-/// - The iterator must have **at least** `N` elements
+/// This function calls its `unsafe` equivalent but chains the iterator to a repeated default
+/// value, so the iterator is guaranteed to be long enough to fully initialize the array.
 pub(crate) fn array_from_iterator_with_default<I, T, const N: usize>(
     iterator: I,
     default: T,
@@ -68,4 +88,50 @@ where
 {
     // Safety: The iterator has an infinite length so the array will eventually be full
     unsafe { array_from_iterator(iterator.into_iter().chain(iter::repeat(default))) }
+}
+
+/// Initialize an array from an iterator.
+///
+/// # Generic Arguments
+/// * `I` - Any collection that implements [`IntoIterator<item=(T, T)>`].
+/// * `T` - Field type of the array.
+/// * `N` - Capacity of the array.
+///
+/// # Arguments
+/// * `iterator` - Collection of `(T, T)`.
+///
+/// # Returns
+/// * `initialized_array` - An array filled with elements from the iterator.
+///
+/// # Safety
+/// * The iterator must have **at least** `N` elements or this will assume an uninitialized
+///   value is initialized (resulting in UB).
+///
+/// # Panics
+/// * This function will panic in debug builds if the safety criterion is not met.
+pub(crate) unsafe fn arrays_from_zipped_iterator<I, T, const N: usize>(
+    iterator: I,
+) -> ([T; N], [T; N])
+where
+    I: IntoIterator<Item = (T, T)>,
+{
+    let mut maybe_uninit_array1: MaybeUninit<[T; N]> = MaybeUninit::uninit();
+    let mut maybe_uninit_array2: MaybeUninit<[T; N]> = MaybeUninit::uninit();
+    let arr1_ptr = maybe_uninit_array1.as_mut_ptr().cast::<T>();
+    let arr2_ptr = maybe_uninit_array2.as_mut_ptr().cast::<T>();
+    let mut write_counter = 0;
+    for (i, (a, b)) in (0..N).zip(iterator.into_iter()) {
+        unsafe {
+            arr1_ptr.add(i).write(a);
+            arr2_ptr.add(i).write(b);
+        }
+        write_counter += 1;
+    }
+    debug_assert_eq!(write_counter, N);
+    unsafe {
+        (
+            maybe_uninit_array1.assume_init(),
+            maybe_uninit_array2.assume_init(),
+        )
+    }
 }

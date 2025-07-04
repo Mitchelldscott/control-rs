@@ -117,7 +117,7 @@ fn main() {
     println!("DC Gain: {:?}", dc_gain(&Motor_TF));
     println!("System Poles: {:?}", poles(&Motor_TF).ok());
 
-    let mut fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([-10.0], [5.0]);
+    let mut fr = FrequencyResponse::<f64, 1, 1, 100>::logspace(-10.0, 5.0);
     Motor_TF.frequency_response(&mut fr);
     #[cfg(feature = "std")]
     std::fs::create_dir_all("target/plots").expect("Failed to creat plots directory");
