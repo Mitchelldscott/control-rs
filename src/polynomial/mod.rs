@@ -28,14 +28,10 @@
 //! - [Numerical Recipes – Polynomial Evaluation](https://numerical.recipes/)
 //!
 // TODO:
-//  * calculus
-//      * `compose(f: Polynomial, g: Polynomial) -> Polynomial`
-//      * `from_roots(&mut self, roots: &[T]) -> Result<(), Polynomial>`
-//      * `from_complex_roots(&mut self, roots: &[Complex<T>]) -> Result<(), Polynomial>`
-//      * `roots(p: Polynomial, roots: &mut [T]) -> Result<(), PolynomialError>`
-//      * `complex_roots(p: Polynomial, roots: &mut [Complex<T>]) -> Result<(), PolynomialError>`
-//  * Move internal function to separate files (keep private) so other mods can use them without polynomial
-//      * string formatter with variable as argument
+//  * `compose(f: Polynomial, g: Polynomial) -> Polynomial`
+//  * `from_roots(&mut self, roots: &[T]) -> Result<(), Polynomial>`
+//  * `from_complex_roots(&mut self, roots: &[Complex<T>]) -> Result<(), Polynomial>`
+//  * string formatter with variable as argument
 
 use core::{
     array, fmt,
@@ -375,13 +371,15 @@ impl<T: Clone, const N: usize> Polynomial<T, N> {
     /// # Returns
     /// * `T` - The value of the polynomial at the given value.
     ///
+    /// # Panics
+    /// * This function may panic attempting multiplication or addition.
+    ///
     /// # Example
     /// ```rust
     /// use control_rs::polynomial::Polynomial;
     /// let p = Polynomial::new([1, 2, 3]);
     /// assert_eq!(p.evaluate(&2), 11);
     /// ```
-    /// TODO: Unit Test
     #[inline]
     pub fn evaluate<U>(&self, value: &U) -> U
     where

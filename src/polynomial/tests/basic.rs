@@ -207,3 +207,12 @@ mod coefficient_accessors {
         );
     }
 }
+
+mod evaluation {
+    use super::*;
+    #[test]
+    fn constant() {
+        let constant = Constant::from_element(10u16);
+        assert_eq!(constant.evaluate(&0), 10);
+    }
+}
