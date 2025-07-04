@@ -463,6 +463,10 @@ impl<T, const N: usize> Polynomial<T, N> {
     ///     * `Some(coefficient)` - when N > degree.
     ///     * `None` - when N <= degree.
     ///
+    /// # Safety
+    /// If the polynomial has a degree, and it is greater than the requested index, this function
+    /// makes an `unsafe` call to access the coefficient.
+    ///
     /// # Example
     /// ```
     /// use control_rs::Polynomial;
@@ -489,6 +493,10 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// * `Option<&mut T>`
     ///     * `Some(coefficient)` - when N > degree.
     ///     * `None` - when N <= degree.
+    ///
+    /// # Safety
+    /// If the polynomial has a degree, and it is greater than the requested index, this function
+    /// makes an `unsafe` call to access the coefficient.
     ///
     /// ```
     /// use control_rs::Polynomial;
@@ -518,6 +526,9 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     ///     * `Some(leading_coefficient)` - when N > 0.
     ///     * `None` - when N == 0.
     ///
+    /// # Safety
+    /// If the polynomial has a leading term this function makes an `unsafe` call to access it.
+    ///
     /// # Example
     /// ```
     /// use control_rs::Polynomial;
@@ -540,6 +551,9 @@ impl<T: Zero, const N: usize> Polynomial<T, N> {
     /// * `Option<&mut T>`
     ///     * `Some(leading_coefficient)` - when N > 0.
     ///     * `None` - when N == 0.
+    ///
+    /// # Safety
+    /// If the polynomial has a leading term this function makes an `unsafe` call to access it.
     ///
     /// # Example
     /// ```
@@ -566,9 +580,11 @@ where
     /// Only available for polynomials that have a constant term (i.e. `N > 0`).
     ///
     /// # Returns
-    /// * `Option<&T>`
-    ///     * `Some(constant)` - when N > 0.
-    ///     * `None` - when N == 0.
+    /// * `constant` - The lowest degree term of the polynomial.
+    ///
+    /// # Safety
+    /// This function uses an `unsafe` call to access the first element of the array. The
+    /// function is only available for polynomials with capacity > 0 so it is always safe.
     ///
     /// # Example
     /// ```
@@ -586,9 +602,11 @@ where
     /// Returns the constant term of the polynomial.
     ///
     /// # Returns
-    /// * `Option<&mut T>`
-    ///     * `Some(constant)` - when N > 0.
-    ///     * `None` - when N == 0.
+    /// * `constant` - The lowest degree term of the polynomial.
+    ///
+    /// # Safety
+    /// This function uses an `unsafe` call to access the first element of the array. The
+    /// function is only available for polynomials with capacity > 0 so it is always safe.
     ///
     /// # Example
     /// ```
@@ -627,8 +645,7 @@ impl<T: Clone + AddAssign + Zero + One, const N: usize> Polynomial<T, N> {
     /// *`Polynomial` - a polynomial with capacity `N - 1`
     ///
     /// # Errors
-    /// * `Zero` - The polynomial's degree is zero, this replaces returning an empty polynomial
-    /// * `DerivativeOfZero` - The polynomial has no non-zero terms
+    /// see [`DerivativeEdgeCase`] for variants.
     ///
     /// # Examples
     /// ```
