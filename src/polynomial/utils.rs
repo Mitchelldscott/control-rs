@@ -736,6 +736,7 @@ where
 /// assert_f64_eq!(coefficients[1], 0.0);
 /// assert_f64_eq!(coefficients[2], 1.0, 9.0e-16);
 /// ```
+/// TODO: Unit tests + docs
 pub fn fit<T: One + RealField, const N: usize, const K: usize>(
     x: [T; K],
     y: [T; K],

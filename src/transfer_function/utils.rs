@@ -5,14 +5,12 @@ use core::{
     ops::{Div, Neg, Sub},
 };
 
-use nalgebra::{
-    Complex, Const, DefaultAllocator, DimDiff, DimSub, RealField, SMatrix, Scalar, U1,
-    allocator::Allocator,
-};
+use nalgebra::{Complex, Const, DefaultAllocator, DimDiff, DimSub, RealField, SMatrix, Scalar, U1, allocator::Allocator, DimAdd, DimMin, DimMinimum, OMatrix};
 use num_traits::{Float, One, Zero};
 
 use crate::{
     StateSpace, TransferFunction,
+    frequency_tools::FrequencyResponse,
     polynomial::utils::{RootFindingError, largest_nonzero_index, unchecked_roots},
     state_space::utils::control_canonical,
 };
@@ -259,4 +257,142 @@ where
 {
     let tf_as_monic = as_monic(tf);
     control_canonical(&tf_as_monic.numerator, &tf_as_monic.denominator)
+}
+
+/// Fits a single-input, single-output (SISO) transfer function to frequency response data
+/// using a least-squares algorithm.
+///
+/// This function solves the equation H(s) = B(s)/A(s) for the coefficients of B(s) and A(s),
+/// where H(s) is the complex frequency response. The problem is formulated as a linear
+/// system `H(s)A(s) = B(s)`.
+///
+/// We rewrite this as `B(s) - H(s)A(s) = 0`. To avoid the trivial solution of all zeros,
+/// the leading denominator coefficient `a_n` is typically fixed to 1.
+///
+/// The equation for each frequency `w_k` is:
+/// (b_0 + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+/// where s = j*w_k.
+///
+/// This can be set up as a linear system Ax = b, where x contains the unknown coefficients.
+///
+/// # Generic Arguments
+/// * `M` - Degree of the numerator.
+/// * `N` - Degree of the denominator.
+/// * `K` - Number of frequency points.
+///
+/// # Arguments
+/// * `freq_response`: The frequency response data for a single channel (input 0 to output 0).
+/// * `m_order`: The desired order of the numerator polynomial (m).
+/// * `n_order`: The desired order of the denominator polynomial (n).
+///
+/// # Returns
+/// * `Ok(TransferFunction)`: The fitted transfer function if successful.
+/// * `Err(&str)`: An error message if fitting fails (e.g., no response data).
+///
+/// # Errors
+/// * The function will return a &str if the least squares solution fails.
+///
+/// # Example
+/// ```
+/// use control_rs::{
+///     assert_f64_eq,
+///     transfer_function::{fit, TransferFunction},
+///     frequency_tools::{FrequencyResponse, FrequencyTools}
+/// };
+/// let tf = TransferFunction::new([1.0], [1.0, 1.0]);
+/// let mut fr = FrequencyResponse::logspace(-1.0, 100.0);
+/// tf.frequency_response::<100>(&mut fr);
+/// let fitted_tf: TransferFunction<f64, 1, 2> = fit(&fr).expect("failed to fit fr data");
+/// assert_f64_eq!(fitted_tf.numerator[0], 1.0, 1e-14);
+/// assert_f64_eq!(fitted_tf.denominator[0], 1.0, 1e-14);
+/// assert_f64_eq!(fitted_tf.denominator[1], 1.0);
+/// ```
+pub fn fit<T: Copy + RealField, const M: usize, const N: usize, const K: usize, const NM: usize>(
+    freq_response: &FrequencyResponse<T, 1, 1, K>, // Example with K=100 points
+) -> Result<TransferFunction<T, M, N>, &'static str>
+where
+    Const<M>: DimSub<U1>,
+    Const<N>: DimSub<U1>,
+    Const<K>: DimSub<U1> + DimMin<Const<NM>>,
+    Const<NM>: DimMin<Const<K>, Output = Const<NM>> + DimSub<U1>,
+    <Const<N> as DimSub<U1>>::Output: DimAdd<Const<M>, Output = Const<NM>>,
+    Const<K>: DimMin<Const<NM>>,
+    DimMinimum<Const<K>, Const<NM>>: DimSub<U1>,
+    DefaultAllocator: Allocator<Const<K>, Const<NM>>
+        + Allocator<Const<NM>>
+        + Allocator<Const<K>>
+        + Allocator<DimDiff<DimMinimum<Const<K>, Const<NM>>, U1>>
+        + Allocator<DimMinimum<Const<K>, Const<NM>>, Const<NM>>
+        + Allocator<Const<K>, DimMinimum<Const<K>, Const<NM>>>
+        + Allocator<DimMinimum<Const<K>, Const<NM>>>
+{
+    // Ensure we have response data to work with.
+    // This implementation focuses on a Single-Input Single-Output (SISO) system.
+    let responses = if let Some(res) = &freq_response.responses {
+        &res[0][0]
+    } else {
+        return Err("Frequency response data is missing.");
+    };
+
+    let frequencies = &freq_response.frequencies;
+    let num_points = frequencies.len();
+
+    // The number of unknown coefficients is M (for b_0 to b_{M-1}) + N-1 (for a_0 to a_{N-1}).
+    // The coefficient a_N is fixed to 1.
+    // let num_coefficients = M + N - 1;
+
+    // We need at least as many frequency points as unknown coefficients.
+    // if num_points < num_coefficients { // implemented as trait bound
+    //     return Err("Not enough frequency points to solve for the given orders.");
+    // }
+
+    // Construct the matrix A for the Least-Squares problem Ax = b.
+    // Each row corresponds to a frequency point.
+    // The columns correspond to the coefficients [b_0, ..., b_{M-1}, a_0, ..., a_{N-2}].
+    let mut a_mat = OMatrix::<Complex<T>, Const<K>, Const<NM>>::zeros();
+
+    // Construct the vector b.
+    let mut b_vec = OMatrix::<Complex<T>, Const<K>, U1>::zeros();
+
+    for k in 0..num_points {
+        let w = frequencies[k].clone();
+        let s = Complex::new(T::zero(), w);
+        let h_s = responses[k].clone();
+
+        // Fill with the part of the row for numerator coefficients (B(s))
+        for i in 0..M {
+            a_mat[(k, i)] = s.powu(i as u32);
+        }
+
+        // Fill with the part of the row for denominator coefficients (A(s))
+        for i in 0..(N - 1) {
+            a_mat[(k, M + i)] = -h_s.clone() * s.powu(i as u32);
+        }
+
+        // The right-hand side is H(s) * s^n, since we fixed a_n = 1.
+        b_vec[k] = h_s * s.powu(N as u32 - 1);
+    }
+
+    // Solve the Least-Squares problem A*x = b.
+    // The SVD decomposition is a robust way to solve this.
+    let svd = a_mat.svd(true, true);
+    let x = svd.solve(&b_vec, T::RealField::from_f64(1e-10).unwrap()) // 1e-10 is the tolerance
+        .map_err(|_| "Least-squares solution failed.")?;
+
+    // Extract coefficients from the solution vector x.
+    let mut numerator = [T::zero(); M];
+    let mut denominator = [T::zero(); N];
+
+    for i in 0..M {
+        numerator[i] = x[i].re.clone(); // Coefficients should be real
+    }
+    for i in 0..(N - 1) {
+        denominator[i] = x[M + i].re.clone();
+    }
+    denominator[N - 1] = T::one(); // The fixed coefficient
+
+    Ok(TransferFunction {
+        numerator,
+        denominator,
+    })
 }
