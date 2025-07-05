@@ -1,9 +1,18 @@
 //! Quadcopter attitude and altitude controls
+//! TODO:
+//!     * Fix NLDynamics
+//!         * fix bugs
+//!         * move to separate mod like dc_motor
+//!         * double check ground implementation
+//!     * Change linearization to use analytical derivation of jacobians not perturbations
+//!     * Find paper with good control architecture
+//!     * Implement controller and compare performance with paper
 
-use control_rs::systems::{DynamicalSystem, NLModel};
-
-use control_rs::StateSpace;
-use control_rs::integrators::runge_kutta4;
+use control_rs::{
+    StateSpace,
+    integrators::runge_kutta4,
+    systems::{DynamicalSystem, NLModel},
+};
 use nalgebra::{Matrix3, Rotation3, SMatrix, SVector, Vector3, Vector4};
 
 /// Calculates the Direction Cosine Matrix (DCM) from Euler angles (roll, pitch, yaw).
@@ -245,10 +254,10 @@ fn main() {
         / (4.0 * quad_dynamics.thrust_coefficient))
         .sqrt();
     let quad_input = QuadInput::new(
-        grav_compensation+0.01,
-        grav_compensation-0.01,
-        grav_compensation+0.01,
-        grav_compensation-0.01,
+        grav_compensation + 0.01,
+        grav_compensation - 0.01,
+        grav_compensation + 0.01,
+        grav_compensation - 0.01,
     );
     for _ in 0..1000 {
         quad_state = runge_kutta4(&quad_dynamics, quad_state, quad_input, 0.0, 0.1, 0.01);
