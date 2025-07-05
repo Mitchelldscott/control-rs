@@ -1,6 +1,12 @@
 # Control-rs
 
-Rust-native numerical modeling and synthesis library for embedded projects.
+Rust-native numerical modeling and synthesis library for embedded projects. By closely integrating advanced numerical
+tools with the embedded Rust ecosystem, `control-rs` offers a powerful and flexible way to design and implement
+control systems. Instead of relying on MATLAB's hardware support and code generation, `control-rs` provides a toolbox
+designed to be integrated with any of the awesome embedded Rust crates. 
+
+The inspiration for this project comes from my enthusiasm for embedded Rust and interest in realtime system 
+identification and control. 
 
 The crate is `no_std` by default (but has a `std` feature flag for plotting) and intends to support 
 both fixed-point and floating-point numeric types.
@@ -8,8 +14,9 @@ both fixed-point and floating-point numeric types.
 This project has two long-term goals:
 1. Cargo templates for robotic components (i.e., ESCs, BMS and odometry systems). These templates will use the
 [awesome embedded rust crates](https://!github.com/rust-embedded/awesome-embedded-rust) to provide detailed guides to implementing and operating the components.
-2. Wrapper crates for specific control system design tools (i.e., autopilot or self-driving tools). These toolboxes
-will have specific models, types and routines to help design and deploy more complex control and estimation systems.
+2. Wrapper crates for specific control system design tools (i.e., autopilot, self-driving or chemical process controls). 
+These toolboxes will have specific models, types and routines to help design and deploy more complex control and 
+estimation systems.
 
 This list covers a few projects that are in the works:
 - [ ] DC Motor lead-lag compensator
@@ -73,7 +80,7 @@ use control_rs::{
 };
 
 fn main() {
-    // create a transfer function 1 / s(s + 0.1)
+    // transfer function 1 / s(s + 0.1)
     let mut tf = TransferFunction::new([1.0], [1.0, 0.1, 0.0]);
     println!("{tf}");
     println!("DC Gain of TF: {}", dc_gain(&tf));
@@ -128,7 +135,7 @@ estimator and controller for an RC car or Quadcopter.
 
 # Contributing
 
-We welcome contributions! If you are a controls student/enthusiast doing a project leave an issue on git with the 
+We welcome contributions! If you are a control theory student/enthusiast doing a project leave an issue on git with the 
 functions you need so `control-rs` can be your one-stop-shop solution for design and implementation.
 
 # License
