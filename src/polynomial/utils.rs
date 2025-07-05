@@ -8,8 +8,8 @@ use core::{
     ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign},
 };
 use nalgebra::{
-    ArrayStorage, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax, DimSub, RealField,
-    SMatrix, U1, allocator::Allocator,
+    ArrayStorage, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax, DimMin, DimMinimum, DimSub, RealField,
+    SMatrix, U1, allocator::Allocator
 };
 use num_traits::{Float, One, Zero};
 
@@ -710,4 +710,53 @@ where
         }
     }
     quotient
+}
+
+/// Fits a polynomial to the given data points using the least squares method.
+///
+/// # Generic Arguments
+/// * `T` - Field type of the data points
+/// * `N` - Capacity of the polynomial coefficients (restricted to `[1,127]`).
+/// * `K` - Number of data points in the X, y sample (restricted to `[1,127]`).
+///
+/// # Arguments
+/// * `x` - Input data points.
+/// * `y` - Corresponding output values.
+///
+/// # Returns
+/// * `coefficients` - A degree minor array of coefficients fit to the data.
+///
+/// # Example
+/// ```rust
+/// use control_rs::{polynomial::utils::fit, assert_f64_eq};
+/// let x = [-2.0, -1.0, 0.0, 1.0, 2.0];
+/// let y = [4.0, 1.0, 0.0, 1.0, 4.0];
+/// let coefficients: [f64; 3] = fit(x, y);
+/// assert_f64_eq!(coefficients[0], 0.0, 2.5e-15);
+/// assert_f64_eq!(coefficients[1], 0.0);
+/// assert_f64_eq!(coefficients[2], 1.0, 9.0e-16);
+/// ```
+/// TODO: Unit tests + docs
+pub fn fit<T: One + RealField, const N: usize, const K: usize>(
+    x: [T; K],
+    y: [T; K],
+) -> [T; N]
+where
+    Const<K>: DimMin<Const<N>>,
+    DimMinimum<Const<K>, Const<N>>: DimSub<U1>,
+    DefaultAllocator: Allocator<DimMinimum<Const<K>, Const<N>>, Const<N>>
+        + Allocator<Const<K>, DimMinimum<Const<K>, Const<N>>>
+        + Allocator<DimMinimum<Const<K>, Const<N>>>
+        + Allocator<DimDiff<DimMinimum<Const<K>, Const<N>>, U1>>,
+{
+    let h = SMatrix::<T, K, 1>::from_row_slice(&y);
+    let vandermonde = SMatrix::<T, K, N>::from_fn(|i, j| {
+        // (0..degree - j).fold(T::one(), |acc, _| acc * x[i].clone()) // degree major order
+        x[i].clone().powi(j as i32) // can use RealField trait fn
+    });
+    vandermonde
+        .svd(true, true)
+        .solve(&h, T::RealField::from_f64(1e-15).unwrap())
+        .expect("Least squares solution failed")
+        .data.0[0].clone()
 }
