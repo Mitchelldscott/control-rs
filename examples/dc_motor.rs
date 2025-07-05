@@ -132,7 +132,7 @@ fn main() {
     assert_eq!(dc_gain(&gain_compensated_tf), 1.0);
 
     #[cfg(feature = "std")]
-    let fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([-10.0], [5.0]);
+    let fr = FrequencyResponse::<f64, 1, 1, 100>::logspace(-10.0, 5.0);
     #[cfg(feature = "std")]
     bode(
         "DC Motor gain compensated Transfer Function",
@@ -154,7 +154,7 @@ fn main() {
     );
 
     #[cfg(feature = "std")]
-    let fr = FrequencyResponse::<f64, 100, 1, 1>::logspace([-10.0], [5.0]);
+    let fr = FrequencyResponse::<f64, 1, 1, 100>::logspace(-10.0, 5.0);
     #[cfg(feature = "std")]
     bode(
         "DC Motor lead compensated Transfer Function",

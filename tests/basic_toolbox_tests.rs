@@ -161,7 +161,7 @@ mod bode_and_nyquist_plot_tests {
         let title = "Demo Bode Plot";
         let tf = TransferFunction::new([1.0], [1.0, 1.0, 1.0]);
 
-        let response = FrequencyResponse::<f64, 100, 1, 1>::logspace([-1.0], [10.0]);
+        let response = FrequencyResponse::<f64, 1, 1, 100>::logspace(-1.0, 10.0);
 
         std::fs::create_dir_all("../target/plots").unwrap();
         bode(title, &tf, response).write_html("../target/plots/test_bode_plot.html");
@@ -173,6 +173,6 @@ mod bode_and_nyquist_plot_tests {
         let _title = "Demo Nyquist Plot";
         let _tf = TransferFunction::new([1.0], [1.0, 1.0, 1.0]);
 
-        let _response = FrequencyResponse::<f64, 100, 1, 1>::logspace([0.1], [10.0]);
+        let _response = FrequencyResponse::<f64, 1, 1, 100>::logspace(0.1, 10.0);
     }
 }

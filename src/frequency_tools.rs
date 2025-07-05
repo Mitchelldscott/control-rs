@@ -156,15 +156,15 @@ pub trait FrequencyTools<T, const N: usize, const M: usize> {
 /// * `T` - The field type for frequencies and responses.
 /// * `N` - The number of input channels.
 /// * `M` - The number of output channels.
-/// * `K` - The number of frequency points to sample.
+/// * `K` - The number of frequency points to be sampled.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrequencyResponse<T, const N: usize, const M: usize, const K: usize> {
     /// An array of the frequency points to sample every input and output channel.
     pub frequencies: [T; K],
     /// A 3D array representing the complex frequency responses. The dimensions are:
-    /// `[input_index][output_index][frequency_point_index]`. This means for each of `K` frequency
-    /// points, there is an `MxN` matrix of complex responses, where `responses[i][j][k]` is the
-    /// response from input `i` to output `j` at the `k`-th frequency point.
+    /// `[input_index][output_index][frequency_point_index]`. This means for each of the `K`
+    /// frequency points, there are `MxN` complex responses, where `responses[i][j][k]`
+    /// is the response from input `i` to output `j` at the `k`-th frequency point.
     pub responses: Option<[[[Complex<T>; K]; M]; N]>,
 }
 
@@ -329,8 +329,8 @@ impl<T: Copy + Zero + One + RealField + Magnitude + Phase, const N: usize, const
     pub fn new<const K: usize>(frequency_response: &FrequencyResponse<T, N, M, K>) -> Self {
         let mut margins = [[PhaseGainCrossover::default(); N]; M];
         if let Some(responses) = frequency_response.responses {
-            for (margin_row, response) in margins.iter_mut().zip(responses.iter()) {
-                for (margin, response) in margin_row.iter_mut().zip(response.iter()) {
+            for (margin_row, response_row) in margins.iter_mut().zip(responses.iter()) {
+                for (margin, response) in margin_row.iter_mut().zip(response_row.iter()) {
                     *margin = PhaseGainCrossover::new(&frequency_response.frequencies, response);
                 }
             }
@@ -364,39 +364,53 @@ pub fn unzip_complex_array<T: RealField, const K: usize>(
     }
 }
 
-/// Finds the margin and frequency associated with a threshold.
+/// Finds the value in two arrays where a third array crosses a threshold.
 ///
+/// The function will attempt to interpolate the values in the second and third array using a linear
+/// approximation of the crossover in the first array.
 ///
+/// # Generic Arguments
+/// * `T` - Field type of the threshold and three input arrays.
+/// * `K` - Capacity of each array.
+///
+/// # Arguments
+/// * `crossover` - The array that may cross the threshold.
+/// * `a` - First array to read a value from.
+/// * `b` - Second array to read a value from.
+///
+/// # Returns
+/// * `(Option, Option)`
+///     * `(value_a, value_b)` - The approximate values from the second and third arrays.
+///     * `(None, None)` - The crossover array does not cross the threshold.
 pub fn find_margin<T, const K: usize>(
+    crossover: &[T; K],
     a: &[T; K],
     b: &[T; K],
-    c: &[T; K],
     threshold: T,
 ) -> (Option<T>, Option<T>)
 where
     T: Clone + PartialOrd + Sub<Output = T> + Mul<Output = T> + Div<Output = T>,
 {
-    if let Some((index, is_exact)) = first_crossover_index(a, &threshold) {
+    if let Some((index, is_exact)) = first_crossover_index(crossover, &threshold) {
         if is_exact {
-            (Some(b[index].clone()), Some(c[index].clone()))
+            (Some(a[index].clone()), Some(b[index].clone()))
         } else {
             (
-                Some(array_interpolation(a, b, index, threshold.clone())),
-                Some(array_interpolation(a, c, index, threshold)),
+                Some(array_interpolation(crossover, a, index, threshold.clone())),
+                Some(array_interpolation(crossover, b, index, threshold)),
             )
         }
     } else {
         (None, None)
     }
 }
-/// Computes the first crossover of a signal
+/// Computes the first crossover of a signal.
 ///
 /// This function will find the index when the array crosses the given threshold:
 ///
 /// <pre>b[i] < thresh < b[i+1] || b[i] > thresh > b[i+1]</pre>
 ///
-/// If no crossover is found within the given frequency range, the function returns `None` for
-/// that parameter.
+/// If no crossover is found within the given frequency range, the function returns `None`.
 ///
 /// # Generic Arguments
 /// * `T` - Field type of the array and threshold.
@@ -449,7 +463,7 @@ where
 /// * `interpolated_value` - The interpolated value from `b`.
 ///
 /// # Panics
-/// * If index == K-1, out of bounds access will occur.
+/// * If index == K-1, out-of-bounds access will occur.
 fn array_interpolation<T, const K: usize>(a: &[T; K], b: &[T; K], index: usize, threshold: T) -> T
 where
     T: Clone + PartialOrd + Sub<Output = T> + Mul<Output = T> + Div<Output = T>,
@@ -505,6 +519,7 @@ pub fn logspace<T: Float + AddAssign, const N: usize>(a: T, b: T) -> [T; N] {
         return result;
     }
 
+    // TODO: Remove this unwrap
     #[allow(clippy::unwrap_used)]
     let step = (b - a) / T::from(N - 1).unwrap();
 
