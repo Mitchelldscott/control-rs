@@ -13,7 +13,7 @@ both fixed-point and floating-point numeric types.
 
 This project has two long-term goals:
 1. Cargo templates for robotic components (i.e., ESCs, BMS and odometry systems). These templates will use the
-[awesome embedded rust crates](https://!github.com/rust-embedded/awesome-embedded-rust) to provide detailed guides to implementing and operating the components.
+[awesome embedded rust crates](https://github.com/rust-embedded/awesome-embedded-rust) to provide detailed guides to implementing and operating the components.
 2. Wrapper crates for specific control system design tools (i.e., autopilot, self-driving or chemical process controls). 
 These toolboxes will have specific models, types and routines to help design and deploy more complex control and 
 estimation systems.
