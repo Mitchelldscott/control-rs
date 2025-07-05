@@ -2,8 +2,9 @@
 
 use control_rs::systems::{DynamicalSystem, NLModel};
 
-use nalgebra::{SMatrix, Matrix3, Vector3, Vector4, Rotation3, SVector};
 use control_rs::StateSpace;
+use control_rs::integrators::runge_kutta4;
+use nalgebra::{Matrix3, Rotation3, SMatrix, SVector, Vector3, Vector4};
 
 /// Calculates the Direction Cosine Matrix (DCM) from Euler angles (roll, pitch, yaw).
 ///
@@ -17,7 +18,9 @@ pub fn dcm(theta: f64, phi: f64, psi: f64) -> Matrix3<f64> {
     // the Z-Y'-X'' sequence, which is equivalent to the Python code's
     // Rz @ Ry @ Rx multiplication.
     // q.x is roll, q.y is pitch, q.z is yaw.
-    Rotation3::from_euler_angles(theta, phi, psi).matrix().clone()
+    Rotation3::from_euler_angles(theta, phi, psi)
+        .matrix()
+        .clone()
 }
 
 /// Creates a skew-symmetric matrix from a 3D vector.
@@ -92,18 +95,22 @@ type QuadInput = SVector<f64, 4>;
 type QuadState = SVector<f64, 12>;
 type QuadOutput = SVector<f64, 12>; // full state output for now
 
-
 impl DynamicalSystem<QuadInput, QuadState, QuadOutput> for QuadcopterNLDynamics {
     /// Implements the nonlinear quadcopter equations of motion: x_dot = f(x, u).
     fn dynamics(&self, x: QuadState, u: QuadInput) -> QuadState {
         // Deconstruct state vector for clarity
+        let position = x.fixed_rows::<3>(0);
         let velocity = x.fixed_rows::<3>(3);
         let angles = x.fixed_rows::<3>(6); // [roll, pitch, yaw]
         let ang_velocity = x.fixed_rows::<3>(9); // [p, q, r]
 
         // --- Kinematics ---
         // 1. Position derivative (dx/dt = v)
-        let pos_dot = velocity;
+        let pos_dot = if position[2] >= 0.0 {
+            Vector3::new(velocity[0], velocity[1], velocity[2])
+        } else {
+            Vector3::new(velocity[0], velocity[1], 0.0)
+        };
 
         // 2. Euler angle rates (d(angles)/dt = W * w)
         let (phi, theta, psi) = (angles[0], angles[1], angles[2]);
@@ -114,16 +121,21 @@ impl DynamicalSystem<QuadInput, QuadState, QuadOutput> for QuadcopterNLDynamics 
 
         // Transformation matrix from body rates to Euler rates
         let mut w_matrix = Matrix3::zeros();
-        if c_th.abs() > 1e-6 { // Avoid singularity at pitch = +/- 90 deg
-            w_matrix.m11 = 1.0; w_matrix.m12 = s_phi * t_th; w_matrix.m13 = c_phi * t_th;
-            w_matrix.m22 = c_phi; w_matrix.m23 = -s_phi;
-            w_matrix.m32 = s_phi / c_th; w_matrix.m33 = c_phi / c_th;
+        if c_th.abs() > 1e-6 {
+            // Avoid singularity at pitch = +/- 90 deg
+            w_matrix.m11 = 1.0;
+            w_matrix.m12 = s_phi * t_th;
+            w_matrix.m13 = c_phi * t_th;
+            w_matrix.m22 = c_phi;
+            w_matrix.m23 = -s_phi;
+            w_matrix.m32 = s_phi / c_th;
+            w_matrix.m33 = c_phi / c_th;
         }
         let angles_dot = w_matrix * ang_velocity;
 
         // --- Dynamics ---
         // Total thrust
-        let total_thrust = self.thrust_coefficient * u.sum();
+        let total_thrust = self.thrust_coefficient * u.map(|u_i| u_i.powi(2)).sum();
 
         // Rotation matrix from body to inertial frame
         let r_matrix = dcm(theta, phi, psi);
@@ -131,8 +143,11 @@ impl DynamicalSystem<QuadInput, QuadState, QuadOutput> for QuadcopterNLDynamics 
         // 3. Acceleration in inertial frame (dv/dt = g - R*T/m)
         let thrust_inertial = r_matrix * Vector3::new(0.0, 0.0, total_thrust);
         let gravity_vec = Vector3::new(0.0, 0.0, -self.gravity);
-        let vel_dot = gravity_vec + (1.0 / self.airframe_mass) * thrust_inertial;
-
+        let vel_dot = if position[2] >= 0.0 {
+            gravity_vec + (thrust_inertial / self.airframe_mass)
+        } else {
+            thrust_inertial / self.airframe_mass
+        };
         // 4. Angular acceleration (dw/dt = J^-1 * (tau - w x Jw))
         let l = self.wing_length;
         let k = self.thrust_coefficient;
@@ -140,8 +155,8 @@ impl DynamicalSystem<QuadInput, QuadState, QuadOutput> for QuadcopterNLDynamics 
 
         // Torques in body frame
         let tau = Vector3::new(
-            l * k * (u[3].powi(2) - u[1].powi(2)),             // Roll torque
-            l * k * (u[2].powi(2) - u[0].powi(2)),             // Pitch torque
+            l * k * (u[3].powi(2) - u[1].powi(2)), // Roll torque
+            l * k * (u[2].powi(2) - u[0].powi(2)), // Pitch torque
             cd * (-u[0].powi(2) + u[1].powi(2) - u[2].powi(2) + u[3].powi(2)), // Yaw torque
         );
 
@@ -175,22 +190,24 @@ type QuadcopterSS = StateSpace<
 
 /// This implementation allows the quadcopter model to be linearized at any
 /// operating point (x, u).
-impl NLModel<
-    QuadInput,
-    QuadState,
-    QuadOutput,
-    SMatrix<f64, 12, 12>,
-    SMatrix<f64, 12, 4>,
-    SMatrix<f64, 12, 12>,
-    SMatrix<f64, 12, 4>,
-> for QuadcopterNLDynamics {
+impl
+    NLModel<
+        QuadInput,
+        QuadState,
+        QuadOutput,
+        SMatrix<f64, 12, 12>,
+        SMatrix<f64, 12, 4>,
+        SMatrix<f64, 12, 12>,
+        SMatrix<f64, 12, 4>,
+    > for QuadcopterNLDynamics
+{
     /// Linearizes the system about a nominal state and input using the
     /// finite difference method to approximate the Jacobians.
     fn linearize(&self, x: QuadState, u: QuadInput) -> QuadcopterSS {
         let mut a = SMatrix::<f64, 12, 12>::zeros();
         let mut b = SMatrix::<f64, 12, 4>::zeros();
         let c = SMatrix::<f64, 12, 12>::identity(); // Since y = x, C is the identity matrix
-        let d = SMatrix::<f64, 12, 4>::zeros();      // Since y does not depend on u, D is zero
+        let d = SMatrix::<f64, 12, 4>::zeros(); // Since y does not depend on u, D is zero
 
         // Epsilon for numerical differentiation
         let eps = 1e-6;
@@ -198,7 +215,7 @@ impl NLModel<
         // --- Calculate A Matrix (Jacobian df/dx) ---
         let fx_nominal = self.dynamics(x, u);
         for i in 0..12 {
-            let mut x_perturbed = *x;
+            let mut x_perturbed = x;
             x_perturbed[i] += eps;
             let fx_perturbed = self.dynamics(x_perturbed, u);
             let column = (fx_perturbed - fx_nominal) / eps;
@@ -207,7 +224,7 @@ impl NLModel<
 
         // --- Calculate B Matrix (Jacobian df/du) ---
         for i in 0..4 {
-            let mut u_perturbed = *u;
+            let mut u_perturbed = u;
             u_perturbed[i] += eps;
             let fx_perturbed = self.dynamics(x, u_perturbed);
             let column = (fx_perturbed - fx_nominal) / eps;
@@ -222,6 +239,20 @@ impl NLModel<
 fn main() {
     // Initialize the dynamics
     let quad_dynamics = QuadcopterNLDynamics::default();
+    let mut quad_state = QuadState::zeros();
+    // F = ma = 4 * tau * U^2
+    let grav_compensation = (quad_dynamics.airframe_mass * quad_dynamics.gravity
+        / (4.0 * quad_dynamics.thrust_coefficient))
+        .sqrt();
+    let quad_input = QuadInput::new(
+        grav_compensation+0.01,
+        grav_compensation-0.01,
+        grav_compensation+0.01,
+        grav_compensation-0.01,
+    );
+    for _ in 0..1000 {
+        quad_state = runge_kutta4(&quad_dynamics, quad_state, quad_input, 0.0, 0.1, 0.01);
+    }
 
-
+    println!("{:?}", quad_state);
 }
