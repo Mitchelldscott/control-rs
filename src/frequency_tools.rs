@@ -32,64 +32,152 @@
 //! - [ ] remove all the unwraps
 //!     - `first_crossover` should get broken up to return the index of the crossover
 //!     - Need a frequency field trait to provide some constants and log fns
-//! - [ ] textbook example of trait productivity
 //! - [ ] move plotly to plotly helper file (or wait for a nice gui)
 
-use crate::static_storage::array_from_iterator;
+#[cfg(feature = "std")]
+use core::ops::Neg;
 use core::ops::{AddAssign, Div, Mul, Sub};
-use nalgebra::{Complex, ComplexField, RealField};
-use num_traits::{Float, Zero};
 
-// this is not that useful without fixed point support
-// pub trait Frequency {
-//     fn pow(self, exp: Self) -> Self;
-//     fn log10(self) -> Self;
-//     fn mag_to_db(self) -> Self;
-//     fn db_to_mag(self) -> Self;
-// }
+use nalgebra::{Complex, ComplexField, RealField};
+use num_traits::{Float, One, Zero};
+
+use crate::static_storage::arrays_from_zipped_iterator;
+
+/// A trait for types that can represent an angle and provide
+/// conversion from degrees to radians.
+pub trait Phase: Sized + Mul<Output = Self> + Div<Output = Self> {
+    /// Associated const to help with generic functions
+    const PI: Self;
+    /// Associated const to help with generic functions
+    const ONE_EIGHTY: Self;
+    /// Converts the angle from degrees to radians.
+    #[must_use]
+    #[inline]
+    fn to_radians(self) -> Self {
+        self * (Self::PI / Self::ONE_EIGHTY)
+    }
+    /// Converts the angle from radians to degrees.
+    #[must_use]
+    #[inline]
+    fn to_degrees(self) -> Self {
+        self * (Self::ONE_EIGHTY / Self::PI)
+    }
+}
+
+impl Phase for f32 {
+    const PI: Self = core::f32::consts::PI;
+    const ONE_EIGHTY: Self = 180.0;
+}
+impl Phase for f64 {
+    const PI: Self = core::f64::consts::PI;
+    const ONE_EIGHTY: Self = 180.0;
+}
+
+/// A trait for types that can represent a magnitude and provide
+/// conversion between absolute values and decibels (dB).
+pub trait Magnitude: Sized + Mul<Output = Self> + Div<Output = Self> {
+    /// Associated constant for magnitude calculations.
+    const TEN: Self;
+
+    /// Associated constant for decibel calculations.
+    const TWENTY: Self;
+
+    /// Calculates x where 10^x = self
+    ///
+    /// This is not defined for values <= 0
+    #[must_use]
+    fn log10(self) -> Self;
+
+    /// Calculates self^exp
+    ///
+    /// This is not defined for values <= 0
+    #[must_use]
+    fn powf(self, exp: Self) -> Self;
+
+    /// Converts an absolute magnitude value to decibels (dB).
+    ///
+    /// The formula used is `20 * log10(self / DB_REFERENCE)`.
+    #[must_use]
+    #[inline]
+    fn to_db(self) -> Self {
+        Self::TWENTY * self.log10()
+    }
+
+    /// Converts a decibel (dB) value to an absolute magnitude.
+    ///
+    /// The formula used is `DB_REFERENCE * 10^(self / DB_MULTIPLIER)`.
+    #[must_use]
+    #[inline]
+    fn to_mag(self) -> Self {
+        Self::TEN.powf(self / Self::TWENTY)
+    }
+}
+
+impl Magnitude for f32 {
+    const TEN: Self = 10.0;
+    const TWENTY: Self = 20.0;
+    #[inline]
+    fn log10(self) -> Self {
+        self.log10()
+    }
+    #[inline]
+    fn powf(self, exp: Self) -> Self {
+        self.powf(exp)
+    }
+}
+
+impl Magnitude for f64 {
+    const TEN: Self = 10.0;
+    const TWENTY: Self = 20.0;
+    #[inline]
+    fn log10(self) -> Self {
+        self.log10()
+    }
+    #[inline]
+    fn powf(self, exp: Self) -> Self {
+        self.powf(exp)
+    }
+}
 
 /// Standard interface for frequency analysis tools
-pub trait FrequencyTools<T: Float + RealField, const N: usize, const M: usize> {
+pub trait FrequencyTools<T, const N: usize, const M: usize> {
     /// Calculates the complex response from a set of input frequencies
-    fn frequency_response<const L: usize>(&self, response: &mut FrequencyResponse<T, L, N, M>);
+    fn frequency_response<const K: usize>(&self, response: &mut FrequencyResponse<T, N, M, K>);
 }
 
-/// A unified Frequency Response object
+/// A Unified Frequency Response.
 ///
 /// This struct provides constructors and utilities for generating and handling frequency response
-/// data for a system with generic input and output dimensions. The number of frequency points is
-/// also configured through a generic parameter to allow easily controlling the resolution.
+/// data for a system with generic input and output channels.
 ///
-/// > A channel is a path from input to output, a system's channels are commonly represented as a
-/// > matrix (with rows = inputs and columns = outputs).
-///
-/// By default, the constructors will set the response to `None` and only fill the frequencies that
-/// will be sampled.
+/// By default, the constructors will set the response to `None`.
 ///
 /// # Generic Arguments
-/// * `T` - The field type for frequencies and responses
-/// * `L` - The number of frequency points to sample per channel
-/// * `N` - Dimension of the system's input
-/// * `M` - Dimension of the system's output
+/// * `T` - The field type for frequencies and responses.
+/// * `N` - The number of input channels.
+/// * `M` - The number of output channels.
+/// * `K` - The number of frequency points to be sampled.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FrequencyResponse<T, const L: usize, const N: usize, const M: usize> {
-    /// A 2D array where each row corresponds to the frequency points for a single input channel.
-    pub frequencies: [[T; L]; N],
-    /// A 2D array where each row corresponds to the complex frequency responses for a single
-    /// output channel.
-    pub responses: Option<[[Complex<T>; L]; M]>,
+pub struct FrequencyResponse<T, const N: usize, const M: usize, const K: usize> {
+    /// An array of the frequency points to sample every input and output channel.
+    pub frequencies: [T; K],
+    /// A 3D array representing the complex frequency responses. The dimensions are:
+    /// `[input_index][output_index][frequency_point_index]`. This means for each of the `K`
+    /// frequency points, there are `MxN` complex responses, where `responses[i][j][k]`
+    /// is the response from input `i` to output `j` at the `k`-th frequency point.
+    pub responses: Option<[[[Complex<T>; K]; M]; N]>,
 }
 
-impl<T, const L: usize, const N: usize, const M: usize> FrequencyResponse<T, L, N, M> {
-    /// Creates a new `FrequencyResponse` with specified frequency data and zeroed responses.
+impl<T, const N: usize, const M: usize, const K: usize> FrequencyResponse<T, N, M, K> {
+    /// Creates a new `FrequencyResponse` with specified frequency data and no responses.
     ///
     /// # Arguments
-    /// * `frequencies` - A 2D array containing frequency points for each input channel
+    /// * `frequencies` - An array containing frequency points.
     ///
     /// # Returns
     /// * `FrequencyResponse` - instance with the provided frequencies and zero-initialized
-    ///   responses
-    pub const fn new(frequencies: [[T; L]; N]) -> Self {
+    ///   responses.
+    pub const fn new(frequencies: [T; K]) -> Self {
         Self {
             frequencies,
             responses: None,
@@ -97,100 +185,69 @@ impl<T, const L: usize, const N: usize, const M: usize> FrequencyResponse<T, L, 
     }
 }
 
-impl<T, const L: usize, const N: usize, const M: usize> FrequencyResponse<T, L, N, M>
+impl<T, const N: usize, const M: usize, const K: usize> FrequencyResponse<T, N, M, K>
 where
-    T: Float + Zero,
+    T: RealField,
 {
-    /// Extract the magnitude and phase from a frequency responses output channel
+    /// Extract the magnitude and phase from a frequency response channel.
     ///
-    /// If there is no frequency response, the magnitude and phase arrays will be zero-filled
-    pub fn mag_phase(&self, output_channel: usize) -> ([T; L], [T; L]) {
-        // TODO: remove zero initialization + move this to general function so Margins can reuse it
-        let mut mag = [T::zero(); L];
-        let mut phase = [T::zero(); L];
-        if let Some(responses) = self.responses {
-            responses[output_channel]
-                .iter()
-                .zip(mag.iter_mut().zip(phase.iter_mut()))
-                .for_each(|(response, (mag, phase))| (*mag, *phase) = response.to_polar());
+    /// # Arguments
+    /// * `input_channel` - index of the input channel to extract a response from.
+    /// * `output_channel` - index of the output channel to extract a response from.
+    ///
+    ///# Returns
+    /// * `Option`
+    ///     * `(mag, phase)` - magnitude and phase of the specified input/output response channel.
+    ///     * `None` - There is no response data for the specified channel.
+    pub fn mag_phase(
+        &self,
+        input_channel: usize,
+        output_channel: usize,
+    ) -> Option<([T; K], [T; K])> {
+        if input_channel < N
+            && output_channel < M
+            && let Some(responses) = &self.responses
+        {
+            Some(unzip_complex_array(
+                &responses[input_channel][output_channel],
+            ))
+        } else {
+            None
         }
-        (mag, phase)
     }
 }
 
-impl<T, const L: usize, const N: usize, const M: usize> FrequencyResponse<T, L, N, M>
+impl<T, const N: usize, const M: usize, const K: usize> FrequencyResponse<T, N, M, K>
 where
     T: Float + AddAssign,
 {
     /// Creates a new `FrequencyResponse` with logarithmically spaced frequencies.
     ///
-    /// # Arguments
-    /// * `freq_start` - Start frequencies for each input channel
-    /// * `freq_stop` - Stop frequencies for each input channel
-    ///
-    /// # Returns
-    /// * `FrequencyResponse` - instance with logarithmically spaced frequencies and
-    ///   no responses
-    pub fn logspace(freq_start: [T; N], freq_stop: [T; N]) -> Self {
-        // Safety: There will be N arrays of L log spaced values
-        let frequencies = unsafe {
-            array_from_iterator(
-                (0..N).map(|i| logspace::<T, L>(freq_start[i], freq_stop[i])),
-            )
-        };
-        Self {
-            frequencies,
-            responses: None,
-        }
-    }
-
-    /// Creates a new `FrequencyResponse` where only one input channel has frequency data.
+    /// This is a wrapper for [`logspace()`].
     ///
     /// # Arguments
-    /// * `freq_start` - The start frequency for the isolated input channel
-    /// * `freq_stop` - The stop frequency for the isolated input channel
-    /// * `channel` - The index of the input channel to fill
+    /// * `freq_start` - Start frequency.
+    /// * `freq_stop` - Stop frequencies.
     ///
     /// # Returns
-    /// * `FrequencyResponse` instance with frequency data for the specified channel and no responses
-    pub fn isolated(freq_start: T, freq_stop: T, channel: usize) -> Self {
-        // TODO: remove zero initialization, or should this whole function get removed
-        let mut frequencies = [[T::zero(); L]; N];
-        frequencies[channel] = logspace(freq_start, freq_stop);
+    /// * `FrequencyResponse` - Instance with logarithmically spaced frequencies and
+    ///   no responses.
+    pub fn logspace(freq_start: T, freq_stop: T) -> Self {
         Self {
-            frequencies,
-            responses: None,
-        }
-    }
-
-    /// Creates a new `FrequencyResponse` where all input channels share the same frequency data
-    ///
-    /// This function will generate N copies of a log space between the given start and stop
-    /// frequencies.
-    ///
-    /// # Arguments
-    /// * `freq_start` - The start frequency for all input channels
-    /// * `freq_stop` - The stop frequency for all input channels
-    ///
-    /// # Returns
-    /// * `FrequencyResponse` - instance with shared frequency data across all input channels and zero-initialized responses
-    pub fn simultaneous(freq_start: T, freq_stop: T) -> Self {
-        Self {
-            frequencies: [logspace(freq_start, freq_stop); N],
+            frequencies: logspace(freq_start, freq_stop),
             responses: None,
         }
     }
 }
 
-/// A structure representing frequency stability margins.
+/// A structure representing frequency stability margins and their corresponding crossover
+/// frequencies.
 ///
 /// This struct encapsulates key frequency domain metrics used to evaluate the stability
 /// of a control system, such as phase crossover, gain crossover, phase margin, and gain margin.
 ///
 /// # Generic Arguments
-/// - `T`: The numeric type for the stability metrics (e.g., `f32` or `f64`).
-/// 
-/// TODO: This shouldn't need to store the margin, those should be easily extracted from the resp
+/// - `T`: Field type for the stability metrics.
 #[derive(Copy, Clone, Debug)]
 pub struct PhaseGainCrossover<T> {
     /// The frequency at which the phase crosses -180 degrees
@@ -203,7 +260,7 @@ pub struct PhaseGainCrossover<T> {
     pub gain_margin: Option<T>,
 }
 
-impl<T: Float + RealField> PhaseGainCrossover<T> {
+impl<T: Copy + Zero + One + RealField + Phase + Magnitude> PhaseGainCrossover<T> {
     /// Computes both the magnitude and phase crossover frequencies and margins of
     /// a frequency response
     ///
@@ -213,40 +270,17 @@ impl<T: Float + RealField> PhaseGainCrossover<T> {
     ///
     /// # Returns
     /// * `PhaseGainCrossover` - the margins and crossovers of the response
-    pub fn new<const L: usize>(frequencies: &[T; L], response: &[Complex<T>; L]) -> Self {
-        // TODO: Remove duplicate code + see `FrequencyResponse::mag_phase()`
-        let mut phases = [T::zero(); L];
-        let mut magnitudes = [T::zero(); L];
-
-        (0..L).for_each(|i| (magnitudes[i], phases[i]) = response[i].to_polar());
-
-        let gain_crossover = first_crossover(frequencies, &magnitudes, T::one());
-        let phase_crossover = first_crossover(frequencies, &phases, -T::pi());
-
-        let gain_margin = phase_crossover.map(|wc| {
-            // should be using frequencies.iter().position(|hz| hz == threshold, or change first_crossover to return the index)
-            // unwrap is safe because the crossover frequency exists, meaning there is a corresponding
-            // index in the magnitude array
-            // TODO: Fix this so there doesn't need to be an unwrap (see `first_crossover()` todos)
-            let mag_at_crossover =
-                first_crossover(&magnitudes, frequencies, wc).unwrap_or_else(|| T::zero());
-            // TODO: Use Frequency trait to do this conversion
-            T::from(20).unwrap_or_else(|| T::zero()) * -ComplexField::log10(mag_at_crossover)
-        });
-
-        let phase_margin = gain_crossover.map(|wc| {
-            // unwrap is safe because the crossover frequency exists, meaning there is a corresponding
-            // index in the phase array
-            let phase_at_crossover =
-                first_crossover(&phases, frequencies, wc).unwrap_or_else(|| T::zero());
-            (phase_at_crossover + T::pi()).to_degrees()
-        });
+    pub fn new<const K: usize>(frequencies: &[T; K], response: &[Complex<T>; K]) -> Self {
+        let (magnitudes, phases) = unzip_complex_array(response);
+        let (gain_margin, phase_crossover) = find_margin(&phases, &magnitudes, frequencies, -T::PI);
+        let (phase_margin, gain_crossover) =
+            find_margin(&magnitudes, &phases, frequencies, T::one());
 
         Self {
             phase_crossover,
             gain_crossover,
-            phase_margin,
-            gain_margin,
+            phase_margin: phase_margin.map(|rads| (rads + T::PI).to_degrees()),
+            gain_margin: gain_margin.map(|mag| mag.to_db().neg()),
         }
     }
 }
@@ -275,7 +309,9 @@ impl<T> Default for PhaseGainCrossover<T> {
 /// - `M`: Dimension of the system's output.
 pub struct FrequencyMargin<T, const N: usize, const M: usize>(pub [[PhaseGainCrossover<T>; N]; M]);
 
-impl<T: Float + RealField, const N: usize, const M: usize> FrequencyMargin<T, N, M> {
+impl<T: Copy + Zero + One + RealField + Magnitude + Phase, const N: usize, const M: usize>
+    FrequencyMargin<T, N, M>
+{
     /// Creates a new `FrequencyMargin` instance from a given `FrequencyResponse`
     ///
     /// This function computes the stability margins for all input-output channel pairs in the
@@ -290,12 +326,12 @@ impl<T: Float + RealField, const N: usize, const M: usize> FrequencyMargin<T, N,
     ///
     /// # Returns
     /// * `FrequencyMargin` - A new instance containing the calculated margins for all input-output channels
-    pub fn new<const L: usize>(response: &FrequencyResponse<T, L, N, M>) -> Self {
+    pub fn new<const K: usize>(frequency_response: &FrequencyResponse<T, N, M, K>) -> Self {
         let mut margins = [[PhaseGainCrossover::default(); N]; M];
-        if let Some(responses) = response.responses {
-            for (margin_row, res) in margins.iter_mut().zip(responses.iter()) {
-                for (margin, frequency) in margin_row.iter_mut().zip(response.frequencies.iter()) {
-                    *margin = PhaseGainCrossover::new::<L>(frequency, res);
+        if let Some(responses) = frequency_response.responses {
+            for (margin_row, response_row) in margins.iter_mut().zip(responses.iter()) {
+                for (margin, response) in margin_row.iter_mut().zip(response_row.iter()) {
+                    *margin = PhaseGainCrossover::new(&frequency_response.frequencies, response);
                 }
             }
         }
@@ -303,55 +339,155 @@ impl<T: Float + RealField, const N: usize, const M: usize> FrequencyMargin<T, N,
     }
 }
 
-/// Computes the first crossover of a signal
-///
-/// Given two 1D arrays and a threshold, this function will find the value of the first when the
-/// second crosses the given threshold:
-///
-/// <pre>b[i] < thresh < b[i+1] || b[i] > thresh > b[i+1]</pre>
-///
-/// Used to find the crossover frequencies of a transfer function's gain and phase.
-/// The gain crossover frequency is the frequency at which the gain of the transfer
-/// function is 1 (0 dB). The phase crossover frequency is where the phase crosses -180°.
-///
-/// If no crossover is found within the given frequency range, the function returns `None` for
-/// that parameter.
+/// Helper function to unzip an array of complex numbers into an array of magnitudes and phases
 ///
 /// # Arguments
-/// * `a` - The first array of values (the return value is sampled or interpolated from these)
-/// * `b` - The second array of values (these are the values that may cross the threshold)
-/// * `threshold` - The target threshold for the crossover (e.g., 1.0 for magnitude, -π for phase)
-///
-/// # Generic Arguments
-/// * `T` - Scalar type for frequencies and values (e.g., `f32`, `f64`)
-/// * `N` - Number of frequency samples provided
+/// * `complex` - Array of complex values.
 ///
 /// # Returns
-/// * `Option<T>` - The crossover frequency in rad/s, or `None` if no crossover frequency is found
-/// 
-/// TODO: 
-///   * Split this up into `first_crossover(arr, threshold) -> index` and
-///     `interpolate_arrays(arr_a, arr_b) -> T`
-fn first_crossover<T, const N: usize>(a: &[T; N], b: &[T; N], threshold: T) -> Option<T>
+/// * `(magnitude, phase)` - Tuple of magnitudes and phases.
+///
+/// # Safety
+/// This function makes an `unsafe` call to initialize two arrays from a collection of tuples.
+/// The call is guaranteed to be safe because there are K elements that will get mapped to K tuples.
+pub fn unzip_complex_array<T: RealField, const K: usize>(
+    complex_array: &[Complex<T>; K],
+) -> ([T; K], [T; K]) {
+    // Safety: `complex_array` has exactly K elements, `to_polar()` converts each of those elements
+    // to a tuple of (T, T) so all elements of both arrays are guaranteed to get fully initialized.
+    unsafe {
+        arrays_from_zipped_iterator(
+            complex_array
+                .iter()
+                .map(|complex| complex.clone().to_polar()),
+        )
+    }
+}
+
+/// Finds the value in two arrays where a third array crosses a threshold.
+///
+/// The function will attempt to interpolate the values in the second and third array using a linear
+/// approximation of the crossover in the first array.
+///
+/// # Generic Arguments
+/// * `T` - Field type of the threshold and three input arrays.
+/// * `K` - Capacity of each array.
+///
+/// # Arguments
+/// * `crossover` - The array that may cross the threshold.
+/// * `a` - First array to read a value from.
+/// * `b` - Second array to read a value from.
+///
+/// # Returns
+/// * `(Option, Option)`
+///     * `(value_a, value_b)` - The approximate values from the second and third arrays.
+///     * `(None, None)` - The crossover array does not cross the threshold.
+pub fn find_margin<T, const K: usize>(
+    crossover: &[T; K],
+    a: &[T; K],
+    b: &[T; K],
+    threshold: T,
+) -> (Option<T>, Option<T>)
 where
     T: Clone + PartialOrd + Sub<Output = T> + Mul<Output = T> + Div<Output = T>,
 {
-    for i in 0..N - 1 {
-        if b[i] == threshold {
-            return Some(a[i].clone());
+    if let Some((index, is_exact)) = first_crossover_index(crossover, &threshold) {
+        if is_exact {
+            (Some(a[index].clone()), Some(b[index].clone()))
+        } else {
+            (
+                Some(array_interpolation(crossover, a, index, threshold.clone())),
+                Some(array_interpolation(crossover, b, index, threshold)),
+            )
         }
-        if (b[i] < threshold && b[i + 1] > threshold) || (b[i] > threshold && b[i + 1] < threshold)
+    } else {
+        (None, None)
+    }
+}
+/// Computes the first crossover of a signal.
+///
+/// This function will find the index when the array crosses the given threshold:
+///
+/// <pre>b[i] < thresh < b[i+1] || b[i] > thresh > b[i+1]</pre>
+///
+/// If no crossover is found within the given frequency range, the function returns `None`.
+///
+/// # Generic Arguments
+/// * `T` - Field type of the array and threshold.
+/// * `K` - Capacity of the array.
+///
+/// # Arguments
+/// * `array` - The array of values to compare with the threshold.
+/// * `threshold` - The target threshold for the crossover.
+///
+/// # Returns
+/// * `Option`
+///     * `(index, exact_crossover)` - Index of the first crossover and a bool if the crossover was
+///       exactly at that index.
+///     * `None` - The array never crosses the threshold.
+fn first_crossover_index<T, const K: usize>(array: &[T; K], threshold: &T) -> Option<(usize, bool)>
+where
+    T: PartialOrd,
+{
+    for i in 0..K - 1 {
+        if array[i] == *threshold {
+            return Some((i, true));
+        }
+        if (array[i] < *threshold && array[i + 1] > *threshold)
+            || (array[i] > *threshold && array[i + 1] < *threshold)
         {
-            let slope = (b[i + 1].clone() - b[i].clone()) / (a[i + 1].clone() - a[i].clone());
-            let intercept = b[i].clone() - slope.clone() * a[i].clone();
-            return Some((threshold - intercept) / slope);
+            return Some((i, false));
         }
     }
-    // need some cleanup here
-    if b[N - 1] == threshold {
-        return Some(a[N - 1].clone());
+    if array[K - 1] == *threshold {
+        return Some((K - 1, true));
     }
     None
+}
+
+/// Computes the value in array 'b' at the point where array 'a' crosses a threshold.
+///
+/// This function is designed to be used in conjunction with `find_crossover_index`.
+///
+/// # Generic Arguments
+/// * `T` - Field type of the array and threshold.
+/// * `K` - Capacity of the array.
+///
+/// # Arguments
+/// * `a` - The array of values that crossed the threshold.
+/// * `b` - The array to interpolate.
+/// * `index` - The target threshold for the interpolation.
+/// * `threshold` - The target value of the crossover.
+///
+/// # Returns
+/// * `interpolated_value` - The interpolated value from `b`.
+///
+/// # Panics
+/// * If index == K-1, out-of-bounds access will occur.
+fn array_interpolation<T, const K: usize>(a: &[T; K], b: &[T; K], index: usize, threshold: T) -> T
+where
+    T: Clone + PartialOrd + Sub<Output = T> + Mul<Output = T> + Div<Output = T>,
+{
+    // Perform linear interpolation
+    // We have two points: (a[index], b[index]) and (a[index+1], b[index+1])
+    // We want to find 'x' (from array 'b') when 'y' (from array 'a') is 'threshold'.
+    // The equation of a line is y = m*x + c
+    // where m = (y2 - y1) / (x2 - x1)
+    // and c = y1 - m*x1
+    // We want x = (y - c) / m
+    if a[index].clone() == a[index + 1].clone() || b[index].clone() == b[index + 1].clone() {
+        return b[index].clone();
+    }
+
+    // Calculate the slope of 'a' with respect to 'b'
+    let slope =
+        (a[index + 1].clone() - a[index].clone()) / (b[index + 1].clone() - b[index].clone());
+
+    // Calculate the y-intercept (for the line y = m*x + c)
+    let intercept = a[index].clone() - slope.clone() * b[index].clone();
+
+    // Solve for x (the value from 'b') when y (the value from 'a') is 'threshold'
+    (threshold - intercept) / slope
 }
 
 /// Generates `N` logarithmically spaced points of type `T` between 10^a and 10^b.
@@ -369,12 +505,13 @@ where
 /// # Panics
 /// * if 10.0 cannot cast to T
 /// * if N - 1 cannot cast to T
-/// 
+///
 /// TODO: remove unwraps + make a 10E struct that impl powf for floats and ints
 pub fn logspace<T: Float + AddAssign, const N: usize>(a: T, b: T) -> [T; N] {
     let mut result = [T::zero(); N];
+
     #[allow(clippy::unwrap_used)]
-    let ten = T::from(10.0).unwrap();
+    let ten = T::from(10).unwrap();
 
     // Edge case: one point
     if N == 1 {
@@ -382,6 +519,7 @@ pub fn logspace<T: Float + AddAssign, const N: usize>(a: T, b: T) -> [T; N] {
         return result;
     }
 
+    // TODO: Remove this unwrap
     #[allow(clippy::unwrap_used)]
     let step = (b - a) / T::from(N - 1).unwrap();
 
@@ -405,16 +543,13 @@ fn render_bode_subplot<T>(
     col: usize,
     margins: &PhaseGainCrossover<T>,
 ) where
-    T: 'static + Copy + Float + From<i16> + serde::ser::Serialize,
+    T: 'static + Copy + Neg<Output = T> + Zero + One + Magnitude + Phase + serde::ser::Serialize,
 {
     use plotly::common;
     extern crate std;
     use std::{format, vec, vec::Vec};
 
-    let mag_db: Vec<T> = mag
-        .iter()
-        .map(|&m| <T as From<i16>>::from(20) * m.log10())
-        .collect();
+    let mag_db: Vec<T> = mag.iter().map(|&m| m.to_db()).collect();
     let phase_deg: Vec<T> = phase.iter().map(|&p| p.to_degrees()).collect();
 
     // Add magnitude plot
@@ -456,7 +591,7 @@ fn render_bode_subplot<T>(
     // Phase margin line
     if let (Some(wc), Some(pm)) = (margins.gain_crossover, margins.phase_margin) {
         plot.add_trace(
-            plotly::Scatter::new(vec![wc, wc], vec![<T as From<i16>>::from(-180), pm])
+            plotly::Scatter::new(vec![wc, wc], vec![T::ONE_EIGHTY.neg(), pm])
                 .mode(common::Mode::Lines)
                 .name(format!("Phase FrequencyMargin[{row}, {col}]"))
                 .x_axis("x2")
@@ -472,13 +607,13 @@ fn render_bode_subplot<T>(
 
 #[cfg(feature = "std")]
 /// Renders a Bode plot for an object implementing `FrequencyTools`
-pub fn bode<T, F, const L: usize, const N: usize, const M: usize>(
+pub fn bode<T, F, const N: usize, const M: usize, const K: usize>(
     title: &str,
     system: &F,
-    mut response: FrequencyResponse<T, L, N, M>,
+    mut response: FrequencyResponse<T, N, M, K>,
 ) -> plotly::Plot
 where
-    T: Copy + Float + RealField + From<i16> + serde::ser::Serialize,
+    T: Copy + Neg<Output = T> + Zero + One + RealField + Magnitude + Phase + serde::ser::Serialize,
     F: FrequencyTools<T, N, M>,
 {
     use plotly::Layout;
@@ -519,20 +654,20 @@ where
     );
 
     // extract each output mag/phase (make a helper in response soon)
-    for out_channel in 0..M {
-        let (magnitudes, phases) = response.mag_phase(out_channel);
-
-        // render the output as the response to each input
-        for (in_channel, frequency) in response.frequencies.iter().enumerate() {
-            render_bode_subplot(
-                &mut plot,
-                frequency,
-                &magnitudes,
-                &phases,
-                in_channel,
-                out_channel,
-                &margins.0[out_channel][in_channel],
-            );
+    for in_channel in 0..N {
+        for out_channel in 0..M {
+            if let Some((magnitudes, phases)) = response.mag_phase(in_channel, out_channel) {
+                // render the output as the response to each input
+                render_bode_subplot(
+                    &mut plot,
+                    &response.frequencies,
+                    &magnitudes,
+                    &phases,
+                    in_channel,
+                    out_channel,
+                    &margins.0[in_channel][out_channel],
+                );
+            }
         }
     }
 
@@ -562,40 +697,51 @@ mod test_log_space {
 }
 
 #[cfg(test)]
-mod test_first_crossover {
+mod test_find_margin {
     use super::*;
     use crate::{assert_f32_eq, assert_f64_eq};
 
     #[test]
     fn crossover_detection() {
         // Test inputs
-        let frequencies: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
-        let magnitudes: [f64; 6] = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3];
+        let frequencies = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
+        let magnitudes = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3];
+        let phases = [-f64::PI; 6];
         let threshold = 1.0;
 
         // Trigger edge case where b[i] == threshold
-        let result = first_crossover(&frequencies, &magnitudes, threshold);
+        let margin = find_margin(&magnitudes, &phases, &frequencies, threshold);
 
-        assert!(result.is_some());
+        assert!(margin.0.is_some());
         #[allow(clippy::unwrap_used)]
-        let result = result.unwrap();
-        assert_f64_eq!(result, 1.0); // `frequencies[2]`
+        let phase_margin = margin.0.unwrap();
+        assert_f64_eq!(phase_margin, -f64::PI);
+
+        assert!(margin.1.is_some());
+        #[allow(clippy::unwrap_used)]
+        let gain_crossover = margin.1.unwrap();
+        assert_f64_eq!(gain_crossover, 1.0);
     }
 
     #[test]
     fn crossover_interpolation() {
         // Test inputs
-        let frequencies: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
-        let magnitudes: [f64; 6] = [0.8, 0.9, 0.95, 1.05, 1.2, 1.3]; // inconsistent step
+        let frequencies = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
+        let magnitudes = [0.8, 0.9, 0.95, 1.05, 1.2, 1.3]; // inconsistent step
+        let phases = [-f64::PI; 6];
         let threshold = 1.0;
 
-        // Linear interpolation for crossover
-        let result = first_crossover(&frequencies, &magnitudes, threshold);
+        let margin = find_margin(&magnitudes, &phases, &frequencies, threshold);
 
-        assert!(result.is_some());
+        assert!(margin.0.is_some());
         #[allow(clippy::unwrap_used)]
-        let result = result.unwrap();
-        assert_f64_eq!(result, 1.25, 1e-10); // Interpolated value
+        let phase_margin = margin.0.unwrap();
+        assert_f64_eq!(phase_margin, -f64::PI);
+
+        assert!(margin.1.is_some());
+        #[allow(clippy::unwrap_used)]
+        let gain_crossover = margin.1.unwrap();
+        assert_f64_eq!(gain_crossover, 1.25, 1e-10);
     }
 
     #[test]
@@ -603,12 +749,14 @@ mod test_first_crossover {
         // Test inputs with no crossover
         let frequencies: [f64; 6] = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5];
         let magnitudes: [f64; 6] = [0.8, 0.85, 0.9, 0.95, 0.98, 0.99];
+        let phases = [-f64::PI; 6];
         let threshold = 1.0;
 
         // No crossover detected
-        let result = first_crossover(&frequencies, &magnitudes, threshold);
+        let margin = find_margin(&magnitudes, &phases, &frequencies, threshold);
 
-        assert!(result.is_none());
+        assert!(margin.0.is_none());
+        assert!(margin.1.is_none());
     }
 
     #[allow(clippy::unwrap_used)]
@@ -620,9 +768,10 @@ mod test_first_crossover {
         let threshold = 1.0;
 
         // Linear interpolation for decreasing crossover
-        let result = first_crossover(&frequencies, &magnitudes, threshold);
-
-        assert_f32_eq!(result.unwrap(), 1.25, 1.2e-7); // Interpolated value
+        let index = first_crossover_index(&magnitudes, &threshold).unwrap();
+        assert!(!index.1);
+        let result = array_interpolation(&magnitudes, &frequencies, index.0, threshold);
+        assert_f32_eq!(result, 1.25, 1.2e-7); // Interpolated value
     }
     #[allow(clippy::unwrap_used)]
     #[test]
@@ -630,29 +779,46 @@ mod test_first_crossover {
         let frequencies: [usize; 10] = core::array::from_fn(|i| i);
         let magnitudes: [usize; 10] = core::array::from_fn(|i| (i >= 5).into());
         let threshold = 1;
-        // Linear interpolation for decreasing crossover
-        let result = first_crossover(&frequencies, &magnitudes, threshold);
-        assert_eq!(result.unwrap(), 5); // Interpolated value
+        let index = first_crossover_index(&magnitudes, &threshold).unwrap();
+        assert!(index.1);
+        assert_eq!(frequencies[index.0], 5);
     }
-    #[allow(clippy::unwrap_used, clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+    #[allow(
+        clippy::unwrap_used,
+        clippy::cast_possible_wrap,
+        clippy::cast_possible_truncation
+    )]
     #[test]
     fn integer_interpolation() {
         let frequencies: [i32; 10] = core::array::from_fn(|i| i as i32);
         let magnitudes: [i32; 10] = core::array::from_fn(|i| if i < 5 { 5 } else { 7 });
         let threshold = 6;
-        // Linear interpolation for decreasing crossover
-        let result = first_crossover(&frequencies, &magnitudes, threshold);
-        assert_eq!(result.unwrap(), 4); // Interpolated value
+        let index = first_crossover_index(&magnitudes, &threshold).unwrap();
+        assert!(!index.1);
+        assert_eq!(frequencies[index.0], 4);
     }
 
-    #[allow(clippy::unwrap_used, clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+    #[allow(
+        clippy::unwrap_used,
+        clippy::cast_possible_wrap,
+        clippy::cast_possible_truncation,
+        clippy::cast_precision_loss
+    )]
     #[test]
     fn multiple_crossovers() {
         let frequencies: [f32; 10] = core::array::from_fn(|i| i as f32);
         let magnitudes: [f32; 10] = core::array::from_fn(|i| if i % 2 == 0 { 1.0 } else { 3.0 });
         let threshold = 2.0;
-        // Linear interpolation for decreasing crossover
-        let result = first_crossover(&frequencies, &magnitudes, threshold);
-        assert_f32_eq!(result.unwrap(), 0.5); // Interpolated value
+        let index = first_crossover_index(&magnitudes, &threshold).unwrap();
+        assert!(!index.1);
+        let result = array_interpolation(&magnitudes, &frequencies, index.0, threshold);
+        assert_f32_eq!(result, 0.5);
+    }
+    #[test]
+    #[should_panic = "index out of bounds: the len is 6 but the index is 6"]
+    fn array_interpolation_oob() {
+        let frequencies: [usize; 6] = core::array::from_fn(|i| i);
+        let magnitudes: [usize; 6] = core::array::from_fn(|i| (i >= 5).into());
+        array_interpolation(&magnitudes, &frequencies, 5, 1);
     }
 }

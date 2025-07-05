@@ -343,6 +343,75 @@ mod scalar_div {
     }
 }
 
+mod scalar_rem {
+    use super::*;
+    // #[test]
+    // fn empty_post_rem() {
+    //     let empty: Polynomial<i8, 0> = Polynomial::from_element(1);
+    //     assert!((empty / 1).is_empty());
+    // }
+    // #[test]
+    // fn empty_pre_rem() {
+    //     let empty: Polynomial<u8, 0> = Polynomial::from_element(1);
+    //     assert!((1 / empty).is_empty());
+    // }
+    // #[test]
+    // fn empty_rem_assign() {
+    //     let mut empty: Polynomial<i16, 0> = Polynomial::from_element(1);
+    //     empty /= 1;
+    //     assert!(empty.is_empty());
+    // }
+    #[test]
+    fn constant_post_rem() {
+        let constant: Polynomial<u16, 1> = Polynomial::from_element(1);
+        assert_eq!(constant.rem(1), Polynomial::from_data([0]));
+    }
+    #[test]
+    fn constant_pre_rem() {
+        let constant: Polynomial<i32, 1> = Polynomial::from_element(2);
+        assert_eq!(2 % constant, Polynomial::from_data([0i32]));
+    }
+    #[test]
+    fn constant_rem_assign() {
+        let mut constant: Polynomial<isize, 1> = Polynomial::from_element(3);
+        constant %= 3;
+        assert_eq!(constant, Polynomial::from_data([0isize]));
+    }
+    #[test]
+    fn line_post_rem() {
+        let line: Polynomial<usize, 2> = Polynomial::from_element(4);
+        assert_eq!(line % 4, Polynomial::from_data([0, 0]));
+    }
+    #[test]
+    fn line_rem_assign() {
+        let mut line: Polynomial<f64, 2> = Polynomial::from_element(6.0);
+        line %= 6.0;
+        assert_eq!(line, Polynomial::from_data([0.0, 0.0]));
+    }
+    #[test]
+    fn quadratic_post_rem() {
+        let quadratic: Polynomial<i64, 3> = Polynomial::from_iterator(0..3);
+        assert_eq!(quadratic % 3, Polynomial::from_data([0, 1, 2]));
+    }
+    #[test]
+    fn quadratic_rem_assign() {
+        let mut quadratic: Polynomial<i64, 3> = Polynomial::from_element(9);
+        quadratic %= 4;
+        assert_eq!(quadratic, Polynomial::from_data([1, 1, 1]));
+    }
+    #[test]
+    fn large_post_rem() {
+        let large: Polynomial<i32, 16> = Polynomial::from_element(10);
+        assert_eq!(large % 5, Polynomial::from_element(0));
+    }
+    #[test]
+    fn large_rem_assign() {
+        let mut large: Polynomial<i64, 16> = Polynomial::from_element(12);
+        large %= 12;
+        assert_eq!(large, Polynomial::from_element(0));
+    }
+}
+
 mod const_add {
     use super::*;
     // #[test]

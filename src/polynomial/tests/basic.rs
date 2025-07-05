@@ -20,7 +20,10 @@
 //! * `from_fn`
 //! * `new`
 
-use crate::polynomial::{Constant, Line, Polynomial};
+use crate::{
+    assert_f32_eq, assert_f64_eq,
+    polynomial::{Constant, Cubic, Line, Polynomial, Quadratic},
+};
 
 mod neg {
     use super::*;
@@ -169,7 +172,7 @@ mod coefficient_accessors {
         assert_eq!(p.coefficient(2), Some(&1.0), "coefficient(2)");
         assert_eq!(p.coefficient(23), Some(&1.0), "coefficient(23)");
         assert_eq!(p.coefficient(24), None, "coefficient(24)");
-        assert_eq!(p.constant(), &1.0, "constant");
+        assert_f32_eq!(*p.constant(), 1.0);
         assert_eq!(p.leading_coefficient(), Some(&1.0), "leading_coefficient");
     }
     #[test]
@@ -199,11 +202,131 @@ mod coefficient_accessors {
             "coefficient_mut(15)"
         );
         assert_eq!(p_mut.coefficient_mut(16), None, "coefficient_mut(16)");
-        assert_eq!(p_mut.constant_mut(), &mut 1.0, "constant_mut");
+        assert_f64_eq!(*p_mut.constant_mut(), 1.0);
         assert_eq!(
             p_mut.leading_coefficient_mut(),
             Some(&mut 1.0),
             "leading_coefficient_mut"
         );
+    }
+}
+
+mod constructors {
+    use super::*;
+    use crate::static_storage::array_from_iterator_with_default;
+    #[test]
+    fn new_polynomial() {
+        let incremental_array: [i32; 10] = array_from_iterator_with_default(0..10, 0);
+        let p = Polynomial::new(incremental_array);
+        for (i, a_i) in p.into_iter().rev().enumerate() {
+            assert_eq!(a_i, incremental_array[i]);
+        }
+    }
+    #[test]
+    fn polynomial_from_element() {
+        let p: Polynomial<i32, 10> = Polynomial::from_element(1i32);
+        for a_i in p {
+            assert_eq!(a_i, 1i32);
+        }
+    }
+    #[test]
+    fn polynomial_from_fn() {
+        let p: Polynomial<usize, 5> = Polynomial::from_fn(|i| i * 2);
+        for (i, a_i) in p.into_iter().enumerate() {
+            assert_eq!(a_i, i * 2);
+        }
+    }
+    #[test]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+    fn polynomial_from_iterator_exact() {
+        let p: Polynomial<i32, 1000> = Polynomial::from_iterator(0..1000);
+        for (i, a_i) in p.into_iter().enumerate() {
+            assert_eq!(a_i, i as i32);
+        }
+    }
+    #[test]
+    fn polynomial_from_iterator_empty() {
+        let p: Polynomial<i32, 10> = Polynomial::from_iterator(0..0);
+        for a_i in p {
+            assert_eq!(a_i, 0);
+        }
+    }
+    #[test]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+    fn polynomial_from_iterator_too_long() {
+        let p: Polynomial<i32, 10> = Polynomial::from_iterator(0..100);
+        for (i, a_i) in p.into_iter().enumerate() {
+            assert_eq!(a_i, i as i32);
+        }
+    }
+    #[test]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+    fn resize_to_larger() {
+        let p = Polynomial::from_data([0, 1, 2, 3, 4]);
+        let new_p = p.resize::<10>();
+        for (i, a_i) in new_p.into_iter().enumerate() {
+            if i >= 5 {
+                assert_eq!(a_i, 0);
+            } else {
+                assert_eq!(a_i, i as i32);
+            }
+        }
+    }
+    #[test]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+    fn resize_to_same() {
+        let p = Polynomial::from_data([0, 1, 2, 3, 4]);
+        let new_p = p.resize::<5>();
+        for (i, a_i) in new_p.into_iter().enumerate() {
+            assert_eq!(a_i, i as i32);
+        }
+    }
+    #[test]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+    fn resize_to_shorter() {
+        let p = Polynomial::from_data([0, 1, 2, 3, 4]);
+        let new_p = p.resize::<1>();
+        for (i, a_i) in new_p.into_iter().enumerate() {
+            assert_eq!(a_i, i as i32);
+            assert!(i < 1);
+        }
+    }
+}
+
+mod evaluation {
+    use super::*;
+    #[test]
+    fn constant() {
+        let constant = Constant::from_element(10u16);
+        assert_eq!(constant.evaluate(&0), 10);
+        assert_eq!(constant.evaluate(&1), 10);
+        assert_eq!(constant.evaluate(&2), 10);
+    }
+    #[test]
+    fn line() {
+        let line = Line::new([1i8, 0i8]);
+        assert_eq!(line.evaluate(&-2), -2);
+        assert_eq!(line.evaluate(&-1), -1);
+        assert_eq!(line.evaluate(&0), 0);
+        assert_eq!(line.evaluate(&1), 1);
+        assert_eq!(line.evaluate(&2), 2);
+    }
+    #[test]
+    fn quadratic() {
+        let quadratic = Quadratic::new([1i8, 0i8, 0i8]);
+        assert_eq!(quadratic.evaluate(&-2), 4);
+        assert_eq!(quadratic.evaluate(&-1), 1);
+        assert_eq!(quadratic.evaluate(&0), 0);
+        assert_eq!(quadratic.evaluate(&1), 1);
+        assert_eq!(quadratic.evaluate(&2), 4);
+    }
+    #[test]
+    fn cubic() {
+        let cubic = Cubic::new([1i8, 0i8, 0i8, 0i8]);
+        assert_eq!(cubic.evaluate(&-2), -8);
+        assert_eq!(cubic.evaluate(&-1), -1);
+        assert_eq!(cubic.evaluate(&0), 0);
+        assert_eq!(cubic.evaluate(&1), 1);
+        assert_eq!(cubic.evaluate(&2), 8);
     }
 }

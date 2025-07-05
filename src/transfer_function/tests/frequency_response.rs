@@ -19,10 +19,10 @@ mod frequency_tools_tests {
         ];
 
         // Call the bode function
-        let mut response = FrequencyResponse::new([frequencies]);
+        let mut response = FrequencyResponse::new(frequencies);
         tf.frequency_response(&mut response);
 
-        let (magnitudes, phases) = response.mag_phase(0);
+        let (magnitudes, phases) = response.mag_phase(0, 0).unwrap();
 
         // Expected results
         let expected_magnitudes = [

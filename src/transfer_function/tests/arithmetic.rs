@@ -61,7 +61,11 @@ mod multiplication {
         let tf = TransferFunction::new([1, 2, 3], [1, 2, 3]);
         let product = tf * TransferFunction::new([1, 2, 3], [1, 2, 3]);
         assert_eq!(product.numerator, [9, 12, 10, 4, 1], "Incorrect numerator");
-        assert_eq!(product.denominator, [9, 12, 10, 4, 1], "Incorrect denominator");
+        assert_eq!(
+            product.denominator,
+            [9, 12, 10, 4, 1],
+            "Incorrect denominator"
+        );
     }
 
     #[test]
@@ -109,8 +113,8 @@ mod division {
 }
 
 mod cl {
-    use crate::systems::System;
     use crate::TransferFunction;
+    use crate::systems::System;
     #[test]
     fn test_cl() {
         let tf = TransferFunction::new([1], [1, 1]);

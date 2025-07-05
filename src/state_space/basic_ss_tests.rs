@@ -1,6 +1,6 @@
 use crate::{
     state_space::*,
-    transfer_function::{tf2ss, TransferFunction},
+    transfer_function::{TransferFunction, tf2ss},
 };
 
 #[test]

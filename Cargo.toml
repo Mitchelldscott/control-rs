@@ -1,7 +1,7 @@
 [package]
 name = "control-rs"
 version = "0.0.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 nalgebra = { version = "0.33.0", features = ["libm"] }
@@ -25,3 +25,5 @@ lto = "fat" # or true for a simpler LTO, "fat" is more aggressive
 opt-level = 3
 # Set the number of code generation units to 1 for maximum inter-procedural optimization
 codegen-units = 1
+# Disable debug assertions
+debug-assertions = false

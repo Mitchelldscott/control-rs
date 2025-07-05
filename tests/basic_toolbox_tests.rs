@@ -4,8 +4,8 @@ mod basic_model_tests {
     use control_rs::{
         integrators::runge_kutta4,
         state_space::{
-            utils::{control_canonical, zoh},
             StateSpace,
+            utils::{control_canonical, zoh},
         },
         systems::{DynamicalSystem, NLModel},
     };
@@ -122,7 +122,7 @@ mod tf_frequency_tool_tests {
         let frequencies = [0.0, 0.1, 1.0, 10.0];
 
         // Call the bode function
-        let mut response = FrequencyResponse::new([frequencies]);
+        let mut response = FrequencyResponse::new(frequencies);
         tf.frequency_response(&mut response);
 
         let margins = FrequencyMargin::new(&response);
@@ -151,7 +151,7 @@ mod tf_frequency_tool_tests {
 #[cfg(feature = "std")]
 mod bode_and_nyquist_plot_tests {
     use control_rs::{
-        frequency_tools::{bode, FrequencyResponse},
+        frequency_tools::{FrequencyResponse, bode},
         transfer_function::TransferFunction,
     };
 
@@ -161,7 +161,7 @@ mod bode_and_nyquist_plot_tests {
         let title = "Demo Bode Plot";
         let tf = TransferFunction::new([1.0], [1.0, 1.0, 1.0]);
 
-        let response = FrequencyResponse::<f64, 100, 1, 1>::logspace([-1.0], [10.0]);
+        let response = FrequencyResponse::<f64, 1, 1, 100>::logspace(-1.0, 10.0);
 
         std::fs::create_dir_all("../target/plots").unwrap();
         bode(title, &tf, response).write_html("../target/plots/test_bode_plot.html");
@@ -173,6 +173,6 @@ mod bode_and_nyquist_plot_tests {
         let _title = "Demo Nyquist Plot";
         let _tf = TransferFunction::new([1.0], [1.0, 1.0, 1.0]);
 
-        let _response = FrequencyResponse::<f64, 100, 1, 1>::logspace([0.1], [10.0]);
+        let _response = FrequencyResponse::<f64, 1, 1, 100>::logspace(0.1, 10.0);
     }
 }

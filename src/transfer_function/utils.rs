@@ -6,13 +6,16 @@ use core::{
 };
 
 use nalgebra::{
-    allocator::Allocator, Complex, Const, DefaultAllocator, DimDiff, DimSub, RealField, SMatrix,
-    Scalar, U1,
+    Complex, Const, DefaultAllocator, DimDiff, DimSub, RealField, SMatrix, Scalar, U1,
+    allocator::Allocator,
 };
 use num_traits::{Float, One, Zero};
 
-use crate::polynomial::utils::largest_nonzero_index;
-use crate::{state_space::utils::control_canonical, StateSpace, TransferFunction};
+use crate::{
+    StateSpace, TransferFunction,
+    polynomial::utils::{RootFindingError, largest_nonzero_index, unchecked_roots},
+    state_space::utils::control_canonical,
+};
 
 /// Computes the DC gain of a continuous transfer function.
 ///
@@ -82,7 +85,7 @@ pub fn dc_gain<T: Float, const M: usize, const N: usize>(tf: &TransferFunction<T
 /// * `NoRoots` - the function was not able to find any roots for the denominator
 pub fn poles<T, const M: usize, const N: usize, const L: usize>(
     tf: &TransferFunction<T, M, N>,
-) -> Result<[Complex<T>; L], crate::polynomial::utils::NoRoots>
+) -> Result<[Complex<T>; L], RootFindingError>
 where
     T: Copy
         + Zero
@@ -98,7 +101,7 @@ where
     Const<L>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
 {
-    crate::polynomial::utils::roots(&tf.denominator)
+    unchecked_roots(&tf.denominator)
 }
 
 /// Compute the roots of the transfer function's numerator
@@ -123,23 +126,23 @@ where
 /// * `NoRoots` - the function was not able to find any roots for the denominator
 pub fn zeros<T, const M: usize, const N: usize, const L: usize>(
     tf: &TransferFunction<T, M, N>,
-) -> Result<[Complex<T>; L], crate::polynomial::utils::NoRoots>
+) -> Result<[Complex<T>; L], RootFindingError>
 where
     T: Copy
-    + Zero
-    + One
-    + Neg<Output = T>
-    + Sub<Output = T>
-    + Div<Output = T>
-    + PartialOrd
-    + fmt::Debug
-    + RealField
-    + Float,
+        + Zero
+        + One
+        + Neg<Output = T>
+        + Sub<Output = T>
+        + Div<Output = T>
+        + PartialOrd
+        + fmt::Debug
+        + RealField
+        + Float,
     Const<M>: DimSub<U1, Output = Const<L>>,
     Const<L>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
 {
-    crate::polynomial::utils::roots(&tf.numerator)
+    unchecked_roots(&tf.numerator)
 }
 
 /// Check if the system's poles lie on the left-half plane (LHP), a condition for stability.
