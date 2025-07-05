@@ -163,6 +163,7 @@ impl DynamicalSystem<QuadInput, QuadState, QuadOutput> for QuadcopterNLDynamics 
         let cd = self.prop_drag_coefficient;
 
         // Torques in body frame
+        // TODO: add angular momentum of props to yaw torque
         let tau = Vector3::new(
             l * k * (u[3].powi(2) - u[1].powi(2)), // Roll torque
             l * k * (u[2].powi(2) - u[0].powi(2)), // Pitch torque
