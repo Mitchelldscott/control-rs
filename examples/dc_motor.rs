@@ -1,5 +1,3 @@
-#[cfg(feature = "std")]
-use control_rs::integrators::runge_kutta4;
 /// # DC Motor Position Control with a Lead-Lag Compensator
 ///
 /// This example demonstrates the use of a lead-lag compensator for controlling the
@@ -43,7 +41,11 @@ use control_rs::integrators::runge_kutta4;
 use control_rs::{frequency_tools::*, transfer_function::*};
 
 #[cfg(feature = "std")]
-use control_rs::math::systems::DynamicalSystem;
+use control_rs::{
+    math::systems::DynamicalSystem,
+    integrators::runge_kutta4,
+    state_space::utils::zoh
+};
 
 #[cfg(feature = "std")]
 use plotly::{Layout, Plot, Scatter};
@@ -67,16 +69,18 @@ type SimData = (
 fn step(plant: MotorSS, compensator: LeadCompensator, x0: MotorState, dt: Scalar) -> SimData {
     let mut x = x0.clone();
     let mut x_c = nalgebra::Vector1::zeros();
-    let compensator_ss = tf2ss(&compensator);
+    let compensator_ss = zoh(&tf2ss(&compensator), dt);
+    let mut y = 0.0;
     let mut sim = (
         [0.0; SIM_STEPS],
         [compensator_ss.output(x_c.clone(), 1.0)[(0, 0)]; SIM_STEPS],
         [x0.clone(); SIM_STEPS],
     );
     for i in 1..SIM_STEPS {
-        x_c = compensator_ss.dynamics(x_c.clone(), 1.0);
-        let u = compensator_ss.output(x_c.clone(), 1.0)[(0, 0)];
+        x_c = compensator_ss.dynamics(x_c.clone(), 1.0-y);
+        let u = compensator_ss.output(x_c.clone(), 1.0-y)[(0, 0)];
         x = runge_kutta4(&plant, x.clone(), u, 0.0, dt, dt / 10.0);
+        y = plant.output(x.clone(), u)[(0,0)];
         sim.0[i] = i as Scalar * dt;
         sim.1[i] = u;
         sim.2[i] = x.clone();
@@ -117,7 +121,7 @@ fn main() {
     println!("DC Gain: {:?}", dc_gain(&Motor_TF));
     println!("System Poles: {:?}", poles(&Motor_TF).ok());
 
-    let mut fr = FrequencyResponse::<f64, 1, 1, 100>::logspace(-10.0, 5.0);
+    let mut fr = FrequencyResponse::<f64, 1, 1, 100>::logspace(-1.0, 5.0);
     Motor_TF.frequency_response(&mut fr);
     #[cfg(feature = "std")]
     std::fs::create_dir_all("target/plots").expect("Failed to creat plots directory");
@@ -128,22 +132,11 @@ fn main() {
     // Simulates adding a simple feedforward controller that scales the input by the inverse of the
     // dc_gain, resulting in a new dc_gain = 1. In reality, this drives the motor state to the value
     // of the input voltage. An additional gain can scale the output value to an appropriate speed.
-    let gain_compensated_tf = Motor_TF / dc_gain(&Motor_TF);
-    assert_eq!(dc_gain(&gain_compensated_tf), 1.0);
-
-    #[cfg(feature = "std")]
-    let fr = FrequencyResponse::<f64, 1, 1, 100>::logspace(-10.0, 5.0);
-    #[cfg(feature = "std")]
-    bode(
-        "DC Motor gain compensated Transfer Function",
-        &gain_compensated_tf,
-        fr,
-    )
-    .write_html("target/plots/dc_motor_gain_compensated_bode.html");
+    assert_eq!(dc_gain(&(Motor_TF / dc_gain(&Motor_TF))), 1.0);
 
     #[allow(non_snake_case)]
-    let compensator_tf = lead_compensator(0.1, 30.0);
-    let lead_compensated_tf = gain_compensated_tf * compensator_tf;
+    let compensator_tf = lead_compensator(5.0, 60.0) / dc_gain(&Motor_TF);
+    let lead_compensated_tf = Motor_TF * compensator_tf;
     println!(
         "Compensated System Zeros: {:?}",
         zeros(&lead_compensated_tf).ok()
@@ -154,7 +147,7 @@ fn main() {
     );
 
     #[cfg(feature = "std")]
-    let fr = FrequencyResponse::<f64, 1, 1, 100>::logspace(-10.0, 5.0);
+    let fr = FrequencyResponse::<f64, 1, 1, 100>::logspace(-1.0, 5.0);
     #[cfg(feature = "std")]
     bode(
         "DC Motor lead compensated Transfer Function",
@@ -164,6 +157,6 @@ fn main() {
     .write_html("target/plots/dc_motor_lead_compensated_bode.html");
 
     #[cfg(feature = "std")]
-    plot(step(Motor_SS, compensator_tf, MotorState::zeros(), 0.1))
+    plot(step(Motor_SS, compensator_tf / dc_gain(&Motor_TF), MotorState::zeros(), 0.1))
         .write_html("target/plots/dc_motor_sim.html");
 }
