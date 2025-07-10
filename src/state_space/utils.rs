@@ -95,18 +95,15 @@ where
 /// 7. **F** = **I** + **F** * T * **Psi**
 ///
 /// # Arguments
-///
 /// * `&self` - the dynamic system to linearize
 /// * `ts` - sampling time of the system
 /// * `x` - state vector
 /// * `u` - input vector
 ///
 /// # Returns
-///
 /// * `StateSpace` - a discretized version of the state space model
 ///
 /// # Example
-///
 /// ```
 /// use control_rs::state_space::utils::{control_canonical, zoh};
 /// let ss = control_canonical(&[1.0, 1.0], &[1.0, 1.0, 1.0]);
