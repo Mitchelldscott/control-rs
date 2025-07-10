@@ -118,3 +118,4 @@ pass:
 8. (Optional) Run formal verification tools on specified components.
 
 [1] [“FLS — FLS.” Accessed: Jul. 10, 2025. [Online].](https://rust-lang.github.io/fls/)
+[2] [“minirust/spec at master · minirust/minirust,” GitHub. Accessed: Jul. 10, 2025. [Online].](https://github.com/minirust/minirust/tree/master/spec)
