@@ -1,14 +1,14 @@
 # Control-rs
 
-`control-rs` is a native Rust library for numerical modeling and synthesis of embedded control systems. It leverages
-Rust's high-level safety and low-level control to provide a powerful and flexible, open-source toolbox for model-based 
-design and implementation. `control-rs` is meant for developing robotics, autonomous vehicles, UAVs and other real-time
-embedded systems. Unlike other MBD tools `control-rs` is designed specifically for developing firmware. This focus
-allows for more efficient and customized implementations, with the drawback that users must be more comfortable with
-firmware development.
+`control-rs` is a native Rust library for numerical modeling and synthesis of embedded systems. It leverages Rust's 
+high-level safety and low-level control to provide a powerful and flexible, open-source toolbox for model-based design 
+and implementation. `control-rs` is meant for developing robotics, autonomous vehicles, UAVs and other real-time 
+embedded systems that rely on advance control algorithms. Unlike other MBD tools `control-rs` is designed specifically 
+for developing firmware. This focus allows for more efficient and customized implementations, with the drawback that 
+users must be more comfortable with firmware development.
 
 The inspiration for this project comes from my enthusiasm for embedded Rust and interest in realtime system 
-identification and control. 
+identification and control.
 
 The crate is `no_std` by default (but has a `std` feature flag for plotting) and intends to support 
 both fixed-point and floating-point numeric types.
