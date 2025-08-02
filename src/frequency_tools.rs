@@ -30,8 +30,6 @@
 //!
 //! ### TODO:
 //! - [ ] remove all the unwraps
-//!     - `first_crossover` should get broken up to return the index of the crossover
-//!     - Need a frequency field trait to provide some constants and log fns
 //! - [ ] move plotly to plotly helper file (or wait for a nice gui)
 
 #[cfg(feature = "std")]
@@ -506,7 +504,7 @@ where
 /// * if 10.0 cannot cast to T
 /// * if N - 1 cannot cast to T
 ///
-/// TODO: remove unwraps + make a 10E struct that impl powf for floats and ints
+/// TODO: remove unwraps + make a 10E trait that impl powf for floats and ints
 pub fn logspace<T: Float + AddAssign, const N: usize>(a: T, b: T) -> [T; N] {
     let mut result = [T::zero(); N];
 
@@ -591,7 +589,7 @@ fn render_bode_subplot<T>(
     // Phase margin line
     if let (Some(wc), Some(pm)) = (margins.gain_crossover, margins.phase_margin) {
         plot.add_trace(
-            plotly::Scatter::new(vec![wc, wc], vec![T::ONE_EIGHTY.neg(), pm])
+            plotly::Scatter::new(vec![wc, wc], vec![T::ONE_EIGHTY.neg(), T::ONE_EIGHTY.neg()+pm])
                 .mode(common::Mode::Lines)
                 .name(format!("Phase FrequencyMargin[{row}, {col}]"))
                 .x_axis("x2")

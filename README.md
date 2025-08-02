@@ -1,19 +1,22 @@
 # Control-rs
 
-Rust-native numerical modeling and synthesis library for embedded projects. By closely integrating advanced numerical
-tools with the embedded Rust ecosystem, `control-rs` offers a powerful and flexible way to design and implement
-control systems. Instead of relying on MATLAB's hardware support and code generation, `control-rs` provides a toolbox
-designed to be integrated with any of the awesome embedded Rust crates. 
+`control-rs` is a native Rust library for numerical modeling and synthesis of embedded systems. It leverages Rust's 
+high-level safety and low-level control to provide a powerful and flexible, open-source toolbox for model-based design 
+and implementation. `control-rs` is meant for developing robotics, autonomous vehicles, UAVs and other real-time 
+embedded systems that rely on advance control algorithms. Unlike other MBD tools `control-rs` is designed specifically 
+for developing firmware. This focus allows for more efficient and customized implementations, with the drawback that 
+users must be more comfortable with firmware development.
 
 The inspiration for this project comes from my enthusiasm for embedded Rust and interest in realtime system 
-identification and control. 
+identification and control.
 
 The crate is `no_std` by default (but has a `std` feature flag for plotting) and intends to support 
 both fixed-point and floating-point numeric types.
 
 This project has two long-term goals:
-1. Cargo templates for robotic components (i.e., ESCs, BMS and odometry systems). These templates will use the
-[awesome embedded rust crates](https://github.com/rust-embedded/awesome-embedded-rust) to provide detailed guides to implementing and operating the components.
+1. Implementations of components for robotics (i.e., ESCs, BMS and odometry systems). These templates will use the
+[awesome embedded rust crates](https://github.com/rust-embedded/awesome-embedded-rust) to provide detailed guides to 
+implementing and operating a variety of components that common to robotics.
 2. Wrapper crates for specific control system design tools (i.e., autopilot, self-driving or chemical process controls). 
 These toolboxes will have specific models, types and routines to help design and deploy more complex control and 
 estimation systems.

@@ -316,14 +316,16 @@ mod add {
     fn add_longer() {
         assert_eq!(unchecked_polynomial_add([1], [1, 1]), [2, 1]);
     }
+    #[cfg(debug_assertions)]
     #[should_panic = "attempt to add with overflow"]
     #[test]
-    fn add_overflow() {
+    fn add_overflow_debug() {
         assert_eq!(unchecked_polynomial_add([1, 1], [u32::MAX]), [1, 1]);
     }
+    #[cfg(debug_assertions)]
     #[should_panic = "attempt to add with overflow"]
     #[test]
-    fn add_underflow() {
+    fn add_underflow_debug() {
         assert_eq!(unchecked_polynomial_add([i8::MIN], [i8::MIN]), [0]);
     }
 }
@@ -338,14 +340,16 @@ mod sub {
     fn sub_longer() {
         assert_eq!(unchecked_polynomial_sub([1], [1, 1]), [0, -1]);
     }
+    #[cfg(debug_assertions)]
     #[should_panic = "attempt to subtract with overflow"]
     #[test]
-    fn sub_overflow() {
+    fn sub_overflow_debug() {
         assert_eq!(unchecked_polynomial_sub([i8::MAX], [i8::MIN]), [0]);
     }
+    #[cfg(debug_assertions)]
     #[should_panic = "attempt to subtract with overflow"]
     #[test]
-    fn sub_underflow() {
+    fn sub_underflow_debug() {
         assert_eq!(unchecked_polynomial_sub([i8::MIN], [i8::MAX]), [0]);
     }
 }
@@ -360,14 +364,17 @@ mod convolution {
     fn mul_longer() {
         assert_eq!(convolution(&[1, 1], &[1, 1]), [1, 2, 1]);
     }
+    #[cfg(debug_assertions)]
     #[should_panic = "attempt to multiply with overflow"]
     #[test]
-    fn mul_overflow() {
+    fn mul_overflow_debug() {
         assert_eq!(convolution(&[i8::MAX], &[i8::MAX]), [0]);
     }
+    #[cfg(debug_assertions)]
     #[should_panic = "attempt to add with overflow"]
+    #[allow(clippy::type_complexity)]
     #[test]
-    fn mul_add_overflow() {
+    fn mul_add_overflow_debug() {
         assert_eq!(
             convolution(&[1, 1], &[(u8::MAX / 2) + 1, (u8::MAX / 2) + 1]),
             [u8::MAX / 2, u8::MAX, u8::MAX / 2]
@@ -376,9 +383,10 @@ mod convolution {
 }
 
 mod division {
-    // Have not been able to cause an addition or subtraction overflow, that doesn't mean it is not
+    // Have not been able to cause an addition or subtraction overflow; that doesn't mean it is not
     // possible, just difficult.
     use super::utils::long_division;
+    use crate::assert_f32_eq;
     #[test]
     fn div_by_zero() {
         assert_eq!(long_division([1], &[0]), [0]);
@@ -395,13 +403,14 @@ mod division {
     fn i8_min_div_by_one() {
         assert_eq!(long_division([i8::MIN, i8::MIN], &[1]), [i8::MIN, i8::MIN]);
     }
+    #[cfg(debug_assertions)]
     #[should_panic = "attempt to multiply with overflow"]
     #[test]
-    fn u8_max_div_by_line() {
+    fn u8_max_div_by_line_debug() {
         assert_eq!(long_division([u8::MAX, u8::MAX], &[2, 1]), [0, 0]);
     }
     #[test]
     fn div_by_two() {
-        assert_eq!(long_division([1.0], &[2.0]), [0.5]);
+        assert_f32_eq!(long_division([1.0], &[2.0])[0], 0.5);
     }
 }
