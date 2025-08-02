@@ -1,0 +1,410 @@
+    Checking control-rs v0.0.0 (/home/mdyson/Desktop/control-rs)
+error: redundant clone
+   --> src/state_space/utils.rs:133:60
+    |
+133 |     let k_as_t = (0..k).fold(T::zero(), |t, _| T::one() + t.clone());
+    |                                                            ^^^^^^^^ help: remove this
+    |
+note: this value is dropped without further use
+   --> src/state_space/utils.rs:133:59
+    |
+133 |     let k_as_t = (0..k).fold(T::zero(), |t, _| T::one() + t.clone());
+    |                                                           ^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
+note: the lint level is defined here
+   --> src/lib.rs:14:5
+    |
+14  |     clippy::nursery,
+    |     ^^^^^^^^^^^^^^^
+    = note: `#[deny(clippy::redundant_clone)]` implied by `#[deny(clippy::nursery)]`
+
+error: doc list item overindented
+   --> src/state_space/utils.rs:191:5
+    |
+191 | ///     matrix is the characteristic polynomial of the A matrix, given by `det(sI - A)`.
+    |     ^^^^ help: try using `  ` (2 spaces)
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_overindented_list_items
+note: the lint level is defined here
+   --> src/lib.rs:13:5
+    |
+13  |     clippy::style,
+    |     ^^^^^^^^^^^^^
+    = note: `#[deny(clippy::doc_overindented_list_items)]` implied by `#[deny(clippy::style)]`
+
+error: doc list item overindented
+   --> src/state_space/utils.rs:192:5
+    |
+192 | ///     This is a polynomial of degree `N`. To store its `N + 1` coefficients (from s⁰ to sⁿ),
+    |     ^^^^ help: try using `  ` (2 spaces)
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_overindented_list_items
+
+error: doc list item overindented
+   --> src/state_space/utils.rs:193:5
+    |
+193 | ///     the constant `N2` **must be `N + 1`**.
+    |     ^^^^ help: try using `  ` (2 spaces)
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_overindented_list_items
+
+error: doc list item overindented
+   --> src/state_space/utils.rs:196:5
+    |
+196 | ///     expression `C * adj(sI - A) * B + D`, where `adj` is the adjugate matrix. The
+    |     ^^^^ help: try using `  ` (2 spaces)
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_overindented_list_items
+
+error: doc list item overindented
+   --> src/state_space/utils.rs:197:5
+    |
+197 | ///     polynomials in `adj(sI - A)` have a maximum degree of `N - 1`. Therefore, the resulting
+    |     ^^^^ help: try using `  ` (2 spaces)
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_overindented_list_items
+
+error: doc list item overindented
+   --> src/state_space/utils.rs:198:5
+    |
+198 | ///     numerator polynomial will have a maximum degree of `N`. To store its `N + 1` coefficients,
+    |     ^^^^ help: try using `  ` (2 spaces)
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_overindented_list_items
+
+error: doc list item overindented
+   --> src/state_space/utils.rs:199:5
+    |
+199 | ///     the constant `M2` **must be `N + 1`**. If the D matrix is zero, the maximum numerator
+    |     ^^^^ help: try using `  ` (2 spaces)
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_overindented_list_items
+
+error: doc list item overindented
+   --> src/state_space/utils.rs:200:5
+    |
+200 | ///     degree is `N-1`, requiring `N` coefficients, but `N+1` provides a safe upper bound for all
+    |     ^^^^ help: try using `  ` (2 spaces)
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_overindented_list_items
+
+error: doc list item overindented
+   --> src/state_space/utils.rs:201:5
+    |
+201 | ///     cases.
+    |     ^^^^ help: try using `  ` (2 spaces)
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_overindented_list_items
+
+error: this argument is passed by value, but not consumed in the function body
+   --> src/state_space/utils.rs:208:9
+    |
+208 |     ss: StateSpace<SMatrix<T, N, N>, SMatrix<T, N, M>, SMatrix<T, L, N>, SMatrix<T, L, M>>
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: or consider marking this type as `Copy`
+   --> src/state_space/mod.rs:79:1
+    |
+79  | pub struct StateSpace<A, B, C, D> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+note: the lint level is defined here
+   --> src/lib.rs:15:5
+    |
+15  |     clippy::pedantic,
+    |     ^^^^^^^^^^^^^^^^
+    = note: `#[deny(clippy::needless_pass_by_value)]` implied by `#[deny(clippy::pedantic)]`
+help: consider taking a reference instead
+    |
+208 |     ss: &StateSpace<SMatrix<T, N, N>, SMatrix<T, N, M>, SMatrix<T, L, N>, SMatrix<T, L, M>>
+    |         +
+
+error: needlessly taken reference of both operands
+   --> src/state_space/utils.rs:225:19
+    |
+225 |         let m_k = &ss.a * &r_prev;
+    |                   ^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#op_ref
+    = note: `#[deny(clippy::op_ref)]` implied by `#[deny(clippy::style)]`
+help: use the values directly
+    |
+225 -         let m_k = &ss.a * &r_prev;
+225 +         let m_k = ss.a * r_prev;
+    |
+
+error: needlessly taken reference of left operand
+   --> src/state_space/utils.rs:227:19
+    |
+227 |         let r_k = &m_k + &identity * p_k;
+    |                   ----^^^^^^^^^^^^^^^^^^
+    |                   |
+    |                   help: use the left value directly: `m_k`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#op_ref
+
+error: needlessly taken reference of left operand
+   --> src/state_space/utils.rs:227:26
+    |
+227 |         let r_k = &m_k + &identity * p_k;
+    |                          ---------^^^^^^
+    |                          |
+    |                          help: use the left value directly: `identity`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#op_ref
+
+error: taken reference of right operand
+   --> src/state_space/utils.rs:252:28
+    |
+252 |                 .map(|r_k| &ss.c * r_k * &ss.b)
+    |                            ^^^^^^^^^^^^^^-----
+    |                                          |
+    |                                          help: use the right value directly: `ss.b`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#op_ref
+
+error: needlessly taken reference of left operand
+   --> src/state_space/utils.rs:252:28
+    |
+252 |                 .map(|r_k| &ss.c * r_k * &ss.b)
+    |                            -----^^^^^^
+    |                            |
+    |                            help: use the left value directly: `ss.c`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#op_ref
+
+error: the loop variable `j` is used to index `result`
+   --> src/state_space/utils.rs:260:18
+    |
+260 |         for j in 0..M { // Input index
+    |                  ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_range_loop
+    = note: `#[deny(clippy::needless_range_loop)]` implied by `#[deny(clippy::style)]`
+help: consider using an iterator and enumerate()
+    |
+260 -         for j in 0..M { // Input index
+260 +         for (j, <item>) in result.iter_mut().enumerate().take(M) { // Input index
+    |
+
+error: using `clone` on type `[T; N2]` which implements the `Copy` trait
+   --> src/state_space/utils.rs:281:66
+    |
+281 |             let tf = TransferFunction::new(num_coeffs.data.0[0], den_coeffs.data.0[0].clone());
+    |                                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `den_coeffs.data.0[0]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#clone_on_copy
+note: the lint level is defined here
+   --> src/lib.rs:17:5
+    |
+17  |     clippy::complexity,
+    |     ^^^^^^^^^^^^^^^^^^
+    = note: `#[deny(clippy::clone_on_copy)]` implied by `#[deny(clippy::complexity)]`
+
+error: item in documentation is missing backticks
+   --> src/transfer_function/utils.rs:273:6
+    |
+273 | /// (b_0 + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+    |      ^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+    = note: `#[deny(clippy::doc_markdown)]` implied by `#[deny(clippy::pedantic)]`
+help: try
+    |
+273 - /// (b_0 + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+273 + /// (`b_0` + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+    |
+
+error: item in documentation is missing backticks
+   --> src/transfer_function/utils.rs:273:12
+    |
+273 | /// (b_0 + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+    |            ^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+273 - /// (b_0 + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+273 + /// (b_0 + `b_1`*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+    |
+
+error: item in documentation is missing backticks
+   --> src/transfer_function/utils.rs:273:26
+    |
+273 | /// (b_0 + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+    |                          ^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+273 - /// (b_0 + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+273 + /// (b_0 + b_1*s + ... + `b_m`*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+    |
+
+error: item in documentation is missing backticks
+   --> src/transfer_function/utils.rs:273:43
+    |
+273 | /// (b_0 + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+    |                                           ^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+273 - /// (b_0 + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+273 + /// (b_0 + b_1*s + ... + b_m*s^m) - H(s)*(`a_0` + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+    |
+
+error: item in documentation is missing backticks
+   --> src/transfer_function/utils.rs:273:49
+    |
+273 | /// (b_0 + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+    |                                                 ^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+273 - /// (b_0 + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+273 + /// (b_0 + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + `a_1`*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
+    |
+
+error: item in documentation is missing backticks
+   --> src/transfer_function/utils.rs:274:17
+    |
+274 | /// where s = j*w_k.
+    |                 ^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+274 - /// where s = j*w_k.
+274 + /// where s = j*`w_k`.
+    |
+
+error: docs for function which may panic missing `# Panics` section
+   --> src/transfer_function/utils.rs:310:1
+    |
+310 | / pub fn fit<T: Copy + RealField, const M: usize, const N: usize, const K: usize, const NM: usize>(
+311 | |     freq_response: &FrequencyResponse<T, 1, 1, K>, // Example with K=100 points
+312 | | ) -> Result<TransferFunction<T, M, N>, &'static str>
+313 | | where
+...   |
+326 | |         + Allocator<Const<K>, DimMinimum<Const<K>, Const<NM>>>
+327 | |         + Allocator<DimMinimum<Const<K>, Const<NM>>>
+    | |____________________________________________________^
+    |
+note: first possible panic found here
+   --> src/transfer_function/utils.rs:379:31
+    |
+379 |     let x = svd.solve(&b_vec, T::RealField::from_f64(1e-10).unwrap()) // 1e-10 is the tolerance
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+    = note: `#[deny(clippy::missing_panics_doc)]` implied by `#[deny(clippy::pedantic)]`
+
+error: this type has already been used as a bound predicate
+   --> src/transfer_function/utils.rs:319:5
+    |
+319 |     Const<K>: DimMin<Const<NM>>,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider combining the bounds: `Const<K>: DimSub<U1> + DimMin<Const<NM>> + DimMin<Const<NM>>`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_repetition_in_bounds
+    = note: `#[deny(clippy::type_repetition_in_bounds)]` implied by `#[deny(clippy::nursery)]`
+
+error: using `clone` on type `T` which implements the `Copy` trait
+   --> src/transfer_function/utils.rs:358:17
+    |
+358 |         let w = frequencies[k].clone();
+    |                 ^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `frequencies[k]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#clone_on_copy
+
+error: using `clone` on type `Complex<T>` which implements the `Copy` trait
+   --> src/transfer_function/utils.rs:360:19
+    |
+360 |         let h_s = responses[k].clone();
+    |                   ^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `responses[k]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#clone_on_copy
+
+error: casting `usize` to `u32` may truncate the value on targets with 64-bit wide pointers
+   --> src/transfer_function/utils.rs:364:36
+    |
+364 |             a_mat[(k, i)] = s.powu(i as u32);
+    |                                    ^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+    = note: `#[deny(clippy::cast_possible_truncation)]` implied by `#[deny(clippy::pedantic)]`
+help: ... or use `try_from` and handle the error accordingly
+    |
+364 -             a_mat[(k, i)] = s.powu(i as u32);
+364 +             a_mat[(k, i)] = s.powu(u32::try_from(i));
+    |
+
+error: using `clone` on type `Complex<T>` which implements the `Copy` trait
+   --> src/transfer_function/utils.rs:369:34
+    |
+369 |             a_mat[(k, M + i)] = -h_s.clone() * s.powu(i as u32);
+    |                                  ^^^^^^^^^^^ help: try removing the `clone` call: `h_s`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#clone_on_copy
+
+error: casting `usize` to `u32` may truncate the value on targets with 64-bit wide pointers
+   --> src/transfer_function/utils.rs:369:55
+    |
+369 |             a_mat[(k, M + i)] = -h_s.clone() * s.powu(i as u32);
+    |                                                       ^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+    |
+369 -             a_mat[(k, M + i)] = -h_s.clone() * s.powu(i as u32);
+369 +             a_mat[(k, M + i)] = -h_s.clone() * s.powu(u32::try_from(i));
+    |
+
+error: casting `usize` to `u32` may truncate the value on targets with 64-bit wide pointers
+   --> src/transfer_function/utils.rs:373:33
+    |
+373 |         b_vec[k] = h_s * s.powu(N as u32 - 1);
+    |                                 ^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+    |
+373 -         b_vec[k] = h_s * s.powu(N as u32 - 1);
+373 +         b_vec[k] = h_s * s.powu(u32::try_from(N) - 1);
+    |
+
+error: used `unwrap()` on an `Option` value
+   --> src/transfer_function/utils.rs:379:31
+    |
+379 |     let x = svd.solve(&b_vec, T::RealField::from_f64(1e-10).unwrap()) // 1e-10 is the tolerance
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is `None`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unwrap_used
+note: the lint level is defined here
+   --> src/lib.rs:18:5
+    |
+18  |     clippy::unwrap_used,
+    |     ^^^^^^^^^^^^^^^^^^^
+
+error: using `clone` on type `T` which implements the `Copy` trait
+   --> src/transfer_function/utils.rs:387:24
+    |
+387 |         numerator[i] = x[i].re.clone(); // Coefficients should be real
+    |                        ^^^^^^^^^^^^^^^ help: try removing the `clone` call: `x[i].re`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#clone_on_copy
+
+error: using `clone` on type `T` which implements the `Copy` trait
+   --> src/transfer_function/utils.rs:390:26
+    |
+390 |         denominator[i] = x[M + i].re.clone();
+    |                          ^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `x[M + i].re`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#clone_on_copy
+
+error: could not compile `control-rs` (lib) due to 35 previous errors
