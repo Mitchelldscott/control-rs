@@ -624,7 +624,7 @@ where
 ///
 /// <div class="warning">
 ///
-/// If the divisor is a degenerate polynomial this will return an array of zeros.
+/// If the divisor is a degenerate polynomial, this will return an array of zeros.
 ///
 /// </div>
 ///
@@ -641,8 +641,7 @@ where
 /// * `quotient` - result of the division.
 ///
 /// # Panics
-/// * There is an unchecked multiplication that may overflow (if dividend is as large as possible,
-/// the leading divisor term is 1 and the divisor is not a monomial).
+/// * There is an unchecked multiplication that may overflow.
 /// * There is an unchecked `add_assign` that may overflow
 /// * There is an unchecked `sub_assign` that may overflow
 ///
@@ -651,11 +650,12 @@ where
 /// All the accesses are guaranteed to work based on the generic constants provided.
 ///
 /// # Example
-/// ```rust
+///```rust
 /// use control_rs::polynomial::utils::long_division;
-/// let p1 = [1i32; 2];
-/// let p2 = [1i32; 2];
-/// assert_eq!(long_division(p1, &p2), [1i32, 0i32], "wrong division result");
+/// let p1: [i32; 2] = [1; 2];
+/// let p2: [i32; 2] = [1; 2];
+/// let expected: [i32; 2] = [1, 0];
+/// assert_eq!(long_division::<_, 2, 2>(p1, &p2), expected, "wrong division result");
 /// ```
 ///
 /// # Algorithm
@@ -675,7 +675,7 @@ where
     T: Clone + Zero + Div<Output = T> + Mul<Output = T> + AddAssign + SubAssign,
     Const<N>: DimMax<Const<M>, Output = Const<N>>,
 {
-    let mut quotient = array::from_fn(|_| T::zero());
+    let mut quotient: [T; N] = array::from_fn(|_| T::zero());
     // Find actual degrees
     let dividend_order = largest_nonzero_index(&dividend);
     let divisor_order = largest_nonzero_index(divisor);
@@ -726,20 +726,23 @@ where
 /// # Returns
 /// * `coefficients` - A degree minor array of coefficients fit to the data.
 ///
+/// # Panics
+/// * The vandermonde matrix cannot be solved
+///
 /// # Example
 /// ```rust
 /// use control_rs::{polynomial::utils::fit, assert_f64_eq};
 /// let x = [-2.0, -1.0, 0.0, 1.0, 2.0];
 /// let y = [4.0, 1.0, 0.0, 1.0, 4.0];
-/// let coefficients: [f64; 3] = fit(x, y);
+/// let coefficients: [f64; 3] = fit::<f64, 3, 5>(&x, &y);
 /// assert_f64_eq!(coefficients[0], 0.0, 2.5e-15);
 /// assert_f64_eq!(coefficients[1], 0.0);
 /// assert_f64_eq!(coefficients[2], 1.0, 9.0e-16);
 /// ```
 /// TODO: Unit tests + docs
 pub fn fit<T: One + RealField, const N: usize, const K: usize>(
-    x: [T; K],
-    y: [T; K],
+    x: &[T; K],
+    y: &[T; K],
 ) -> [T; N]
 where
     Const<K>: DimMin<Const<N>>,
@@ -749,11 +752,14 @@ where
         + Allocator<DimMinimum<Const<K>, Const<N>>>
         + Allocator<DimDiff<DimMinimum<Const<K>, Const<N>>, U1>>,
 {
-    let h = SMatrix::<T, K, 1>::from_row_slice(&y);
+    let h = SMatrix::<T, K, 1>::from_row_slice(y);
+    #[allow(clippy::unwrap_used)]
     let vandermonde = SMatrix::<T, K, N>::from_fn(|i, j| {
         // (0..degree - j).fold(T::one(), |acc, _| acc * x[i].clone()) // degree major order
-        x[i].clone().powi(j as i32) // can use RealField trait fn
+        x[i].clone().powi(j.try_into().unwrap()) // can use RealField trait fn
     });
+    #[allow(clippy::unwrap_used)]
+    #[allow(clippy::expect_used)]
     vandermonde
         .svd(true, true)
         .solve(&h, T::RealField::from_f64(1e-15).unwrap())
