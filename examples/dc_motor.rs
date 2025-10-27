@@ -40,7 +40,6 @@
 /// TODO: simulator + Lag compensator
 use control_rs::{frequency_tools::*, transfer_function::*};
 
-
 #[cfg(feature = "std")]
 use control_rs::{
     integrators::runge_kutta4, math::systems::DynamicalSystem, state_space::utils::zoh,
