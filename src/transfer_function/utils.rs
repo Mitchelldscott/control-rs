@@ -5,7 +5,10 @@ use core::{
     ops::{Div, Neg, Sub},
 };
 
-use nalgebra::{Complex, Const, DefaultAllocator, DimDiff, DimSub, RealField, SMatrix, Scalar, U1, allocator::Allocator, DimAdd, DimMin, DimMinimum, OMatrix};
+use nalgebra::{
+    Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMin, DimMinimum, DimSub, OMatrix,
+    RealField, SMatrix, Scalar, U1, allocator::Allocator,
+};
 use num_traits::{Float, One, Zero};
 
 use crate::{
@@ -324,7 +327,7 @@ where
         + Allocator<DimDiff<DimMinimum<Const<K>, Const<NM>>, U1>>
         + Allocator<DimMinimum<Const<K>, Const<NM>>, Const<NM>>
         + Allocator<Const<K>, DimMinimum<Const<K>, Const<NM>>>
-        + Allocator<DimMinimum<Const<K>, Const<NM>>>
+        + Allocator<DimMinimum<Const<K>, Const<NM>>>,
 {
     // Ensure we have response data to work with.
     // This implementation focuses on a Single-Input Single-Output (SISO) system.
@@ -376,7 +379,8 @@ where
     // Solve the Least-Squares problem A*x = b.
     // The SVD decomposition is a robust way to solve this.
     let svd = a_mat.svd(true, true);
-    let x = svd.solve(&b_vec, T::RealField::from_f64(1e-10).unwrap()) // 1e-10 is the tolerance
+    let x = svd
+        .solve(&b_vec, T::RealField::from_f64(1e-10).unwrap()) // 1e-10 is the tolerance
         .map_err(|_| "Least-squares solution failed.")?;
 
     // Extract coefficients from the solution vector x.

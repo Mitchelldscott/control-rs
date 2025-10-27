@@ -42,9 +42,7 @@ use control_rs::{frequency_tools::*, transfer_function::*};
 
 #[cfg(feature = "std")]
 use control_rs::{
-    math::systems::DynamicalSystem,
-    integrators::runge_kutta4,
-    state_space::utils::zoh
+    integrators::runge_kutta4, math::systems::DynamicalSystem, state_space::utils::zoh,
 };
 
 #[cfg(feature = "std")]
@@ -77,10 +75,10 @@ fn step(plant: MotorSS, compensator: LeadCompensator, x0: MotorState, dt: Scalar
         [x0.clone(); SIM_STEPS],
     );
     for i in 1..SIM_STEPS {
-        x_c = compensator_ss.dynamics(x_c.clone(), 1.0-y);
-        let u = compensator_ss.output(x_c.clone(), 1.0-y)[(0, 0)];
+        x_c = compensator_ss.dynamics(x_c.clone(), 1.0 - y);
+        let u = compensator_ss.output(x_c.clone(), 1.0 - y)[(0, 0)];
         x = runge_kutta4(&plant, x.clone(), u, 0.0, dt, dt / 10.0);
-        y = plant.output(x.clone(), u)[(0,0)];
+        y = plant.output(x.clone(), u)[(0, 0)];
         sim.0[i] = i as Scalar * dt;
         sim.1[i] = u;
         sim.2[i] = x.clone();
@@ -157,6 +155,11 @@ fn main() {
     .write_html("target/plots/dc_motor_lead_compensated_bode.html");
 
     #[cfg(feature = "std")]
-    plot(step(Motor_SS, compensator_tf / dc_gain(&Motor_TF), MotorState::zeros(), 0.1))
-        .write_html("target/plots/dc_motor_sim.html");
+    plot(step(
+        Motor_SS,
+        compensator_tf / dc_gain(&Motor_TF),
+        MotorState::zeros(),
+        0.1,
+    ))
+    .write_html("target/plots/dc_motor_sim.html");
 }

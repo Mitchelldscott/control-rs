@@ -3,10 +3,10 @@
 
 use core::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub};
 
+use crate::static_storage::array_from_iterator;
+use crate::{StateSpace, TransferFunction};
 use nalgebra::{Const, DimSub, SMatrix, Scalar, U1};
 use num_traits::{One, Zero};
-use crate::{TransferFunction, StateSpace};
-use crate::static_storage::array_from_iterator;
 
 /// Create a new SISO state-space model from the numerator and denominator coefficients of
 /// a monic transfer function
@@ -149,7 +149,6 @@ where
     }
 }
 
-
 /// Converts a state-space representation to a transfer function matrix.
 ///
 /// This function takes a MIMO (Multiple-Input, Multiple-Output) state-space model
@@ -205,10 +204,19 @@ where
 /// * [Wikipedia Faddeev-LaVerrier](https://en.wikipedia.org/wiki/Faddeev%E2%80%93LeVerrier_algorithm)
 /// * [Matlab ss2tf](https://www.mathworks.com/help/matlab/ref/ss2tf.html)
 pub fn ss2tf<T, const N: usize, const M: usize, const L: usize, const N2: usize, const M2: usize>(
-    ss: StateSpace<SMatrix<T, N, N>, SMatrix<T, N, M>, SMatrix<T, L, N>, SMatrix<T, L, M>>
+    ss: StateSpace<SMatrix<T, N, N>, SMatrix<T, N, M>, SMatrix<T, L, N>, SMatrix<T, L, M>>,
 ) -> [[TransferFunction<T, M2, N2>; L]; M]
 where
-    T: 'static + Copy + Zero + One + PartialEq + core::fmt::Debug + AddAssign + MulAssign + Neg<Output = T> + Div<Output = T>,
+    T: 'static
+        + Copy
+        + Zero
+        + One
+        + PartialEq
+        + core::fmt::Debug
+        + AddAssign
+        + MulAssign
+        + Neg<Output = T>
+        + Div<Output = T>,
     Const<L>: DimSub<U1, Output = Const<N>>,
 {
     // --- 1. Faddeev-LeVerrier Algorithm ---
@@ -245,19 +253,16 @@ where
     // --- 3. Calculate Numerator for Each Input-Output Pair ---
     // Pre-calculate the matrix products C * R_k * B for efficiency.
     // Safety: There are exactly N matrices in r_matrices.
-    let crb_matrices: [SMatrix<T, L, M>; N] = unsafe {
-        array_from_iterator(
-            r_matrices
-                .iter()
-                .map(|r_k| &ss.c * r_k * &ss.b)
-        )
-    };
+    let crb_matrices: [SMatrix<T, L, M>; N] =
+        unsafe { array_from_iterator(r_matrices.iter().map(|r_k| &ss.c * r_k * &ss.b)) };
 
     let mut result = [[TransferFunction::new([T::zero(); M2], [T::zero(); N2]); L]; M];
 
     // Loop through each output `i` and input `j` to build the H_ij(s) transfer function.
-    for i in 0..L { // Output index
-        for j in 0..M { // Input index
+    for i in 0..L {
+        // Output index
+        for j in 0..M {
+            // Input index
             // This requires the const generic M2 to be N + 1.
 
             // a) Calculate numerator part from C * adj(sI - A) * B

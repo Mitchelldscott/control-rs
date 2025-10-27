@@ -4,7 +4,6 @@
 //! re-used throughout the crate. This structure allows each model to exist independently of the
 //! others.
 #![no_std]
-
 // Clippy docs: https://doc.rust-lang.org/clippy/usage.html
 #![deny(
     clippy::all,

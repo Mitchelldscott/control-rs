@@ -408,7 +408,7 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// Returns a coefficient of the polynomial.
     ///
     /// This function takes a pointer to the start of the coefficient array and adds the index using
-    /// [`wrapping_add()`]. The resulting pointer is dereferenced and a reference to the value is
+    /// [`wrapping_add()`]. The resulting pointer is dereferenced, and a reference to the value is
     /// returned.
     ///
     /// # Arguments

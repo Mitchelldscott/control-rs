@@ -8,8 +8,8 @@ use core::{
     ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign},
 };
 use nalgebra::{
-    ArrayStorage, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax, DimMin, DimMinimum, DimSub, RealField,
-    SMatrix, U1, allocator::Allocator
+    ArrayStorage, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax, DimMin, DimMinimum,
+    DimSub, RealField, SMatrix, U1, allocator::Allocator,
 };
 use num_traits::{Float, One, Zero};
 
@@ -740,10 +740,7 @@ where
 /// assert_f64_eq!(coefficients[2], 1.0, 9.0e-16);
 /// ```
 /// TODO: Unit tests + docs
-pub fn fit<T: One + RealField, const N: usize, const K: usize>(
-    x: &[T; K],
-    y: &[T; K],
-) -> [T; N]
+pub fn fit<T: One + RealField, const N: usize, const K: usize>(x: &[T; K], y: &[T; K]) -> [T; N]
 where
     Const<K>: DimMin<Const<N>>,
     DimMinimum<Const<K>, Const<N>>: DimSub<U1>,
@@ -764,5 +761,7 @@ where
         .svd(true, true)
         .solve(&h, T::RealField::from_f64(1e-15).unwrap())
         .expect("Least squares solution failed")
-        .data.0[0].clone()
+        .data
+        .0[0]
+        .clone()
 }
