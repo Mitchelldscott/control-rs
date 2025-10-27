@@ -6,16 +6,16 @@ use core::{
 };
 
 use nalgebra::{
-    Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMin, DimMinimum, DimSub, OMatrix,
-    RealField, SMatrix, Scalar, ToTypenum, U1, allocator::Allocator,
+    allocator::Allocator, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMin, DimMinimum, DimSub,
+    OMatrix, RealField, SMatrix, Scalar, ToTypenum, U1,
 };
 use num_traits::{Float, One, Zero};
 
 use crate::{
-    StateSpace, TransferFunction,
-    frequency_tools::FrequencyResponse,
-    polynomial::utils::{RootFindingError, largest_nonzero_index, unchecked_roots},
+    frequency_tools::FrequencyResponse, polynomial::utils::{largest_nonzero_index, unchecked_roots, RootFindingError},
     state_space::utils::control_canonical,
+    StateSpace,
+    TransferFunction,
 };
 
 /// Computes the DC gain of a continuous transfer function.
@@ -309,7 +309,7 @@ where
 /// let fitted_tf: TransferFunction<f64, 1, 2> = fit(&fr).expect("failed to fit fr data");
 /// assert_f64_eq!(fitted_tf.numerator[0], 1.0, 1e-14);
 /// assert_f64_eq!(fitted_tf.denominator[0], 1.0, 1e-14);
-/// assert_f64_eq!(fitted_tf.denominator[1], 1.0);
+/// assert_f64_eq!(fitted_tf.denominator[1], 1.0, 1e-14);
 /// ```
 pub fn fit<T: Clone + RealField, const M: usize, const N: usize, const K: usize, const NM: usize>(
     freq_response: &FrequencyResponse<T, 1, 1, K>, // Example with K=100 points
@@ -376,8 +376,8 @@ where
 
     // Extract coefficients from the solution vector x.
     let numerator: [T; M] = core::array::from_fn(|i| x[i].re.clone());
-    let mut denominator: [T; N] = core::array::from_fn(|i| x[M + i].re.clone());
-    denominator[N - 1] = T::one(); // The fixed coefficient
+    let mut denominator: [T; N] = core::array::from_fn(|i| x[M + i - 1].re.clone());
+    denominator[0] = T::one(); // The fixed coefficient
 
     Ok(TransferFunction {
         numerator,
