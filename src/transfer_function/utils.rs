@@ -5,7 +5,10 @@ use core::{
     ops::{Div, Neg, Sub},
 };
 
-use nalgebra::{Complex, Const, DefaultAllocator, DimDiff, DimSub, RealField, SMatrix, Scalar, U1, allocator::Allocator, DimAdd, DimMin, DimMinimum, OMatrix};
+use nalgebra::{
+    Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMin, DimMinimum, DimSub, OMatrix,
+    RealField, SMatrix, Scalar, ToTypenum, U1, allocator::Allocator,
+};
 use num_traits::{Float, One, Zero};
 
 use crate::{
@@ -95,7 +98,7 @@ where
         + fmt::Debug
         + RealField
         + Float,
-    Const<N>: DimSub<U1, Output = Const<L>>,
+    Const<N>: ToTypenum + DimSub<U1, Output = Const<L>>,
     Const<L>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
 {
@@ -136,7 +139,7 @@ where
         + fmt::Debug
         + RealField
         + Float,
-    Const<M>: DimSub<U1, Output = Const<L>>,
+    Const<M>: ToTypenum + DimSub<U1, Output = Const<L>>,
     Const<L>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
 {
@@ -182,7 +185,7 @@ where
         + fmt::Debug
         + Float
         + RealField,
-    Const<N>: DimSub<U1, Output = Const<L>>,
+    Const<N>: ToTypenum + DimSub<U1, Output = Const<L>>,
     Const<L>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<L>, DimDiff<Const<L>, U1>> + Allocator<DimDiff<Const<L>, U1>>,
 {
@@ -212,7 +215,7 @@ where
 /// assert_f64_eq!(monic_tf.numerator[1], 2.0 / 3.0);
 /// ```
 ///
-/// TODO: move to polynomial utils
+/// TODO: utilize polynomial utils
 pub fn as_monic<T, const M: usize, const N: usize>(
     tf: &TransferFunction<T, M, N>,
 ) -> TransferFunction<T, M, N>
@@ -224,12 +227,12 @@ where
 
     if let Some(den_deg) = largest_nonzero_index(&denominator) {
         let leading_denominator = denominator[den_deg].clone();
-        numerator
-            .iter_mut()
-            .for_each(|b_i| *b_i = b_i.clone() / leading_denominator.clone());
-        denominator
-            .iter_mut()
-            .for_each(|a_i| *a_i = a_i.clone() / leading_denominator.clone());
+        for b_i in &mut numerator {
+            *b_i = b_i.clone() / leading_denominator.clone();
+        }
+        for a_i in &mut denominator {
+            *a_i = a_i.clone() / leading_denominator.clone();
+        }
     }
 
     TransferFunction {
@@ -238,9 +241,9 @@ where
     }
 }
 
-/// Converts the transfer function to a state space model.
+/// Converts a transfer function to a state space model.
 ///
-///
+/// TODO: finish docs
 pub fn tf2ss<T, const N: usize, const M: usize, const L: usize>(
     tf: &TransferFunction<T, M, L>,
 ) -> StateSpace<SMatrix<T, N, N>, SMatrix<T, N, 1>, SMatrix<T, 1, N>, SMatrix<T, 1, 1>>
@@ -253,7 +256,8 @@ where
         + Div<Output = T>
         + Sub<Output = T>
         + PartialOrd,
-    Const<L>: DimSub<U1, Output = Const<N>>,
+    Const<L>: ToTypenum + DimSub<U1, Output = Const<N>>,
+    Const<N>: DimSub<U1>,
 {
     let tf_as_monic = as_monic(tf);
     control_canonical(&tf_as_monic.numerator, &tf_as_monic.denominator)
@@ -270,8 +274,8 @@ where
 /// the leading denominator coefficient `a_n` is typically fixed to 1.
 ///
 /// The equation for each frequency `w_k` is:
-/// (b_0 + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n
-/// where s = j*w_k.
+/// <pre>(b_0 + b_1*s + ... + b_m*s^m) - H(s)*(a_0 + a_1*s + ... + a_{n-1}*s^{n-1}) = H(s)*s^n</pre>
+/// where `s = j*w_k`.
 ///
 /// This can be set up as a linear system Ax = b, where x contains the unknown coefficients.
 ///
@@ -305,9 +309,9 @@ where
 /// let fitted_tf: TransferFunction<f64, 1, 2> = fit(&fr).expect("failed to fit fr data");
 /// assert_f64_eq!(fitted_tf.numerator[0], 1.0, 1e-14);
 /// assert_f64_eq!(fitted_tf.denominator[0], 1.0, 1e-14);
-/// assert_f64_eq!(fitted_tf.denominator[1], 1.0);
+/// assert_f64_eq!(fitted_tf.denominator[1], 1.0, 1e-14);
 /// ```
-pub fn fit<T: Copy + RealField, const M: usize, const N: usize, const K: usize, const NM: usize>(
+pub fn fit<T: Clone + RealField, const M: usize, const N: usize, const K: usize, const NM: usize>(
     freq_response: &FrequencyResponse<T, 1, 1, K>, // Example with K=100 points
 ) -> Result<TransferFunction<T, M, N>, &'static str>
 where
@@ -316,7 +320,6 @@ where
     Const<K>: DimSub<U1> + DimMin<Const<NM>>,
     Const<NM>: DimMin<Const<K>, Output = Const<NM>> + DimSub<U1>,
     <Const<N> as DimSub<U1>>::Output: DimAdd<Const<M>, Output = Const<NM>>,
-    Const<K>: DimMin<Const<NM>>,
     DimMinimum<Const<K>, Const<NM>>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<K>, Const<NM>>
         + Allocator<Const<NM>>
@@ -324,7 +327,7 @@ where
         + Allocator<DimDiff<DimMinimum<Const<K>, Const<NM>>, U1>>
         + Allocator<DimMinimum<Const<K>, Const<NM>>, Const<NM>>
         + Allocator<Const<K>, DimMinimum<Const<K>, Const<NM>>>
-        + Allocator<DimMinimum<Const<K>, Const<NM>>>
+        + Allocator<DimMinimum<Const<K>, Const<NM>>>,
 {
     // Ensure we have response data to work with.
     // This implementation focuses on a Single-Input Single-Output (SISO) system.
@@ -336,15 +339,6 @@ where
 
     let frequencies = &freq_response.frequencies;
     let num_points = frequencies.len();
-
-    // The number of unknown coefficients is M (for b_0 to b_{M-1}) + N-1 (for a_0 to a_{N-1}).
-    // The coefficient a_N is fixed to 1.
-    // let num_coefficients = M + N - 1;
-
-    // We need at least as many frequency points as unknown coefficients.
-    // if num_points < num_coefficients { // implemented as trait bound
-    //     return Err("Not enough frequency points to solve for the given orders.");
-    // }
 
     // Construct the matrix A for the Least-Squares problem Ax = b.
     // Each row corresponds to a frequency point.
@@ -361,35 +355,29 @@ where
 
         // Fill with the part of the row for numerator coefficients (B(s))
         for i in 0..M {
-            a_mat[(k, i)] = s.powu(i as u32);
+            a_mat[(k, i)] = s.powu(u32::try_from(i).unwrap_or(0u32));
         }
 
         // Fill with the part of the row for denominator coefficients (A(s))
         for i in 0..(N - 1) {
-            a_mat[(k, M + i)] = -h_s.clone() * s.powu(i as u32);
+            a_mat[(k, M + i)] = -h_s.clone() * s.powu(u32::try_from(i).unwrap_or(0u32));
         }
 
         // The right-hand side is H(s) * s^n, since we fixed a_n = 1.
-        b_vec[k] = h_s * s.powu(N as u32 - 1);
+        b_vec[k] = h_s * s.powu(u32::try_from(N - 1).unwrap_or(0u32));
     }
 
     // Solve the Least-Squares problem A*x = b.
     // The SVD decomposition is a robust way to solve this.
     let svd = a_mat.svd(true, true);
-    let x = svd.solve(&b_vec, T::RealField::from_f64(1e-10).unwrap()) // 1e-10 is the tolerance
+    let x = svd
+        .solve(&b_vec, T::default_epsilon()) // 1e-10 is the tolerance
         .map_err(|_| "Least-squares solution failed.")?;
 
     // Extract coefficients from the solution vector x.
-    let mut numerator = [T::zero(); M];
-    let mut denominator = [T::zero(); N];
-
-    for i in 0..M {
-        numerator[i] = x[i].re.clone(); // Coefficients should be real
-    }
-    for i in 0..(N - 1) {
-        denominator[i] = x[M + i].re.clone();
-    }
-    denominator[N - 1] = T::one(); // The fixed coefficient
+    let numerator: [T; M] = core::array::from_fn(|i| x[i].re.clone());
+    let mut denominator: [T; N] = core::array::from_fn(|i| x[M + i - 1].re.clone());
+    denominator[0] = T::one(); // The fixed coefficient
 
     Ok(TransferFunction {
         numerator,

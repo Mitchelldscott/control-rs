@@ -589,16 +589,19 @@ fn render_bode_subplot<T>(
     // Phase margin line
     if let (Some(wc), Some(pm)) = (margins.gain_crossover, margins.phase_margin) {
         plot.add_trace(
-            plotly::Scatter::new(vec![wc, wc], vec![T::ONE_EIGHTY.neg(), T::ONE_EIGHTY.neg()+pm])
-                .mode(common::Mode::Lines)
-                .name(format!("Phase FrequencyMargin[{row}, {col}]"))
-                .x_axis("x2")
-                .y_axis("y2")
-                .line(
-                    common::Line::new()
-                        .dash(common::DashType::Dot)
-                        .color(plotly::color::Rgb::new(0, 0, 0)),
-                ),
+            plotly::Scatter::new(
+                vec![wc, wc],
+                vec![T::ONE_EIGHTY.neg(), T::ONE_EIGHTY.neg() + pm],
+            )
+            .mode(common::Mode::Lines)
+            .name(format!("Phase FrequencyMargin[{row}, {col}]"))
+            .x_axis("x2")
+            .y_axis("y2")
+            .line(
+                common::Line::new()
+                    .dash(common::DashType::Dot)
+                    .color(plotly::color::Rgb::new(0, 0, 0)),
+            ),
         );
     }
 }

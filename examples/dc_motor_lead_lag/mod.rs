@@ -21,7 +21,7 @@
 /// * **Phase Margin**: To ensure a stable system with adequate damping.
 /// * **Gain Crossover Frequency**: To achieve a desired bandwidth and response speed.
 /// * **Steady-State Error**: To minimize the error for a step input, often addressed
-///     by adjusting the low-frequency gain.
+///   by adjusting the low-frequency gain.
 ///
 /// This example will walk through the process of defining the motor's transfer
 /// function, designing the lead-lag compensator based on frequency-domain analysis

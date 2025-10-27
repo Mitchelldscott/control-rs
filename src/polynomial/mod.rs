@@ -39,7 +39,7 @@ use core::{
     slice,
 };
 use nalgebra::{
-    Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax, DimSub, RealField, U1,
+    Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax, DimSub, RealField, ToTypenum, U1,
     allocator::Allocator,
 };
 use num_traits::{Float, Num, One, Zero};
@@ -408,7 +408,7 @@ impl<T, const N: usize> Polynomial<T, N> {
     /// Returns a coefficient of the polynomial.
     ///
     /// This function takes a pointer to the start of the coefficient array and adds the index using
-    /// [`wrapping_add()`]. The resulting pointer is dereferenced and a reference to the value is
+    /// [`wrapping_add()`]. The resulting pointer is dereferenced, and a reference to the value is
     /// returned.
     ///
     /// # Arguments
@@ -580,7 +580,7 @@ where
     ///
     /// # Safety
     /// This function uses an `unsafe` call to access the first element of the array. The
-    /// function is only available for polynomials where `N > 0` so it is always safe.
+    /// function is only available for polynomials where `N > 0`, so it is always safe.
     ///
     /// # Example
     /// ```
@@ -602,7 +602,7 @@ where
     ///
     /// # Safety
     /// This function uses an `unsafe` call to access the first element of the array. The
-    /// function is only available for polynomials where `N > 0` so it is always safe.
+    /// function is only available for polynomials where `N > 0`, so it is always safe.
     ///
     /// # Example
     /// ```
@@ -656,7 +656,7 @@ impl<T: Clone + AddAssign + Zero + One, const N: usize> Polynomial<T, N> {
     #[inline]
     pub fn derivative<const M: usize>(&self) -> Result<Polynomial<T, M>, DerivativeEdgeCase>
     where
-        Const<N>: DimSub<U1, Output = Const<M>>, // `N > 0`, successful derivative is `N-1` items
+        Const<N>: ToTypenum + DimSub<U1, Output = Const<M>>, // `N > 0`, successful derivative is `N-1` items
     {
         self.degree().map_or_else(
             || Err(DerivativeEdgeCase::DerivativeOfZero),
@@ -765,7 +765,7 @@ where
             + fmt::Debug
             + RealField
             + Float,
-        Const<N>: DimSub<U1, Output = Const<M>>,
+        Const<N>: ToTypenum + DimSub<U1, Output = Const<M>>,
         Const<M>: DimSub<U1>,
         DefaultAllocator:
             Allocator<Const<M>, DimDiff<Const<M>, U1>> + Allocator<DimDiff<Const<M>, U1>>,
@@ -1127,8 +1127,8 @@ impl_left_scalar_ops!(i8, u8, i16, u16, i32, u32, isize, usize, f32, f64);
 impl<T, const N: usize, const M: usize, const L: usize> Add<Polynomial<T, M>> for Polynomial<T, N>
 where
     T: Clone + Add<Output = T> + Zero,
-    Const<N>: DimMax<Const<M>, Output = Const<L>> + DimSub<U1>,
-    Const<M>: DimSub<U1>,
+    Const<N>: ToTypenum + DimMax<Const<M>, Output = Const<L>> + DimSub<U1>,
+    Const<M>: ToTypenum + DimSub<U1>,
 {
     type Output = Polynomial<T, L>;
 
@@ -1154,7 +1154,7 @@ where
 impl<T, const N: usize, const M: usize> AddAssign<Polynomial<T, M>> for Polynomial<T, N>
 where
     T: Clone + AddAssign,
-    Const<N>: DimMax<Const<M>, Output = Const<N>> + DimSub<U1>,
+    Const<N>: ToTypenum + DimMax<Const<M>, Output = Const<N>> + DimSub<U1>,
     Const<M>: DimSub<U1>,
 {
     /// Adds the coefficients of a polynomial together
@@ -1179,8 +1179,8 @@ where
 impl<T, const N: usize, const M: usize, const L: usize> Sub<Polynomial<T, M>> for Polynomial<T, N>
 where
     T: Clone + Sub<Output = T> + Zero,
-    Const<N>: DimMax<Const<M>, Output = Const<L>> + DimSub<U1>,
-    Const<M>: DimSub<U1>,
+    Const<N>: ToTypenum + DimMax<Const<M>, Output = Const<L>> + DimSub<U1>,
+    Const<M>: ToTypenum + DimSub<U1>,
 {
     type Output = Polynomial<T, L>;
 

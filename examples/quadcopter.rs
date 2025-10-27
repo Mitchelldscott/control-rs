@@ -22,14 +22,12 @@ use nalgebra::{Matrix3, Rotation3, SMatrix, SVector, Vector3, Vector4};
 /// # Arguments
 ///
 /// * `q` - A 3D vector containing the Euler angles `[roll, pitch, yaw]` in radians.
-pub fn dcm(theta: f64, phi: f64, psi: f64) -> Matrix3<f64> {
+pub fn dcm(theta: f64, phi: f64, psi: f64) -> Rotation3<f64> {
     // nalgebra's `from_euler_angles` creates a rotation matrix using
     // the Z-Y'-X'' sequence, which is equivalent to the Python code's
     // Rz @ Ry @ Rx multiplication.
     // q.x is roll, q.y is pitch, q.z is yaw.
     Rotation3::from_euler_angles(theta, phi, psi)
-        .matrix()
-        .clone()
 }
 
 /// Creates a skew-symmetric matrix from a 3D vector.
@@ -70,9 +68,15 @@ pub struct QuadcopterNLDynamics {
     pub rw: Matrix3<f64>,
 }
 
+impl Default for QuadcopterNLDynamics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl QuadcopterNLDynamics {
     /// Creates a new `QuadcopterNLDynamics` instance with default parameters.
-    pub fn default() -> Self {
+    pub fn new() -> Self {
         Self {
             dt: 0.001,
             prev_u: Vector4::zeros(),
@@ -248,7 +252,7 @@ impl
 // Example of how to use it
 fn main() {
     // Initialize the dynamics
-    let quad_dynamics = QuadcopterNLDynamics::default();
+    let quad_dynamics = QuadcopterNLDynamics::new();
     let mut quad_state = QuadState::zeros();
     // F = ma = 4 * tau * U^2
     let grav_compensation = (quad_dynamics.airframe_mass * quad_dynamics.gravity
