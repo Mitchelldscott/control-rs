@@ -2,35 +2,32 @@
 
 [![Rust](https://github.com/Mitchelldscott/control-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/Mitchelldscott/control-rs/actions/workflows/rust.yml)
 
-`control-rs` is a native Rust library for numerical modeling and synthesis of embedded systems. It leverages Rust's 
-high-level safety and low-level control to provide a powerful and flexible, open-source toolbox for model-based design 
-and implementation. `control-rs` is meant for developing robotics, autonomous vehicles, UAVs and other real-time 
-embedded systems that rely on advance control algorithms. Unlike other MBD tools `control-rs` is designed specifically 
-for developing firmware. This focus allows for more efficient and customized implementations, with the drawback that 
-users must be more comfortable with firmware development.
+`control-rs` is a native Rust library for numerical modeling and synthesis.
+It is intended for developing robotics, autonomous vehicles, UAVs and other real-time embedded
+systems that rely on advanced control algorithms.
 
-The inspiration for this project comes from my enthusiasm for embedded Rust and interest in realtime system 
-identification and control.
+### Long-term goals
 
-The crate is `no_std` by default (but has a `std` feature flag for plotting) and intends to support 
-both fixed-point and floating-point numeric types.
-
-This project has two long-term goals:
-1. Implementations of components for robotics (i.e., ESCs, BMS and odometry systems). These templates will use the
-[awesome embedded rust crates](https://github.com/rust-embedded/awesome-embedded-rust) to provide detailed guides to 
-implementing and operating a variety of components that common to robotics.
-2. Wrapper crates for specific control system design tools (i.e., autopilot, self-driving or chemical process controls). 
-These toolboxes will have specific models, types and routines to help design and deploy more complex control and 
-estimation systems.
+1. **Components & Design Toolboxes** for Robotics
+    - Common robot components (i.e., ESCs, BMS and odometry systems).
+    - System level integration and design toolboxes (i.e. Controller tuning, Sensor Calibration, etc.).
+2. **Data-Driven Model-Based Design**
+    - Tools for model-based design (i.e., Model-Based Optimization, Verification & Validation,
+      System Identification and Control Synthesis).
+3. **Simulation Environments** for Robotics
+    - ODE solvers for continuous and discrete time systems.
+    - Monte-Carlo methods for model randomization and random event selection.
+    - Emulator-based Software-in-the-loop (SITL) for release build verification.
+    - Hardware-in-the-loop (HITL) for functional verification.
 
 This list covers a few projects that are in the works:
-- [ ] DC Motor lead-lag compensator
-- [ ] BLDC ESC (FOC or fancy 6-stage commuter)
-- [ ] LiPo Battery model adaptive estimator
-- [ ] Quadcopter attitude/altitude controller (3-loop autopilot)
-- [ ] Visual-Inertial Odometry
 
-# Features
+- DC Motor lead-lag compensator
+- Brushless DC Electronic Speed Control (FOC or fancy 6-stage commuter)
+- Lithium Polymer Battery model adaptive estimator
+- Quadcopter attitude/altitude controller (3-loop autopilot)
+- Visual-Inertial Odometry
+
 ## Model Types
 
 * `Polynomial` - Dense univariate polynomial
@@ -83,13 +80,11 @@ use control_rs::{
   state_space::{StateSpace, utils::zoh},
   math::systems::DynamicalSystem,
 };
-
-fn main() {
+fn run_sim() {
     // transfer function 1 / s(s + 0.1)
     let mut tf = TransferFunction::new([1.0], [1.0, 0.1, 0.0]);
     println!("{tf}");
     println!("DC Gain of TF: {}", dc_gain(&tf));
-    // convert the tf to a state-space model and discretize the model
     let ss = zoh(&tf2ss(&tf), 0.1);
     println!("{ss}");
     let mut x = nalgebra::Vector2::new(0.0, 0.0);
@@ -151,7 +146,7 @@ Thank you for using `control-rs`!
 
 # Acknowledgements
 
-This project is heavily inspired by the MATLab Control Systems Toolbox, many of the functions were written to have the
+This project is heavily inspired by the `MATLab Control Systems Toolbox`, many of the functions were written to have the
 same call signatures. Also, the core models are almost an exact copy of `nalgebra`'s matrix and many of the trait bounds 
 wouldn't be possible without their crate.
 

@@ -44,7 +44,7 @@ pub trait StaticStorage<T, const N: usize>: Sized {
     /// # Arguments
     /// - `iterator`: The iterator to source elements from.
     /// - `default`: A reference to the value used for padding if the iterator is too short.
-    ///              Requires `T: Clone`.
+    ///   Requires `T: Clone`.
     fn from_iterator_with_default<I: IntoIterator<Item = T>>(iterator: I, default: T) -> Self;
 
     /// Returns a slice providing a view into all `N` elements of the storage.

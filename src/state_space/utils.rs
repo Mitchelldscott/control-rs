@@ -130,11 +130,8 @@ where
 {
     let k = 10;
     // TODO: Really need constants to remove this garbage
-    let k_as_t = (0..k).fold(T::zero(), |t, _| T::one() + t.clone());
+    let k_as_t = (0..k).fold(T::zero(), |t, _| T::one() + t);
     let identity = A::one();
-    // let psi = (0..k - 1).fold(identity.clone(), |psi, i| {
-    //     identity.clone() + ss.a.clone() * ts.clone() * psi / T::from(k - i)
-    // });
     let (_, psi) = (0..k - 1).fold((k_as_t, identity.clone()), |(k, psi), _| {
         (
             k.clone() - T::one(),
@@ -187,24 +184,24 @@ where
 /// (`M2` and `N2` respectively) is determined by `N`, the number of states in the system.
 ///
 /// * **Denominator Size (`N2`)**: The denominator of every transfer function in the
-///     matrix is the characteristic polynomial of the A matrix, given by `det(sI - A)`.
-///     This is a polynomial of degree `N`. To store its `N + 1` coefficients (from s⁰ to sⁿ),
-///     the constant `N2` **must be `N + 1`**.
+///   matrix is the characteristic polynomial of the A matrix, given by `det(sI - A)`.
+///   This is a polynomial of degree `N`. To store its `N + 1` coefficients (from s⁰ to sⁿ),
+///   the constant `N2` **must be `N + 1`**.
 ///
 /// * **Numerator Size (`M2`)**: The numerator of each transfer function is derived from the
-///     expression `C * adj(sI - A) * B + D`, where `adj` is the adjugate matrix. The
-///     polynomials in `adj(sI - A)` have a maximum degree of `N - 1`. Therefore, the resulting
-///     numerator polynomial will have a maximum degree of `N`. To store its `N + 1` coefficients,
-///     the constant `M2` **must be `N + 1`**. If the D matrix is zero, the maximum numerator
-///     degree is `N-1`, requiring `N` coefficients, but `N+1` provides a safe upper bound for all
-///     cases.
+///   expression `C * adj(sI - A) * B + D`, where `adj` is the adjugate matrix. The
+///   polynomials in `adj(sI - A)` have a maximum degree of `N - 1`. Therefore, the resulting
+///   numerator polynomial will have a maximum degree of `N`. To store its `N + 1` coefficients,
+///   the constant `M2` **must be `N + 1`**. If the D matrix is zero, the maximum numerator
+///   degree is `N-1`, requiring `N` coefficients, but `N+1` provides a safe upper bound for all
+///   cases.
 ///
 /// # Reference
 /// * [Swarthmore: Transformations](https://lpsa.swarthmore.edu/Representations/SysRepTransformations/TF2SS.html)
 /// * [Wikipedia Faddeev-LaVerrier](https://en.wikipedia.org/wiki/Faddeev%E2%80%93LeVerrier_algorithm)
 /// * [Matlab ss2tf](https://www.mathworks.com/help/matlab/ref/ss2tf.html)
 pub fn ss2tf<T, const N: usize, const M: usize, const L: usize, const N2: usize, const M2: usize>(
-    ss: StateSpace<SMatrix<T, N, N>, SMatrix<T, N, M>, SMatrix<T, L, N>, SMatrix<T, L, M>>,
+    ss: &StateSpace<SMatrix<T, N, N>, SMatrix<T, N, M>, SMatrix<T, L, N>, SMatrix<T, L, M>>,
 ) -> [[TransferFunction<T, M2, N2>; L]; M]
 where
     T: 'static
@@ -224,67 +221,67 @@ where
     // and the coefficient matrices of the adjugate matrix adj(sI - A).
 
     let mut r_matrices: [SMatrix<T, N, N>; N] = [SMatrix::zeros(); N];
-    let mut p_coeffs: [T; N] = [T::zero(); N]; // p1, p2, ..., pN
+    let mut p_coefficients: [T; N] = core::array::from_fn(|_| T::zero()); // p1, p2, ..., pN
     let identity = SMatrix::<T, N, N>::identity();
 
     let mut r_prev = identity;
     let mut k = T::one();
     for i in 1..=N {
-        let m_k = &ss.a * &r_prev;
+        let m_k = ss.a * r_prev;
         let p_k = -m_k.trace() / k;
-        let r_k = &m_k + &identity * p_k;
+        let r_k = m_k + identity * p_k;
 
         r_matrices[i] = r_prev; // Stores R_{k-1} for adjugate matrix calculation
-        p_coeffs[i] = p_k;
+        p_coefficients[i] = p_k;
         r_prev = r_k;
         k += T::one();
     }
 
     // --- 2. Construct Common Denominator Polynomial ---
     // The characteristic polynomial is s^N + p1*s^(N-1) + ... + pN.
-    // We store coefficients from highest power (s^N) to lowest (s^0). // this is wrong should be flipped
+    // We store coefficients from the lowest (s^0) to the highest power (s^N).
     // This requires the const generic N2 to be N + 1.
-    let mut den_coeffs = SMatrix::<T, N2, 1>::zeros();
-    den_coeffs[0] = T::one(); // Coefficient of s^N
+    let mut den_coefficients = SMatrix::<T, N2, 1>::zeros();
+    den_coefficients[0] = T::one(); // Coefficient of s^N
     for i in 0..N {
-        den_coeffs[i + 1] = p_coeffs[i];
+        den_coefficients[i + 1] = p_coefficients[i];
     }
 
     // --- 3. Calculate Numerator for Each Input-Output Pair ---
     // Pre-calculate the matrix products C * R_k * B for efficiency.
     // Safety: There are exactly N matrices in r_matrices.
     let crb_matrices: [SMatrix<T, L, M>; N] =
-        unsafe { array_from_iterator(r_matrices.iter().map(|r_k| &ss.c * r_k * &ss.b)) };
+        unsafe { array_from_iterator(r_matrices.iter().map(|r_k| ss.c * r_k * ss.b)) };
 
     let mut result = [[TransferFunction::new([T::zero(); M2], [T::zero(); N2]); L]; M];
 
     // Loop through each output `i` and input `j` to build the H_ij(s) transfer function.
     for i in 0..L {
         // Output index
-        for j in 0..M {
+        for (j, result_row) in result.iter_mut().enumerate() {
             // Input index
             // This requires the const generic M2 to be N + 1.
 
             // a) Calculate numerator part from C * adj(sI - A) * B
             // The adjugate polynomial is R_0*s^(N-1) + R_1*s^(N-2) + ... + R_{N-1}
             // The resulting numerator polynomial coefficients are the (i,j) elements of the crb_matrices.
-            let mut num_coeffs = SMatrix::<T, M2, 1>::zeros();
+            let mut num_coefficients = SMatrix::<T, M2, 1>::zeros();
             for k in 0..N {
                 // The coefficient for s^(N-1-k) is (crb_k)_ij.
-                // In our vector (highest power first), this corresponds to index k+1.
-                num_coeffs[k + 1] = crb_matrices[k][(i, j)];
+                // In our vector (the highest power first), this corresponds to index k+1.
+                num_coefficients[k + 1] = crb_matrices[k][(i, j)];
             }
 
             // b) Calculate numerator part from D * det(sI - A)
             // let d_ij = ss.d[(i, j)];
-            // let num_part2: SMatrix<T, M2, 1> = den_coeffs.map(|c| d_ij * c);
+            // let num_part2: SMatrix<T, M2, 1> = den_coefficients.map(|c| d_ij * c);
 
             // c) Combine to get the final numerator polynomial
-            // let num_coeffs = num_part1 + num_part2;
+            // let num_coefficients = num_part1 + num_part2;
 
             // d) Create the TransferFunction and place it in the result matrix (transposed)
-            let tf = TransferFunction::new(num_coeffs.data.0[0], den_coeffs.data.0[0].clone());
-            result[j][i] = tf;
+            let tf = TransferFunction::new(num_coefficients.data.0[0], den_coefficients.data.0[0]);
+            result_row[i] = tf;
         }
     }
 

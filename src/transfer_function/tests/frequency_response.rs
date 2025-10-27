@@ -13,16 +13,16 @@ mod frequency_tools_tests {
 
         // Frequencies to evaluate (in rad/s)
         let frequencies = [
-            0.1,  // Below cutoff frequency
-            1.0,  // At cutoff frequency
-            10.0, // Above cutoff frequency
+            0.1,  // Below the cutoff
+            1.0,  // At the cutoff
+            10.0, // Above the cutoff
         ];
 
         // Call the bode function
         let mut response = FrequencyResponse::new(frequencies);
         tf.frequency_response(&mut response);
 
-        let (magnitudes, phases) = response.mag_phase(0, 0).unwrap();
+        let (magnitudes, phases) = response.mag_phase(0, 0).unwrap_or(([0.0; 3], [0.0; 3]));
 
         // Expected results
         let expected_magnitudes = [

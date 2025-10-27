@@ -3,17 +3,16 @@
 //! This is used by other parts of `control_rs` that perform their own specialized edge cases and
 //! error handling. Users should call the provided Polynomial interface.
 
+use crate::static_storage::{array_from_iterator, array_from_iterator_with_default};
 use core::{
     array, fmt, iter,
     ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign},
 };
 use nalgebra::{
     ArrayStorage, Complex, Const, DefaultAllocator, DimAdd, DimDiff, DimMax, DimMin, DimMinimum,
-    DimSub, RealField, SMatrix, U1, allocator::Allocator,
+    DimSub, RealField, SMatrix, ToTypenum, U1, allocator::Allocator,
 };
 use num_traits::{Float, One, Zero};
-
-use crate::static_storage::{array_from_iterator, array_from_iterator_with_default};
 
 /// Finds the largest index of a non-zero value in a slice.
 ///
@@ -35,7 +34,7 @@ use crate::static_storage::{array_from_iterator, array_from_iterator_with_defaul
 /// # Returns
 /// * `Option<usize>`
 ///     * `Some(index)` - The largest index containing a non-zero value.
-///     * `None` - If the slice is empty or all elements are zero.
+///     * `None` - If the slice is empty, or all elements are zero.
 ///
 /// # Panics
 /// This function does not panic.
@@ -96,7 +95,7 @@ pub fn largest_nonzero_index<T: Zero>(coefficients: &[T]) -> Option<usize> {
 ///
 /// # Safety
 /// This function uses an unsafe block to initialize the derivative array from an iterator. The
-/// length of the new array is inferred from the return type which is guaranteed to be equal to
+/// length of the new array is inferred from the return type, which is guaranteed to be equal to
 /// `N-1`. The iterator given to the initializing function has `N` items and will skip the first
 /// item, so its length is also guaranteed to be `N-1`.
 ///
@@ -154,7 +153,7 @@ where
 ///
 /// # Safety
 /// This function uses an unsafe block to initialize the new array from an iterator. The length of
-/// the new array is inferred from the return type which is guaranteed to be `N+1`. The iterator
+/// the new array is inferred from the return type, which is guaranteed to be `N+1`. The iterator
 /// given to the initializer is created by chaining a single item (the constant) to the source
 /// array, this is guaranteed to have length `N+1`.
 ///
@@ -411,7 +410,7 @@ where
         + fmt::Debug
         + RealField
         + Float,
-    Const<N>: DimSub<U1, Output = Const<M>>,
+    Const<N>: ToTypenum + DimSub<U1, Output = Const<M>>,
     Const<M>: DimSub<U1>,
     DefaultAllocator: Allocator<Const<M>, DimDiff<Const<M>, U1>> + Allocator<DimDiff<Const<M>, U1>>,
 {
@@ -662,7 +661,7 @@ where
 /// <pre>
 /// function n / d is
 /// while r ≠ 0 and degree(r) ≥ degree(d) do
-///     t ← lead(r) / lead(d)       // Divide the leading terms
+///     t ← lead(r) / lead(d) // Divide the leading terms
 ///     q ← q + t
 ///     r ← r − t × d
 /// return (q, r)
@@ -681,31 +680,31 @@ where
     let divisor_order = largest_nonzero_index(divisor);
 
     // degree of self and rhs exists
-    if let Some(dividend_order) = dividend_order {
-        if let Some(divisor_order) = divisor_order {
-            let mut remainder = dividend;
-            // SAFETY: divisor_order is less than the capacity of divisor
-            let leading_divisor = unsafe { divisor.get_unchecked(divisor_order) };
+    if let Some(dividend_order) = dividend_order
+        && let Some(divisor_order) = divisor_order
+    {
+        let mut remainder = dividend;
+        // SAFETY: divisor_order is less than the capacity of divisor
+        let leading_divisor = unsafe { divisor.get_unchecked(divisor_order) };
 
-            for i in (divisor_order..=dividend_order).rev() {
-                // SAFETY: index is less than the capacity of dividend, remainder has the same
-                // capacity
-                let rem_i = unsafe { remainder.get_unchecked(i) };
-                if rem_i.is_zero() {
-                    continue;
-                }
-                // it is guaranteed that `i >= divisor_order` order, this will never panic
-                let q_index = i - divisor_order;
-                // divisor_order is not none so leading divisor is non-zero
-                let term_divisor = rem_i.clone() / leading_divisor.clone();
-                // SAFETY: q_index is less than the capacity of dividend, quotient has the same
-                // capacity
-                unsafe {
-                    *quotient.get_unchecked_mut(q_index) += term_divisor.clone();
-                }
-                for (rem, div) in remainder.iter_mut().skip(q_index).zip(divisor.iter()) {
-                    *rem -= term_divisor.clone() * div.clone();
-                }
+        for i in (divisor_order..=dividend_order).rev() {
+            // SAFETY: index is less than the capacity of dividend, the remainder has the same
+            // capacity
+            let rem_i = unsafe { remainder.get_unchecked(i) };
+            if rem_i.is_zero() {
+                continue;
+            }
+            // it is guaranteed that `i >= divisor_order` order, this will never panic
+            let q_index = i - divisor_order;
+            // divisor_order is not none so leading divisor is non-zero
+            let term_divisor = rem_i.clone() / leading_divisor.clone();
+            // SAFETY: q_index is less than the capacity of dividend, quotient has the same
+            // capacity
+            unsafe {
+                *quotient.get_unchecked_mut(q_index) += term_divisor.clone();
+            }
+            for (rem, div) in remainder.iter_mut().skip(q_index).zip(divisor.iter()) {
+                *rem -= term_divisor.clone() * div.clone();
             }
         }
     }
@@ -759,7 +758,7 @@ where
     #[allow(clippy::expect_used)]
     vandermonde
         .svd(true, true)
-        .solve(&h, T::RealField::from_f64(1e-15).unwrap())
+        .solve(&h, T::default_epsilon())
         .expect("Least squares solution failed")
         .data
         .0[0]
