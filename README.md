@@ -1,6 +1,6 @@
 # Control-rs
 
-[![Rust](https://github.com/Mitchelldscott/control-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/Mitchelldscott/control-rs/actions/workflows/rust.yml)
+[![Rust](https://github.com/Mitchelldscott/control-rs/actions/workflows/CI.yml/badge.svg)](https://github.com/Mitchelldscott/control-rs/actions/workflows/CI.yml)
 
 `control-rs` is a native Rust library for numerical modeling and synthesis.
 It is intended for developing robotics, autonomous vehicles, UAVs and other real-time embedded
